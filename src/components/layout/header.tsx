@@ -17,11 +17,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { MobileNav } from './mobile-nav';
+import { authApi } from '@/lib/api';
 
 interface User {
   email: string;
   name: string;
   loggedInAt: string;
+  role?: string;
 }
 
 export function Header() {
@@ -35,7 +37,10 @@ export function Header() {
     }
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Try API logout
+    await authApi.logout();
+    // Clear local storage
     localStorage.removeItem('paintpro_user');
     router.push('/');
   };

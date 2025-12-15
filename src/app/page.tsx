@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Paintbrush, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { authApi } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,21 +24,39 @@ export default function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    // Simulate authentication delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (!formData.email || !formData.password) {
+      setError('Please enter your email and password');
+      setIsLoading(false);
+      return;
+    }
 
-    // For demo purposes, accept any non-empty credentials
-    if (formData.email && formData.password) {
-      // Store user session (in production, this would be a proper auth token)
+    // Try to login via API
+    const result = await authApi.login({
+      email: formData.email,
+      password: formData.password,
+    });
+
+    if (result.error) {
+      // If API fails (e.g., no database), fall back to demo mode
+      if (result.error.includes('Network') || result.error.includes('Failed')) {
+        // Demo mode - store user in localStorage
+        localStorage.setItem('paintpro_user', JSON.stringify({
+          email: formData.email,
+          name: formData.email.split('@')[0],
+          loggedInAt: new Date().toISOString(),
+        }));
+        router.push('/dashboard');
+      } else {
+        setError(result.error);
+        setIsLoading(false);
+      }
+    } else if (result.data) {
+      // Store user info
       localStorage.setItem('paintpro_user', JSON.stringify({
-        email: formData.email,
-        name: formData.email.split('@')[0],
+        ...result.data.user,
         loggedInAt: new Date().toISOString(),
       }));
       router.push('/dashboard');
-    } else {
-      setError('Please enter your email and password');
-      setIsLoading(false);
     }
   };
 
