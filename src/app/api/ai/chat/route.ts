@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { createChatCompletion } from '@/lib/openai';
+import { createChatCompletion, textToSpeech } from '@/lib/openai';
 
 // POST /api/ai/chat - Send a message to AI assistant
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
     const body = await request.json();
-    const { sessionId, message } = body;
+    const { sessionId, message, isVoiceInput } = body;
 
     if (!sessionId || !message) {
       return NextResponse.json(
@@ -51,11 +51,13 @@ export async function POST(request: NextRequest) {
 
     if (messageError) throw messageError;
 
-    // Get price book data for context
-    const [roomPricesResult, exteriorPricesResult, addonsResult] = await Promise.all([
+    // Get price book data, leads, and business settings for context
+    const [roomPricesResult, exteriorPricesResult, addonsResult, leadsResult, businessSettingsResult] = await Promise.all([
       supabase.from('RoomPrice').select('*'),
       supabase.from('ExteriorPrice').select('*'),
       supabase.from('Addon').select('*'),
+      supabase.from('Lead').select('*').limit(50), // Get recent leads for client lookup
+      supabase.from('BusinessSettings').select('*').single(),
     ]);
 
     if (roomPricesResult.error) throw roomPricesResult.error;
@@ -65,6 +67,8 @@ export async function POST(request: NextRequest) {
     const roomPrices = roomPricesResult.data || [];
     const exteriorPrices = exteriorPricesResult.data || [];
     const addons = addonsResult.data || [];
+    const leads = leadsResult.data || [];
+    const businessSettings = businessSettingsResult.data;
 
     // Build context for AI
     const priceBookContext = {
@@ -110,12 +114,16 @@ export async function POST(request: NextRequest) {
     // Add current user message
     messageHistory.push({ role: 'user', content: message });
 
-    // Generate AI response using OpenAI
-    const aiResponseContent = await createChatCompletion(messageHistory, priceBookContext);
+    // Generate AI response using OpenAI with full context
+    const aiResponseContent = await createChatCompletion(messageHistory, priceBookContext, {
+      availableLeads: leads,
+      businessSettings: businessSettings,
+    });
 
     // Parse the AI response to extract estimate details
     const suggestedLineItems = parseEstimateRequest(aiResponseContent || '', priceBookContext);
     const riskModifiers = extractRiskModifiers(aiResponseContent || '');
+    const clientInfo = extractClientInfo(aiResponseContent || '', leads);
 
     // Save AI response
     const { data: aiMessage, error: aiMessageError } = await supabase
@@ -132,10 +140,21 @@ export async function POST(request: NextRequest) {
 
     if (aiMessageError) throw aiMessageError;
 
+    // If voice input was used, generate audio response
+    let audioUrl;
+    if (isVoiceInput && aiResponseContent) {
+      // Note: In a production app, you'd want to store the audio file
+      // For now, we'll indicate that audio should be generated on the client
+      audioUrl = `/api/ai/speak?messageId=${aiMessage.id}`;
+    }
+
     return NextResponse.json({
       message: aiMessage,
       suggestedLineItems,
       suggestedRiskModifiers: riskModifiers,
+      suggestedClientInfo: clientInfo,
+      audioUrl, // Include audio URL if voice input was used
+      isVoiceResponse: !!isVoiceInput,
     });
   } catch (error) {
     console.error('Error in AI chat:', error);
@@ -314,5 +333,76 @@ function extractRiskModifiers(message: string): string[] {
   }
 
   return modifiers;
+}
+
+// Helper function to extract client information from AI response
+interface ClientInfo {
+  name?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  phone?: string;
+  email?: string;
+  leadId?: string;
+}
+
+function extractClientInfo(message: string, leads: any[]): ClientInfo {
+  const clientInfo: ClientInfo = {};
+
+  // Try to extract name
+  const nameMatch = message.match(/(?:Name|Client):\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
+  if (nameMatch) {
+    clientInfo.name = nameMatch[1].trim();
+  }
+
+  // Try to extract address
+  const addressMatch = message.match(/(?:Address|Location):\s*([^,\n]+(?:,\s*[A-Z]{2}\s*\d{5})?)/i);
+  if (addressMatch) {
+    const fullAddress = addressMatch[1].trim();
+    const addressParts = fullAddress.split(',').map(p => p.trim());
+
+    if (addressParts.length >= 1) {
+      clientInfo.address = addressParts[0];
+    }
+
+    // Try to extract city, state, zip from address
+    const cityStateZipMatch = fullAddress.match(/([A-Za-z\s]+),\s*([A-Z]{2})\s*(\d{5})/);
+    if (cityStateZipMatch) {
+      clientInfo.city = cityStateZipMatch[1].trim();
+      clientInfo.state = cityStateZipMatch[2].trim();
+      clientInfo.zipCode = cityStateZipMatch[3].trim();
+    }
+  }
+
+  // Try to extract phone
+  const phoneMatch = message.match(/(?:Phone|Tel|Mobile):\s*([\d\s\-\(\)]+)/i);
+  if (phoneMatch) {
+    clientInfo.phone = phoneMatch[1].trim();
+  }
+
+  // Try to extract email
+  const emailMatch = message.match(/(?:Email|E-mail):\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+  if (emailMatch) {
+    clientInfo.email = emailMatch[1].trim();
+  }
+
+  // Check if AI mentioned a lead by name or ID
+  const leadIdMatch = message.match(/(?:lead|client)\s*(?:ID|#):\s*([a-f0-9-]+)/i);
+  if (leadIdMatch && leads.some(l => l.id === leadIdMatch[1])) {
+    const lead = leads.find(l => l.id === leadIdMatch[1]);
+    if (lead) {
+      clientInfo.leadId = lead.id;
+      clientInfo.name = `${lead.firstName} ${lead.lastName}`;
+      clientInfo.address = lead.address;
+      clientInfo.city = lead.city;
+      clientInfo.state = lead.state;
+      clientInfo.zipCode = lead.zipCode;
+      clientInfo.phone = lead.phone;
+      clientInfo.email = lead.email;
+    }
+  }
+
+  return clientInfo;
 }
 

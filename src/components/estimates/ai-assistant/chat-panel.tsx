@@ -18,6 +18,8 @@ import {
   AlertTriangle,
   Mic,
   MicOff,
+  Square,
+  Volume2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -77,24 +79,49 @@ const initialMessages: AIMessage[] = [
 **Try saying something like:**
 - "3 bedrooms medium size, walls and trim"
 - "2 small bathrooms with full refresh"
-- "Older house that needs extra prep"`,
+- "Older house that needs extra prep"
+
+**Voice Recording:** Click Record and describe your entire walkthrough (up to 10 minutes). For detailed estimates, speak for at least 5 minutes covering all rooms, surfaces, conditions, and client details.`,
     timestamp: new Date().toISOString(),
   },
 ];
+
+// Maximum recording duration in seconds (10 minutes)
+const MAX_RECORDING_DURATION = 600;
+// Minimum recording duration in seconds (5 minutes for complete estimate descriptions)
+const MIN_RECOMMENDED_DURATION = 300;
 
 export function ChatPanel({ onApplyLineItems, onApplyRiskModifiers }: ChatPanelProps) {
   const [messages, setMessages] = useState<AIMessage[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isVoiceInput, setIsVoiceInput] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionId = useRef(`session-${Date.now()}`);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Cleanup recording timer on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -107,35 +134,82 @@ export function ChatPanel({ onApplyLineItems, onApplyRiskModifiers }: ChatPanelP
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const messageText = input;
+    const wasVoiceInput = isVoiceInput;
     setInput('');
+    setIsVoiceInput(false);
     setIsLoading(true);
 
-    // Simulate AI processing
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Call the real AI API
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionId.current,
+          message: messageText,
+          isVoiceInput: wasVoiceInput,
+        }),
+      });
 
-    // Find matching mock response
-    const inputLower = input.toLowerCase();
-    let response = mockResponses.find((r) =>
-      r.trigger.some((t) => inputLower.includes(t))
-    );
+      if (!response.ok) throw new Error('Failed to get AI response');
 
-    const assistantMessage: AIMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: response?.response ||
-        `I understand you're looking for a quote. Could you specify:
-- Room types (bedroom, bathroom, kitchen, etc.)
-- Room sizes (small, medium, large)
-- Scope (walls only, walls+trim, full refresh)
+      const data = await response.json();
 
-For example: "2 medium bedrooms, walls and trim"`,
-      timestamp: new Date().toISOString(),
-      suggestedLineItems: response?.lineItems,
-      suggestedRiskModifiers: response?.riskModifiers,
+      const assistantMessage: AIMessage = {
+        id: data.message.id,
+        role: 'assistant',
+        content: data.message.content,
+        timestamp: data.message.createdAt,
+        suggestedLineItems: data.suggestedLineItems,
+        suggestedRiskModifiers: data.suggestedRiskModifiers,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      // If voice response is available, play it automatically
+      if (data.isVoiceResponse && data.audioUrl) {
+        playAudio(data.audioUrl, assistantMessage.id);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again.',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const playAudio = (audioUrl: string, messageId: string) => {
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    setPlayingAudioId(messageId);
+
+    audio.onended = () => {
+      setPlayingAudioId(null);
+      audioRef.current = null;
     };
 
-    setMessages((prev) => [...prev, assistantMessage]);
-    setIsLoading(false);
+    audio.onerror = () => {
+      console.error('Error playing audio');
+      setPlayingAudioId(null);
+      audioRef.current = null;
+    };
+
+    audio.play();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -145,56 +219,178 @@ For example: "2 medium bedrooms, walls and trim"`,
     }
   };
 
+  // Format duration as MM:SS
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Clean up recording timer
+  const clearRecordingTimer = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
   const handleVoiceToggle = async () => {
     if (isRecording) {
       // Stop recording
+      clearRecordingTimer();
       if (mediaRecorderRef.current) {
         mediaRecorderRef.current.stop();
       }
       setIsRecording(false);
+      setRecordingDuration(0);
     } else {
       // Start recording
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 44100,
+          }
+        });
+
+        // Use audio/webm with opus codec for better compression on long recordings
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm';
+
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType,
+          audioBitsPerSecond: 128000, // Good quality while keeping file size reasonable
+        });
         mediaRecorderRef.current = mediaRecorder;
         const audioChunks: Blob[] = [];
 
         mediaRecorder.ondataavailable = (event) => {
-          audioChunks.push(event.data);
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
         };
 
         mediaRecorder.onstop = async () => {
           // Stop all tracks
           stream.getTracks().forEach(track => track.stop());
+          clearRecordingTimer();
 
-          // For demo, simulate transcription
-          // In production, send audioChunks to Whisper API
-          const mockTranscription = "3 medium bedrooms with walls and trim";
-          setInput(mockTranscription);
+          try {
+            // Create audio blob from recorded chunks
+            const audioBlob = new Blob(audioChunks, { type: mimeType });
 
-          // Add a message showing voice was captured
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              role: 'assistant',
-              content: `Voice captured. I heard: "${mockTranscription}"\n\nPress Enter or click Send to process.`,
-              timestamp: new Date().toISOString(),
-            },
-          ]);
+            // Check file size (OpenAI Whisper supports up to 25MB)
+            const fileSizeMB = audioBlob.size / (1024 * 1024);
+            console.log(`Audio file size: ${fileSizeMB.toFixed(2)}MB`);
+
+            if (fileSizeMB > 24) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: Date.now().toString(),
+                  role: 'assistant',
+                  content: `Recording is too large (${fileSizeMB.toFixed(1)}MB). Please try a shorter recording under 10 minutes.`,
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+              return;
+            }
+
+            // Convert to File object for API
+            const audioFile = new File([audioBlob], 'recording.webm', { type: mimeType });
+
+            // Send to transcription API
+            const formData = new FormData();
+            formData.append('audio', audioFile);
+
+            setIsLoading(true);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Transcribing ${formatDuration(recordingDuration)} of audio... This may take a moment for longer recordings.`,
+                timestamp: new Date().toISOString(),
+              },
+            ]);
+
+            const response = await fetch('/api/ai/transcribe', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(errorData.error || 'Transcription failed');
+            }
+
+            const data = await response.json();
+            const transcription = data.text;
+
+            // Set the transcribed text in the input
+            setInput(transcription);
+            setIsVoiceInput(true); // Mark that this came from voice
+
+            // Show transcription to user with preview
+            const preview = transcription.length > 500
+              ? transcription.substring(0, 500) + '...'
+              : transcription;
+
+            setMessages((prev) => {
+              // Remove the "Transcribing..." message
+              const filtered = prev.filter(m => !m.content.startsWith('Transcribing'));
+              return [
+                ...filtered,
+                {
+                  id: Date.now().toString(),
+                  role: 'assistant',
+                  content: `Transcription complete (${transcription.split(' ').length} words):\n\n"${preview}"\n\nPress Enter or click Send to process your estimate request.`,
+                  timestamp: new Date().toISOString(),
+                },
+              ];
+            });
+            setIsLoading(false);
+          } catch (error) {
+            console.error('Transcription error:', error);
+            setMessages((prev) => {
+              const filtered = prev.filter(m => !m.content.startsWith('Transcribing'));
+              return [
+                ...filtered,
+                {
+                  id: Date.now().toString(),
+                  role: 'assistant',
+                  content: 'Sorry, I had trouble transcribing the audio. Please try again or type your message.',
+                  timestamp: new Date().toISOString(),
+                },
+              ];
+            });
+            setIsLoading(false);
+          }
         };
 
-        mediaRecorder.start();
+        // Request data every 10 seconds for long recordings (helps with memory management)
+        mediaRecorder.start(10000);
         setIsRecording(true);
+        setRecordingDuration(0);
 
-        // Auto-stop after 10 seconds
-        setTimeout(() => {
-          if (mediaRecorderRef.current?.state === 'recording') {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-          }
-        }, 10000);
+        // Start duration timer
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingDuration(prev => {
+            const newDuration = prev + 1;
+            // Auto-stop at max duration
+            if (newDuration >= MAX_RECORDING_DURATION) {
+              if (mediaRecorderRef.current?.state === 'recording') {
+                mediaRecorderRef.current.stop();
+                setIsRecording(false);
+              }
+              clearRecordingTimer();
+            }
+            return newDuration;
+          });
+        }, 1000);
+
       } catch (error) {
         console.error('Error accessing microphone:', error);
         setMessages((prev) => [
@@ -356,6 +552,44 @@ For example: "2 medium bedrooms, walls and trim"`,
         </div>
       </ScrollArea>
 
+      {/* Recording Status Bar */}
+      {isRecording && (
+        <div className="px-4 py-3 bg-red-50 border-t border-red-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                <div className="absolute inset-0 w-3 h-3 bg-red-500 rounded-full animate-ping opacity-75" />
+              </div>
+              <span className="font-mono text-lg font-semibold text-red-700">
+                {formatDuration(recordingDuration)}
+              </span>
+              <span className="text-sm text-red-600">
+                / {formatDuration(MAX_RECORDING_DURATION)} max
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {recordingDuration < MIN_RECOMMENDED_DURATION && (
+                <span className="text-xs text-amber-600">
+                  {formatDuration(MIN_RECOMMENDED_DURATION - recordingDuration)} until recommended min
+                </span>
+              )}
+              {recordingDuration >= MIN_RECOMMENDED_DURATION && (
+                <Badge variant="secondary" className="bg-green-100 text-green-700">
+                  Good length
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="mt-2 h-1.5 bg-red-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-red-500 transition-all duration-1000 ease-linear"
+              style={{ width: `${(recordingDuration / MAX_RECORDING_DURATION) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-4 border-t">
         <div className="flex gap-2">
@@ -363,7 +597,7 @@ For example: "2 medium bedrooms, walls and trim"`,
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Describe the painting job..."
+            placeholder={isRecording ? "Recording in progress..." : "Describe the painting job..."}
             disabled={isLoading || isRecording}
             className="flex-1"
           />
@@ -371,18 +605,31 @@ For example: "2 medium bedrooms, walls and trim"`,
             variant={isRecording ? "destructive" : "outline"}
             onClick={handleVoiceToggle}
             disabled={isLoading}
-            className={cn(isRecording && "animate-pulse")}
+            className={cn(
+              "min-w-[100px] gap-2",
+              isRecording && "bg-red-600 hover:bg-red-700"
+            )}
           >
-            {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {isRecording ? (
+              <>
+                <Square className="h-4 w-4" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Mic className="h-4 w-4" />
+                Record
+              </>
+            )}
           </Button>
-          <Button onClick={handleSend} disabled={isLoading || !input.trim()}>
+          <Button onClick={handleSend} disabled={isLoading || !input.trim() || isRecording}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
         <p className="text-xs text-slate-400 mt-2">
           {isRecording
-            ? "Recording... Click mic to stop (auto-stops in 10s)"
-            : "Press Enter to send or use the mic for voice input."}
+            ? "Click Stop when finished. Describe all rooms, surfaces, and conditions for your estimate."
+            : "Press Enter to send or use Record for voice input (up to 10 min). For detailed estimates, speak for at least 5 minutes."}
         </p>
       </div>
     </Card>
