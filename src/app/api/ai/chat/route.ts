@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { createChatCompletion } from '@/lib/openai';
 
 // POST /api/ai/chat - Send a message to AI assistant
 export async function POST(request: NextRequest) {
@@ -91,12 +92,30 @@ export async function POST(request: NextRequest) {
       })),
     };
 
-    // Parse the user message to extract estimate details
-    const suggestedLineItems = parseEstimateRequest(message, priceBookContext);
-    const riskModifiers = extractRiskModifiers(message);
+    // Fetch conversation history for context
+    const { data: previousMessages } = await supabase
+      .from('AIMessage')
+      .select('role, content')
+      .eq('conversationId', conversation.id)
+      .order('createdAt', { ascending: true });
 
-    // Generate AI response
-    const aiResponse = generateAIResponse(message, suggestedLineItems, riskModifiers, priceBookContext);
+    // Build message history for OpenAI (limit to last 10 messages for cost control)
+    const messageHistory = (previousMessages || [])
+      .slice(-10)
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+    // Add current user message
+    messageHistory.push({ role: 'user', content: message });
+
+    // Generate AI response using OpenAI
+    const aiResponseContent = await createChatCompletion(messageHistory, priceBookContext);
+
+    // Parse the AI response to extract estimate details
+    const suggestedLineItems = parseEstimateRequest(aiResponseContent || '', priceBookContext);
+    const riskModifiers = extractRiskModifiers(aiResponseContent || '');
 
     // Save AI response
     const { data: aiMessage, error: aiMessageError } = await supabase
@@ -104,9 +123,9 @@ export async function POST(request: NextRequest) {
       .insert({
         conversationId: conversation.id,
         role: 'assistant',
-        content: aiResponse.content,
-        suggestedLineItems: JSON.parse(JSON.stringify(aiResponse.lineItems)),
-        suggestedRiskModifiers: aiResponse.riskModifiers,
+        content: aiResponseContent || 'Sorry, I encountered an error generating a response.',
+        suggestedLineItems: JSON.parse(JSON.stringify(suggestedLineItems)),
+        suggestedRiskModifiers: riskModifiers,
       })
       .select()
       .single();
@@ -115,8 +134,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       message: aiMessage,
-      suggestedLineItems: aiResponse.lineItems,
-      suggestedRiskModifiers: aiResponse.riskModifiers,
+      suggestedLineItems,
+      suggestedRiskModifiers: riskModifiers,
     });
   } catch (error) {
     console.error('Error in AI chat:', error);
@@ -297,54 +316,3 @@ function extractRiskModifiers(message: string): string[] {
   return modifiers;
 }
 
-// Generate AI response
-function generateAIResponse(
-  message: string,
-  lineItems: SuggestedLineItem[],
-  riskModifiers: string[],
-  priceBook: PriceBookContext
-): { content: string; lineItems: SuggestedLineItem[]; riskModifiers: string[] } {
-  const subtotal = lineItems.reduce((sum, item) => sum + item.lineTotal, 0);
-
-  // Calculate risk modifier impact
-  let riskMultiplier = 1;
-  for (const modifier of riskModifiers) {
-    if (modifier.includes('+10%')) riskMultiplier += 0.1;
-    if (modifier.includes('+15%')) riskMultiplier += 0.15;
-    if (modifier.includes('+20%')) riskMultiplier += 0.2;
-    if (modifier.includes('+25%')) riskMultiplier += 0.25;
-  }
-
-  const adjustedTotal = subtotal * riskMultiplier;
-
-  let content = '';
-
-  if (lineItems.length > 0) {
-    content = `Based on your description, I found the following in your price book:\n\n`;
-    content += `📋 **Suggested Line Items:**\n`;
-
-    for (const item of lineItems) {
-      content += `• ${item.quantity}x ${item.description} @ $${item.unitPrice.toFixed(2)} = $${item.lineTotal.toFixed(2)}\n`;
-    }
-
-    content += `\n**Subtotal:** $${subtotal.toFixed(2)}\n`;
-
-    if (riskModifiers.length > 0) {
-      content += `\n⚠️ **Risk Modifiers Detected:**\n`;
-      for (const modifier of riskModifiers) {
-        content += `• ${modifier}\n`;
-      }
-      content += `\n**Adjusted Total:** $${adjustedTotal.toFixed(2)}\n`;
-    }
-
-    content += `\nWould you like me to apply these to your estimate?`;
-  } else {
-    content = `I couldn't find specific room matches in your price book. Could you provide more details about:\n`;
-    content += `• Number and type of rooms (e.g., "3 bedrooms, 2 bathrooms")\n`;
-    content += `• Room sizes (small, medium, large)\n`;
-    content += `• Scope of work (walls only, walls and trim, full refresh)\n\n`;
-    content += `Your price book includes: ${priceBook.rooms.map(r => r.type).filter((v, i, a) => a.indexOf(v) === i).join(', ')}`;
-  }
-
-  return { content, lineItems, riskModifiers };
-}
