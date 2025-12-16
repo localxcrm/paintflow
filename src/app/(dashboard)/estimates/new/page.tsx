@@ -32,6 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ChatPanel } from '@/components/estimates/ai-assistant';
+import { ClientSearch } from '@/components/estimates/client-search';
 import {
   ArrowLeft,
   Plus,
@@ -95,17 +96,32 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+interface ClientInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  leadId?: string;
+}
+
+const emptyClientInfo: ClientInfo = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  address: '',
+  city: '',
+  state: 'CT',
+  zipCode: '',
+};
+
 export default function NewEstimatePage() {
-  const [clientInfo, setClientInfo] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    address: '',
-    city: '',
-    state: 'CT',
-    zipCode: '',
-  });
+  const [clientInfo, setClientInfo] = useState<ClientInfo>(emptyClientInfo);
+  const [isNewClient, setIsNewClient] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [riskModifiers, setRiskModifiers] = useState(defaultRiskModifiers);
   const [discount, setDiscount] = useState(0);
@@ -287,50 +303,123 @@ export default function NewEstimatePage() {
           {/* Client Info */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Client Information</CardTitle>
+              <CardTitle className="text-base">Informações do Cliente</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  placeholder="First Name"
-                  value={clientInfo.firstName}
-                  onChange={(e) => setClientInfo({ ...clientInfo, firstName: e.target.value })}
+              {/* Client Search */}
+              {!isNewClient && !clientInfo.firstName && (
+                <ClientSearch
+                  onSelectClient={(client) => {
+                    setClientInfo(client);
+                    setIsNewClient(false);
+                  }}
+                  onNewClient={() => {
+                    setClientInfo(emptyClientInfo);
+                    setIsNewClient(true);
+                  }}
+                  selectedClient={clientInfo.firstName ? clientInfo : null}
+                  onClearClient={() => {
+                    setClientInfo(emptyClientInfo);
+                    setIsNewClient(false);
+                  }}
                 />
-                <Input
-                  placeholder="Last Name"
-                  value={clientInfo.lastName}
-                  onChange={(e) => setClientInfo({ ...clientInfo, lastName: e.target.value })}
-                />
-                <Input
-                  placeholder="Email"
-                  type="email"
-                  value={clientInfo.email}
-                  onChange={(e) => setClientInfo({ ...clientInfo, email: e.target.value })}
-                />
-                <Input
-                  placeholder="Phone"
-                  value={clientInfo.phone}
-                  onChange={(e) => setClientInfo({ ...clientInfo, phone: e.target.value })}
-                />
-              </div>
-              <Input
-                placeholder="Street Address"
-                value={clientInfo.address}
-                onChange={(e) => setClientInfo({ ...clientInfo, address: e.target.value })}
-              />
-              <div className="grid grid-cols-3 gap-3">
-                <Input
-                  placeholder="City"
-                  value={clientInfo.city}
-                  onChange={(e) => setClientInfo({ ...clientInfo, city: e.target.value })}
-                />
-                <Input placeholder="State" value={clientInfo.state} disabled />
-                <Input
-                  placeholder="ZIP"
-                  value={clientInfo.zipCode}
-                  onChange={(e) => setClientInfo({ ...clientInfo, zipCode: e.target.value })}
-                />
-              </div>
+              )}
+
+              {/* Selected Client Display */}
+              {clientInfo.firstName && !isNewClient && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-green-900">
+                      {clientInfo.firstName} {clientInfo.lastName}
+                    </p>
+                    <p className="text-sm text-green-700">
+                      {clientInfo.address && `${clientInfo.address}, `}
+                      {clientInfo.city}, {clientInfo.state} {clientInfo.zipCode}
+                    </p>
+                  </div>
+                  {clientInfo.leadId && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-700">
+                      Cliente existente
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-green-600 hover:text-green-800 hover:bg-green-100"
+                    onClick={() => {
+                      setClientInfo(emptyClientInfo);
+                      setIsNewClient(false);
+                    }}
+                  >
+                    Alterar
+                  </Button>
+                </div>
+              )}
+
+              {/* New Client Form */}
+              {isNewClient && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      Novo Cliente
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setClientInfo(emptyClientInfo);
+                        setIsNewClient(false);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      placeholder="Nome"
+                      value={clientInfo.firstName}
+                      onChange={(e) => setClientInfo({ ...clientInfo, firstName: e.target.value })}
+                    />
+                    <Input
+                      placeholder="Sobrenome"
+                      value={clientInfo.lastName}
+                      onChange={(e) => setClientInfo({ ...clientInfo, lastName: e.target.value })}
+                    />
+                    <Input
+                      placeholder="Email"
+                      type="email"
+                      value={clientInfo.email}
+                      onChange={(e) => setClientInfo({ ...clientInfo, email: e.target.value })}
+                    />
+                    <Input
+                      placeholder="Telefone"
+                      value={clientInfo.phone}
+                      onChange={(e) => setClientInfo({ ...clientInfo, phone: e.target.value })}
+                    />
+                  </div>
+                  <Input
+                    placeholder="Endereço"
+                    value={clientInfo.address}
+                    onChange={(e) => setClientInfo({ ...clientInfo, address: e.target.value })}
+                  />
+                  <div className="grid grid-cols-3 gap-3">
+                    <Input
+                      placeholder="Cidade"
+                      value={clientInfo.city}
+                      onChange={(e) => setClientInfo({ ...clientInfo, city: e.target.value })}
+                    />
+                    <Input placeholder="Estado" value={clientInfo.state} disabled />
+                    <Input
+                      placeholder="CEP"
+                      value={clientInfo.zipCode}
+                      onChange={(e) => setClientInfo({ ...clientInfo, zipCode: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
