@@ -1,24 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/settings/portfolio - Get all portfolio images
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const projectType = searchParams.get('projectType');
 
-    const where: Record<string, unknown> = {};
+    let query = supabase
+      .from('PortfolioImage')
+      .select('*');
 
     if (projectType) {
-      where.projectType = projectType;
+      query = query.eq('projectType', projectType);
     }
 
-    const portfolioImages = await prisma.portfolioImage.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    });
+    query = query.order('createdAt', { ascending: false });
 
-    return NextResponse.json(portfolioImages);
+    const { data: portfolioImages, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json(portfolioImages || []);
   } catch (error) {
     console.error('Error fetching portfolio images:', error);
     return NextResponse.json(
@@ -31,16 +37,23 @@ export async function GET(request: NextRequest) {
 // POST /api/settings/portfolio - Add a new portfolio image
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const portfolioImage = await prisma.portfolioImage.create({
-      data: {
+    const { data: portfolioImage, error } = await supabase
+      .from('PortfolioImage')
+      .insert({
         beforeUrl: body.beforeUrl,
         afterUrl: body.afterUrl,
         projectType: body.projectType || 'interior',
         description: body.description,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json(portfolioImage, { status: 201 });
   } catch (error) {

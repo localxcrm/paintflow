@@ -6,16 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Paintbrush, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Paintbrush, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
 import { authApi } from '@/lib/api';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
+    name: '',
     email: '',
     password: '',
+    confirmPassword: '',
   });
   const [error, setError] = useState('');
 
@@ -24,32 +26,35 @@ export default function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    if (!formData.email || !formData.password) {
-      setError('Please enter your email and password');
+    // Validation
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError('Please fill in all fields');
       setIsLoading(false);
       return;
     }
 
-    // Try to login via API
-    const result = await authApi.login({
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setIsLoading(false);
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      setIsLoading(false);
+      return;
+    }
+
+    // Register via API
+    const result = await authApi.register({
+      name: formData.name,
       email: formData.email,
       password: formData.password,
     });
 
     if (result.error) {
-      // If API fails (e.g., no database), fall back to demo mode
-      if (result.error.includes('Network') || result.error.includes('Failed')) {
-        // Demo mode - store user in localStorage
-        localStorage.setItem('paintpro_user', JSON.stringify({
-          email: formData.email,
-          name: formData.email.split('@')[0],
-          loggedInAt: new Date().toISOString(),
-        }));
-        router.push('/dashboard');
-      } else {
-        setError(result.error);
-        setIsLoading(false);
-      }
+      setError(result.error);
+      setIsLoading(false);
     } else if (result.data) {
       // Store user info
       localStorage.setItem('paintpro_user', JSON.stringify({
@@ -72,12 +77,12 @@ export default function LoginPage() {
           <p className="text-slate-500 mt-1">Painting Business Management</p>
         </div>
 
-        {/* Login Card */}
+        {/* Registration Card */}
         <Card className="shadow-xl border-0">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
+            <CardTitle className="text-2xl text-center">Create an account</CardTitle>
             <CardDescription className="text-center">
-              Sign in to your account to continue
+              Enter your details to get started
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -87,6 +92,19 @@ export default function LoginPage() {
                   {error}
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="h-11"
+                  required
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -102,21 +120,12 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <button
-                    type="button"
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                    onClick={() => alert('Password reset coming soon!')}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
+                    placeholder="At least 6 characters"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="h-11 pr-10"
@@ -132,6 +141,19 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Re-enter your password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  className="h-11"
+                  required
+                />
+              </div>
+
               <Button
                 type="submit"
                 className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-medium"
@@ -140,59 +162,27 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Signing in...
+                    Creating account...
                   </>
                 ) : (
-                  'Sign in'
+                  'Create account'
                 )}
               </Button>
             </form>
-
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-slate-500">Demo credentials</span>
-                </div>
-              </div>
-
-              <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-sm text-slate-600 text-center">
-                  Use any email and password to access the demo
-                </p>
-                <div className="mt-2 flex gap-2 justify-center">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setFormData({
-                        email: 'demo@paintpro.com',
-                        password: 'demo123',
-                      });
-                    }}
-                  >
-                    Fill Demo Credentials
-                  </Button>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-sm text-slate-500 mt-6">
-          Don&apos;t have an account?{' '}
+        <div className="mt-6 text-center">
           <button
             type="button"
-            className="text-blue-600 hover:text-blue-700 font-medium"
-            onClick={() => router.push('/register')}
+            className="inline-flex items-center text-sm text-slate-600 hover:text-slate-900 font-medium"
+            onClick={() => router.push('/')}
           >
-            Sign up
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to login
           </button>
-        </p>
+        </div>
 
         <p className="text-center text-xs text-slate-400 mt-4">
           &copy; {new Date().getFullYear()} PaintPro. All rights reserved.

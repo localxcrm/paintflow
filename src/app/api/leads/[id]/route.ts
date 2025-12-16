@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/leads/[id] - Get a single lead
 export async function GET(
@@ -7,22 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const lead = await prisma.lead.findUnique({
-      where: { id },
-      include: {
-        assignedTo: true,
-        estimates: true,
-        jobs: true,
-      },
-    });
+    const { data: lead, error } = await supabase
+      .from('Lead')
+      .select('*, TeamMember(*), Estimate(*), Job(*)')
+      .eq('id', id)
+      .single();
 
-    if (!lead) {
-      return NextResponse.json(
-        { error: 'Lead not found' },
-        { status: 404 }
-      );
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Lead not found' },
+          { status: 404 }
+        );
+      }
+      throw error;
     }
 
     return NextResponse.json(lead);
@@ -41,33 +42,39 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const lead = await prisma.lead.update({
-      where: { id },
-      data: {
-        ...(body.firstName !== undefined && { firstName: body.firstName }),
-        ...(body.lastName !== undefined && { lastName: body.lastName }),
-        ...(body.email !== undefined && { email: body.email }),
-        ...(body.phone !== undefined && { phone: body.phone }),
-        ...(body.address !== undefined && { address: body.address }),
-        ...(body.city !== undefined && { city: body.city }),
-        ...(body.state !== undefined && { state: body.state }),
-        ...(body.zipCode !== undefined && { zipCode: body.zipCode }),
-        ...(body.source !== undefined && { source: body.source }),
-        ...(body.status !== undefined && { status: body.status }),
-        ...(body.projectType !== undefined && { projectType: body.projectType }),
-        ...(body.nextFollowupDate !== undefined && { nextFollowupDate: body.nextFollowupDate ? new Date(body.nextFollowupDate) : null }),
-        ...(body.estimatedJobValue !== undefined && { estimatedJobValue: body.estimatedJobValue }),
-        ...(body.wonLostReason !== undefined && { wonLostReason: body.wonLostReason }),
-        ...(body.notes !== undefined && { notes: body.notes }),
-        ...(body.assignedToId !== undefined && { assignedToId: body.assignedToId }),
-      },
-      include: {
-        assignedTo: true,
-      },
-    });
+    const updateData: any = { updatedAt: new Date().toISOString() };
+
+    if (body.firstName !== undefined) updateData.firstName = body.firstName;
+    if (body.lastName !== undefined) updateData.lastName = body.lastName;
+    if (body.email !== undefined) updateData.email = body.email;
+    if (body.phone !== undefined) updateData.phone = body.phone;
+    if (body.address !== undefined) updateData.address = body.address;
+    if (body.city !== undefined) updateData.city = body.city;
+    if (body.state !== undefined) updateData.state = body.state;
+    if (body.zipCode !== undefined) updateData.zipCode = body.zipCode;
+    if (body.source !== undefined) updateData.source = body.source;
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.projectType !== undefined) updateData.projectType = body.projectType;
+    if (body.nextFollowupDate !== undefined) updateData.nextFollowupDate = body.nextFollowupDate ? new Date(body.nextFollowupDate).toISOString() : null;
+    if (body.estimatedJobValue !== undefined) updateData.estimatedJobValue = body.estimatedJobValue;
+    if (body.wonLostReason !== undefined) updateData.wonLostReason = body.wonLostReason;
+    if (body.notes !== undefined) updateData.notes = body.notes;
+    if (body.assignedToId !== undefined) updateData.assignedToId = body.assignedToId;
+
+    const { data: lead, error } = await supabase
+      .from('Lead')
+      .update(updateData)
+      .eq('id', id)
+      .select('*, TeamMember(*)')
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json(lead);
   } catch (error) {
@@ -85,11 +92,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.lead.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Lead')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

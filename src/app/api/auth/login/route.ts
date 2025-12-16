@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { verifyPassword, createSession } from '@/lib/auth';
 import { cookies } from 'next/headers';
+import type { User } from '@/types/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,12 +17,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    const supabase = createServerSupabaseClient();
 
-    if (!user) {
+    // Find user
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .single<User>();
+
+    if (userError || !user) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -45,10 +50,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Update last login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    await supabase
+      .from('User')
+      .update({ lastLoginAt: new Date().toISOString() })
+      .eq('id', user.id);
 
     // Create session
     const session = await createSession(user.id);
@@ -59,7 +64,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      expires: session.expiresAt,
+      expires: new Date(session.expiresAt),
       path: '/',
     });
 

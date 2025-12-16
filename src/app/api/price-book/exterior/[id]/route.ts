@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/price-book/exterior/[id] - Get a single exterior price
 export async function GET(
@@ -7,17 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const exteriorPrice = await prisma.exteriorPrice.findUnique({
-      where: { id },
-    });
+    const { data: exteriorPrice, error } = await supabase
+      .from('ExteriorPrice')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!exteriorPrice) {
-      return NextResponse.json(
-        { error: 'Exterior price not found' },
-        { status: 404 }
-      );
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Exterior price not found' },
+          { status: 404 }
+        );
+      }
+      throw error;
     }
 
     return NextResponse.json(exteriorPrice);
@@ -36,17 +42,26 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const exteriorPrice = await prisma.exteriorPrice.update({
-      where: { id },
-      data: {
-        ...(body.surfaceType !== undefined && { surfaceType: body.surfaceType }),
-        ...(body.pricePerSqft !== undefined && { pricePerSqft: body.pricePerSqft }),
-        ...(body.prepMultiplier !== undefined && { prepMultiplier: body.prepMultiplier }),
-      },
-    });
+    const updateData: any = { updatedAt: new Date().toISOString() };
+
+    if (body.surfaceType !== undefined) updateData.surfaceType = body.surfaceType;
+    if (body.pricePerSqft !== undefined) updateData.pricePerSqft = body.pricePerSqft;
+    if (body.prepMultiplier !== undefined) updateData.prepMultiplier = body.prepMultiplier;
+
+    const { data: exteriorPrice, error } = await supabase
+      .from('ExteriorPrice')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json(exteriorPrice);
   } catch (error) {
@@ -64,11 +79,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.exteriorPrice.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('ExteriorPrice')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/price-book/exterior - Get all exterior prices
 export async function GET() {
   try {
-    const exteriorPrices = await prisma.exteriorPrice.findMany({
-      orderBy: { surfaceType: 'asc' },
-    });
+    const supabase = createServerSupabaseClient();
 
-    return NextResponse.json(exteriorPrices);
+    const { data: exteriorPrices, error } = await supabase
+      .from('ExteriorPrice')
+      .select('*')
+      .order('surfaceType', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json(exteriorPrices || []);
   } catch (error) {
     console.error('Error fetching exterior prices:', error);
     return NextResponse.json(
@@ -21,15 +28,22 @@ export async function GET() {
 // POST /api/price-book/exterior - Create a new exterior price
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const exteriorPrice = await prisma.exteriorPrice.create({
-      data: {
+    const { data: exteriorPrice, error } = await supabase
+      .from('ExteriorPrice')
+      .insert({
         surfaceType: body.surfaceType,
         pricePerSqft: body.pricePerSqft,
         prepMultiplier: body.prepMultiplier || 1.0,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json(exteriorPrice, { status: 201 });
   } catch (error) {

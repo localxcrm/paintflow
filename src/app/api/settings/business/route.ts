@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/settings/business - Get business settings
 export async function GET() {
   try {
-    // Get the single business settings record or create default
-    let settings = await prisma.businessSettings.findFirst();
+    const supabase = createServerSupabaseClient();
 
-    if (!settings) {
-      settings = await prisma.businessSettings.create({
-        data: {
+    // Get the single business settings record or create default
+    let { data: settings, error } = await supabase
+      .from('BusinessSettings')
+      .select('*')
+      .limit(1)
+      .single();
+
+    if (error && error.code === 'PGRST116') {
+      // No settings found, create default
+      const { data: newSettings, error: createError } = await supabase
+        .from('BusinessSettings')
+        .insert({
           subPayoutPct: 60,
           subMaterialsPct: 15,
           subLaborPct: 45,
@@ -18,8 +26,17 @@ export async function GET() {
           defaultDepositPct: 30,
           arTargetDays: 7,
           priceRoundingIncrement: 50,
-        },
-      });
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        throw createError;
+      }
+
+      settings = newSettings;
+    } else if (error) {
+      throw error;
     }
 
     return NextResponse.json(settings);
@@ -35,14 +52,21 @@ export async function GET() {
 // PATCH /api/settings/business - Update business settings
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    // Get existing settings or create one
-    let settings = await prisma.businessSettings.findFirst();
+    // Get existing settings
+    let { data: settings, error: fetchError } = await supabase
+      .from('BusinessSettings')
+      .select('*')
+      .limit(1)
+      .single();
 
-    if (!settings) {
-      settings = await prisma.businessSettings.create({
-        data: {
+    if (fetchError && fetchError.code === 'PGRST116') {
+      // No settings found, create one
+      const { data: newSettings, error: createError } = await supabase
+        .from('BusinessSettings')
+        .insert({
           subPayoutPct: body.subPayoutPct ?? 60,
           subMaterialsPct: body.subMaterialsPct ?? 15,
           subLaborPct: body.subLaborPct ?? 45,
@@ -51,25 +75,43 @@ export async function PATCH(request: NextRequest) {
           defaultDepositPct: body.defaultDepositPct ?? 30,
           arTargetDays: body.arTargetDays ?? 7,
           priceRoundingIncrement: body.priceRoundingIncrement ?? 50,
-        },
-      });
-    } else {
-      settings = await prisma.businessSettings.update({
-        where: { id: settings.id },
-        data: {
-          ...(body.subPayoutPct !== undefined && { subPayoutPct: body.subPayoutPct }),
-          ...(body.subMaterialsPct !== undefined && { subMaterialsPct: body.subMaterialsPct }),
-          ...(body.subLaborPct !== undefined && { subLaborPct: body.subLaborPct }),
-          ...(body.minGrossProfitPerJob !== undefined && { minGrossProfitPerJob: body.minGrossProfitPerJob }),
-          ...(body.targetGrossMarginPct !== undefined && { targetGrossMarginPct: body.targetGrossMarginPct }),
-          ...(body.defaultDepositPct !== undefined && { defaultDepositPct: body.defaultDepositPct }),
-          ...(body.arTargetDays !== undefined && { arTargetDays: body.arTargetDays }),
-          ...(body.priceRoundingIncrement !== undefined && { priceRoundingIncrement: body.priceRoundingIncrement }),
-        },
-      });
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        throw createError;
+      }
+
+      return NextResponse.json(newSettings);
+    } else if (fetchError) {
+      throw fetchError;
     }
 
-    return NextResponse.json(settings);
+    // Update existing settings
+    const updateData: any = { updatedAt: new Date().toISOString() };
+
+    if (body.subPayoutPct !== undefined) updateData.subPayoutPct = body.subPayoutPct;
+    if (body.subMaterialsPct !== undefined) updateData.subMaterialsPct = body.subMaterialsPct;
+    if (body.subLaborPct !== undefined) updateData.subLaborPct = body.subLaborPct;
+    if (body.minGrossProfitPerJob !== undefined) updateData.minGrossProfitPerJob = body.minGrossProfitPerJob;
+    if (body.targetGrossMarginPct !== undefined) updateData.targetGrossMarginPct = body.targetGrossMarginPct;
+    if (body.defaultDepositPct !== undefined) updateData.defaultDepositPct = body.defaultDepositPct;
+    if (body.arTargetDays !== undefined) updateData.arTargetDays = body.arTargetDays;
+    if (body.priceRoundingIncrement !== undefined) updateData.priceRoundingIncrement = body.priceRoundingIncrement;
+
+    const { data: updatedSettings, error: updateError } = await supabase
+      .from('BusinessSettings')
+      .update(updateData)
+      .eq('id', settings.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return NextResponse.json(updatedSettings);
   } catch (error) {
     console.error('Error updating business settings:', error);
     return NextResponse.json(

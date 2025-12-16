@@ -1,45 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
+import type { LeadWithAssignedTo } from '@/types/database';
 
 // GET /api/leads - Get all leads with optional filtering
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const where: Record<string, unknown> = {};
+    // Build query
+    let query = supabase
+      .from('Lead')
+      .select('*, TeamMember(*)', { count: 'exact' });
 
+    // Apply filters
     if (status && status !== 'all') {
-      where.status = status;
+      query = query.eq('status', status);
     }
 
+    // Search across multiple fields (Supabase doesn't have contains, use ilike)
     if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } },
-        { address: { contains: search, mode: 'insensitive' } },
-      ];
+      query = query.or(`firstName.ilike.%${search}%,lastName.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,address.ilike.%${search}%`);
     }
 
-    const [leads, total] = await Promise.all([
-      prisma.lead.findMany({
-        where,
-        include: {
-          assignedTo: true,
-        },
-        orderBy: { leadDate: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.lead.count({ where }),
-    ]);
+    // Apply ordering, limit, and offset
+    query = query
+      .order('leadDate', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    return NextResponse.json({ leads, total, limit, offset });
+    const { data: leads, count, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({
+      leads: leads || [],
+      total: count || 0,
+      limit,
+      offset
+    });
   } catch (error) {
     console.error('Error fetching leads:', error);
     return NextResponse.json(
@@ -52,10 +56,12 @@ export async function GET(request: NextRequest) {
 // POST /api/leads - Create a new lead
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const lead = await prisma.lead.create({
-      data: {
+    const { data: lead, error } = await supabase
+      .from('Lead')
+      .insert({
         firstName: body.firstName,
         lastName: body.lastName,
         email: body.email,
@@ -67,16 +73,18 @@ export async function POST(request: NextRequest) {
         source: body.source,
         status: body.status || 'new',
         projectType: body.projectType || 'interior',
-        leadDate: body.leadDate ? new Date(body.leadDate) : new Date(),
-        nextFollowupDate: body.nextFollowupDate ? new Date(body.nextFollowupDate) : null,
-        estimatedJobValue: body.estimatedJobValue,
-        notes: body.notes,
-        assignedToId: body.assignedToId,
-      },
-      include: {
-        assignedTo: true,
-      },
-    });
+        leadDate: body.leadDate || new Date().toISOString(),
+        nextFollowupDate: body.nextFollowupDate || null,
+        estimatedJobValue: body.estimatedJobValue || null,
+        notes: body.notes || null,
+        assignedToId: body.assignedToId || null,
+      })
+      .select('*, TeamMember(*)')
+      .single<LeadWithAssignedTo>();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json(lead, { status: 201 });
   } catch (error) {

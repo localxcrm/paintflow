@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/estimates - Get all estimates with optional filtering
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const search = searchParams.get('search');
@@ -11,42 +12,39 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const where: Record<string, unknown> = {};
+    // Build query
+    let query = supabase
+      .from('Estimate')
+      .select('*, Lead(*), EstimateLineItem(*), EstimateSignature(*)', { count: 'exact' });
 
+    // Apply filters
     if (status) {
-      where.status = status;
+      query = query.eq('status', status);
     }
 
     if (leadId) {
-      where.leadId = leadId;
+      query = query.eq('leadId', leadId);
     }
 
+    // Search across multiple fields
     if (search) {
-      where.OR = [
-        { clientName: { contains: search, mode: 'insensitive' } },
-        { address: { contains: search, mode: 'insensitive' } },
-        { estimateNumber: { contains: search, mode: 'insensitive' } },
-      ];
+      query = query.or(`clientName.ilike.%${search}%,address.ilike.%${search}%,estimateNumber.ilike.%${search}%`);
     }
 
-    const [estimates, total] = await Promise.all([
-      prisma.estimate.findMany({
-        where,
-        include: {
-          lead: true,
-          lineItems: true,
-          signature: true,
-        },
-        orderBy: { estimateDate: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.estimate.count({ where }),
-    ]);
+    // Apply ordering, limit, and offset
+    query = query
+      .order('estimateDate', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    const { data: estimates, count, error } = await query;
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({
-      estimates,
-      total,
+      estimates: estimates || [],
+      total: count || 0,
       limit,
       offset,
     });
@@ -62,13 +60,16 @@ export async function GET(request: NextRequest) {
 // POST /api/estimates - Create a new estimate
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
     // Generate estimate number
-    const lastEstimate = await prisma.estimate.findFirst({
-      orderBy: { createdAt: 'desc' },
-      select: { estimateNumber: true },
-    });
+    const { data: lastEstimate } = await supabase
+      .from('Estimate')
+      .select('estimateNumber')
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .single();
 
     let nextNumber = 1001;
     if (lastEstimate?.estimateNumber) {
@@ -90,7 +91,12 @@ export async function POST(request: NextRequest) {
     const totalPrice = subtotal - discountAmount;
 
     // Get business settings for cost calculations
-    const settings = await prisma.businessSettings.findFirst();
+    const { data: settings } = await supabase
+      .from('BusinessSettings')
+      .select('*')
+      .limit(1)
+      .single();
+
     const subMaterialsPct = settings?.subMaterialsPct || 15;
     const subLaborPct = settings?.subLaborPct || 45;
     const minGrossProfit = settings?.minGrossProfitPerJob || 900;
@@ -102,14 +108,16 @@ export async function POST(request: NextRequest) {
     const grossProfit = totalPrice - subTotalCost;
     const grossMarginPct = totalPrice > 0 ? (grossProfit / totalPrice) * 100 : 0;
 
-    const estimate = await prisma.estimate.create({
-      data: {
+    // Create estimate
+    const { data: estimate, error: estimateError } = await supabase
+      .from('Estimate')
+      .insert({
         estimateNumber,
         clientName: body.clientName,
         address: body.address,
         status: body.status || 'draft',
-        estimateDate: body.estimateDate ? new Date(body.estimateDate) : new Date(),
-        validUntil: body.validUntil ? new Date(body.validUntil) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        estimateDate: body.estimateDate ? new Date(body.estimateDate).toISOString() : new Date().toISOString(),
+        validUntil: body.validUntil ? new Date(body.validUntil).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         subtotal,
         discountAmount,
         totalPrice,
@@ -122,24 +130,47 @@ export async function POST(request: NextRequest) {
         meetsTargetGm: grossMarginPct >= targetGrossMargin,
         notes: body.notes,
         leadId: body.leadId,
-        lineItems: {
-          create: lineItems.map((item: { description: string; location: string; scope?: string; quantity?: number; unitPrice: number; lineTotal?: number }) => ({
-            description: item.description,
-            location: item.location,
-            scope: item.scope,
-            quantity: item.quantity || 1,
-            unitPrice: item.unitPrice,
-            lineTotal: item.lineTotal || (item.quantity || 1) * item.unitPrice,
-          })),
-        },
-      },
-      include: {
-        lead: true,
-        lineItems: true,
-      },
-    });
+      })
+      .select()
+      .single();
 
-    return NextResponse.json(estimate, { status: 201 });
+    if (estimateError) {
+      throw estimateError;
+    }
+
+    // Create line items separately
+    if (lineItems.length > 0) {
+      const lineItemsData = lineItems.map((item: { description: string; location: string; scope?: string; quantity?: number; unitPrice: number; lineTotal?: number }) => ({
+        estimateId: estimate.id,
+        description: item.description,
+        location: item.location,
+        scope: item.scope,
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal || (item.quantity || 1) * item.unitPrice,
+      }));
+
+      const { error: lineItemsError } = await supabase
+        .from('EstimateLineItem')
+        .insert(lineItemsData);
+
+      if (lineItemsError) {
+        throw lineItemsError;
+      }
+    }
+
+    // Fetch the complete estimate with relations
+    const { data: completeEstimate, error: fetchError } = await supabase
+      .from('Estimate')
+      .select('*, Lead(*), EstimateLineItem(*)')
+      .eq('id', estimate.id)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    return NextResponse.json(completeEstimate, { status: 201 });
   } catch (error) {
     console.error('Error creating estimate:', error);
     return NextResponse.json(

@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 // Routes that don't require authentication
 const publicRoutes = [
   '/',
+  '/register',
   '/api/auth/login',
   '/api/auth/register',
 ];

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // POST /api/estimates/[id]/signature - Add signature to estimate
 export async function POST(
@@ -7,58 +7,74 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
     // Check if estimate exists
-    const estimate = await prisma.estimate.findUnique({
-      where: { id },
-      include: { signature: true },
-    });
+    const { data: estimate, error: estimateError } = await supabase
+      .from('Estimate')
+      .select('*, EstimateSignature(*)')
+      .eq('id', id)
+      .single();
 
-    if (!estimate) {
+    if (estimateError || !estimate) {
       return NextResponse.json(
         { error: 'Estimate not found' },
         { status: 404 }
       );
     }
 
+    const ipAddress = body.ipAddress || request.headers.get('x-forwarded-for') || 'unknown';
+
     // If signature already exists, update it
-    if (estimate.signature) {
-      const signature = await prisma.estimateSignature.update({
-        where: { estimateId: id },
-        data: {
+    if (estimate.EstimateSignature && estimate.EstimateSignature.length > 0) {
+      const { data: signature, error: updateError } = await supabase
+        .from('EstimateSignature')
+        .update({
           clientName: body.clientName,
           signatureDataUrl: body.signatureDataUrl,
-          signedAt: new Date(),
-          ipAddress: body.ipAddress || request.headers.get('x-forwarded-for') || 'unknown',
-        },
-      });
+          signedAt: new Date().toISOString(),
+          ipAddress,
+        })
+        .eq('estimateId', id)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw updateError;
+      }
 
       // Update estimate status to accepted
-      await prisma.estimate.update({
-        where: { id },
-        data: { status: 'accepted' },
-      });
+      await supabase
+        .from('Estimate')
+        .update({ status: 'accepted', updatedAt: new Date().toISOString() })
+        .eq('id', id);
 
       return NextResponse.json(signature);
     }
 
     // Create new signature
-    const signature = await prisma.estimateSignature.create({
-      data: {
+    const { data: signature, error: createError } = await supabase
+      .from('EstimateSignature')
+      .insert({
         estimateId: id,
         clientName: body.clientName,
         signatureDataUrl: body.signatureDataUrl,
-        ipAddress: body.ipAddress || request.headers.get('x-forwarded-for') || 'unknown',
-      },
-    });
+        ipAddress,
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      throw createError;
+    }
 
     // Update estimate status to accepted
-    await prisma.estimate.update({
-      where: { id },
-      data: { status: 'accepted' },
-    });
+    await supabase
+      .from('Estimate')
+      .update({ status: 'accepted', updatedAt: new Date().toISOString() })
+      .eq('id', id);
 
     return NextResponse.json(signature, { status: 201 });
   } catch (error) {
@@ -76,17 +92,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const signature = await prisma.estimateSignature.findUnique({
-      where: { estimateId: id },
-    });
+    const { data: signature, error } = await supabase
+      .from('EstimateSignature')
+      .select('*')
+      .eq('estimateId', id)
+      .single();
 
-    if (!signature) {
-      return NextResponse.json(
-        { error: 'Signature not found' },
-        { status: 404 }
-      );
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Signature not found' },
+          { status: 404 }
+        );
+      }
+      throw error;
     }
 
     return NextResponse.json(signature);

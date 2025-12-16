@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/subcontractors/[id] - Get a single subcontractor
 export async function GET(
@@ -7,26 +7,41 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const subcontractor = await prisma.subcontractor.findUnique({
-      where: { id },
-      include: {
-        jobs: {
-          take: 10,
-          orderBy: { jobDate: 'desc' },
-        },
-      },
-    });
+    // Get subcontractor
+    const { data: subcontractor, error: subError } = await supabase
+      .from('Subcontractor')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!subcontractor) {
-      return NextResponse.json(
-        { error: 'Subcontractor not found' },
-        { status: 404 }
-      );
+    if (subError) {
+      if (subError.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Subcontractor not found' },
+          { status: 404 }
+        );
+      }
+      throw subError;
     }
 
-    return NextResponse.json(subcontractor);
+    // Get related jobs (limit 10, most recent)
+    const { data: jobs } = await supabase
+      .from('Job')
+      .select('*')
+      .eq('subcontractorId', id)
+      .order('jobDate', { ascending: false })
+      .limit(10);
+
+    // Combine results
+    const result = {
+      ...subcontractor,
+      jobs: jobs || [],
+    };
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching subcontractor:', error);
     return NextResponse.json(
@@ -42,21 +57,30 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const subcontractor = await prisma.subcontractor.update({
-      where: { id },
-      data: {
-        ...(body.name !== undefined && { name: body.name }),
-        ...(body.companyName !== undefined && { companyName: body.companyName }),
-        ...(body.email !== undefined && { email: body.email }),
-        ...(body.phone !== undefined && { phone: body.phone }),
-        ...(body.specialty !== undefined && { specialty: body.specialty }),
-        ...(body.defaultPayoutPct !== undefined && { defaultPayoutPct: body.defaultPayoutPct }),
-        ...(body.isActive !== undefined && { isActive: body.isActive }),
-      },
-    });
+    const updateData: any = { updatedAt: new Date().toISOString() };
+
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.companyName !== undefined) updateData.companyName = body.companyName;
+    if (body.email !== undefined) updateData.email = body.email;
+    if (body.phone !== undefined) updateData.phone = body.phone;
+    if (body.specialty !== undefined) updateData.specialty = body.specialty;
+    if (body.defaultPayoutPct !== undefined) updateData.defaultPayoutPct = body.defaultPayoutPct;
+    if (body.isActive !== undefined) updateData.isActive = body.isActive;
+
+    const { data: subcontractor, error } = await supabase
+      .from('Subcontractor')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json(subcontractor);
   } catch (error) {
@@ -74,11 +98,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.subcontractor.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Subcontractor')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

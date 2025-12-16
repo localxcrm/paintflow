@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/estimates/[id] - Get a single estimate
 export async function GET(
@@ -7,23 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const estimate = await prisma.estimate.findUnique({
-      where: { id },
-      include: {
-        lead: true,
-        lineItems: true,
-        signature: true,
-        job: true,
-      },
-    });
+    const { data: estimate, error } = await supabase
+      .from('Estimate')
+      .select('*, Lead(*), EstimateLineItem(*), EstimateSignature(*), Job(*)')
+      .eq('id', id)
+      .single();
 
-    if (!estimate) {
-      return NextResponse.json(
-        { error: 'Estimate not found' },
-        { status: 404 }
-      );
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Estimate not found' },
+          { status: 404 }
+        );
+      }
+      throw error;
     }
 
     return NextResponse.json(estimate);
@@ -42,11 +42,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
     // If line items are being updated, recalculate totals
-    let calculatedFields = {};
+    let calculatedFields: any = {};
     if (body.lineItems) {
       const subtotal = body.lineItems.reduce(
         (sum: number, item: { lineTotal?: number; quantity?: number; unitPrice?: number }) =>
@@ -57,7 +58,12 @@ export async function PATCH(
       const totalPrice = subtotal - discountAmount;
 
       // Get business settings for cost calculations
-      const settings = await prisma.businessSettings.findFirst();
+      const { data: settings } = await supabase
+        .from('BusinessSettings')
+        .select('*')
+        .limit(1)
+        .single();
+
       const subMaterialsPct = settings?.subMaterialsPct || 15;
       const subLaborPct = settings?.subLaborPct || 45;
       const minGrossProfit = settings?.minGrossProfitPerJob || 900;
@@ -81,43 +87,57 @@ export async function PATCH(
         meetsTargetGm: grossMarginPct >= targetGrossMargin,
       };
 
-      // Delete existing line items and create new ones
-      await prisma.estimateLineItem.deleteMany({
-        where: { estimateId: id },
-      });
+      // Delete existing line items
+      await supabase
+        .from('EstimateLineItem')
+        .delete()
+        .eq('estimateId', id);
 
-      await prisma.estimateLineItem.createMany({
-        data: body.lineItems.map((item: { description: string; location: string; scope?: string; quantity?: number; unitPrice: number; lineTotal?: number }) => ({
-          estimateId: id,
-          description: item.description,
-          location: item.location,
-          scope: item.scope,
-          quantity: item.quantity || 1,
-          unitPrice: item.unitPrice,
-          lineTotal: item.lineTotal || (item.quantity || 1) * item.unitPrice,
-        })),
-      });
+      // Create new line items
+      const lineItemsData = body.lineItems.map((item: { description: string; location: string; scope?: string; quantity?: number; unitPrice: number; lineTotal?: number }) => ({
+        estimateId: id,
+        description: item.description,
+        location: item.location,
+        scope: item.scope,
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal || (item.quantity || 1) * item.unitPrice,
+      }));
+
+      const { error: lineItemsError } = await supabase
+        .from('EstimateLineItem')
+        .insert(lineItemsData);
+
+      if (lineItemsError) {
+        throw lineItemsError;
+      }
     }
 
-    const estimate = await prisma.estimate.update({
-      where: { id },
-      data: {
-        ...(body.clientName !== undefined && { clientName: body.clientName }),
-        ...(body.address !== undefined && { address: body.address }),
-        ...(body.status !== undefined && { status: body.status }),
-        ...(body.estimateDate !== undefined && { estimateDate: new Date(body.estimateDate) }),
-        ...(body.validUntil !== undefined && { validUntil: new Date(body.validUntil) }),
-        ...(body.discountAmount !== undefined && { discountAmount: body.discountAmount }),
-        ...(body.notes !== undefined && { notes: body.notes }),
-        ...(body.leadId !== undefined && { leadId: body.leadId }),
-        ...calculatedFields,
-      },
-      include: {
-        lead: true,
-        lineItems: true,
-        signature: true,
-      },
-    });
+    // Build update data
+    const updateData: any = { updatedAt: new Date().toISOString() };
+
+    if (body.clientName !== undefined) updateData.clientName = body.clientName;
+    if (body.address !== undefined) updateData.address = body.address;
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.estimateDate !== undefined) updateData.estimateDate = new Date(body.estimateDate).toISOString();
+    if (body.validUntil !== undefined) updateData.validUntil = new Date(body.validUntil).toISOString();
+    if (body.discountAmount !== undefined) updateData.discountAmount = body.discountAmount;
+    if (body.notes !== undefined) updateData.notes = body.notes;
+    if (body.leadId !== undefined) updateData.leadId = body.leadId;
+
+    // Merge calculated fields
+    Object.assign(updateData, calculatedFields);
+
+    const { data: estimate, error: updateError } = await supabase
+      .from('Estimate')
+      .update(updateData)
+      .eq('id', id)
+      .select('*, Lead(*), EstimateLineItem(*), EstimateSignature(*)')
+      .single();
+
+    if (updateError) {
+      throw updateError;
+    }
 
     return NextResponse.json(estimate);
   } catch (error) {
@@ -135,11 +155,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.estimate.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Estimate')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // Helper function to calculate job financials
 async function calculateJobFinancials(jobValue: number) {
-  const settings = await prisma.businessSettings.findFirst();
+  const supabase = createServerSupabaseClient();
+
+  const { data: settings } = await supabase
+    .from('BusinessSettings')
+    .select('*')
+    .limit(1)
+    .single();
 
   const subPayoutPct = settings?.subPayoutPct || 60;
   const subMaterialsPct = settings?.subMaterialsPct || 15;
@@ -45,6 +51,7 @@ async function calculateJobFinancials(jobValue: number) {
 // GET /api/jobs - Get all jobs with optional filtering
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const search = searchParams.get('search');
@@ -55,56 +62,51 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const where: Record<string, unknown> = {};
+    // Build query
+    let query = supabase
+      .from('Job')
+      .select('*, Lead(*), Estimate(*), salesRep:TeamMember!salesRepId(*), projectManager:TeamMember!projectManagerId(*), Subcontractor(*)', { count: 'exact' });
 
+    // Apply filters
     if (status) {
-      where.status = status;
+      query = query.eq('status', status);
     }
 
     if (leadId) {
-      where.leadId = leadId;
+      query = query.eq('leadId', leadId);
     }
 
     if (salesRepId) {
-      where.salesRepId = salesRepId;
+      query = query.eq('salesRepId', salesRepId);
     }
 
     if (projectManagerId) {
-      where.projectManagerId = projectManagerId;
+      query = query.eq('projectManagerId', projectManagerId);
     }
 
     if (subcontractorId) {
-      where.subcontractorId = subcontractorId;
+      query = query.eq('subcontractorId', subcontractorId);
     }
 
+    // Search across multiple fields
     if (search) {
-      where.OR = [
-        { clientName: { contains: search, mode: 'insensitive' } },
-        { address: { contains: search, mode: 'insensitive' } },
-        { jobNumber: { contains: search, mode: 'insensitive' } },
-      ];
+      query = query.or(`clientName.ilike.%${search}%,address.ilike.%${search}%,jobNumber.ilike.%${search}%`);
     }
 
-    const [jobs, total] = await Promise.all([
-      prisma.job.findMany({
-        where,
-        include: {
-          lead: true,
-          estimate: true,
-          salesRep: true,
-          projectManager: true,
-          subcontractor: true,
-        },
-        orderBy: { jobDate: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.job.count({ where }),
-    ]);
+    // Apply ordering, limit, and offset
+    query = query
+      .order('jobDate', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    const { data: jobs, count, error } = await query;
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({
-      jobs,
-      total,
+      jobs: jobs || [],
+      total: count || 0,
       limit,
       offset,
     });
@@ -120,13 +122,16 @@ export async function GET(request: NextRequest) {
 // POST /api/jobs - Create a new job
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
     // Generate job number
-    const lastJob = await prisma.job.findFirst({
-      orderBy: { createdAt: 'desc' },
-      select: { jobNumber: true },
-    });
+    const { data: lastJob } = await supabase
+      .from('Job')
+      .select('jobNumber')
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .single();
 
     let nextNumber = 1001;
     if (lastJob?.jobNumber) {
@@ -146,32 +151,39 @@ export async function POST(request: NextRequest) {
     let pmCommissionAmount = 0;
 
     if (body.salesRepId) {
-      const salesRep = await prisma.teamMember.findUnique({
-        where: { id: body.salesRepId },
-      });
+      const { data: salesRep } = await supabase
+        .from('TeamMember')
+        .select('*')
+        .eq('id', body.salesRepId)
+        .single();
+
       const salesCommissionPct = body.salesCommissionPct ?? salesRep?.defaultCommissionPct ?? 5;
       salesCommissionAmount = jobValue * (salesCommissionPct / 100);
     }
 
     if (body.projectManagerId) {
-      const pm = await prisma.teamMember.findUnique({
-        where: { id: body.projectManagerId },
-      });
+      const { data: pm } = await supabase
+        .from('TeamMember')
+        .select('*')
+        .eq('id', body.projectManagerId)
+        .single();
+
       const pmCommissionPct = body.pmCommissionPct ?? pm?.defaultCommissionPct ?? 5;
       pmCommissionAmount = jobValue * (pmCommissionPct / 100);
     }
 
-    const job = await prisma.job.create({
-      data: {
+    const { data: job, error: jobError } = await supabase
+      .from('Job')
+      .insert({
         jobNumber,
         clientName: body.clientName,
         address: body.address,
         city: body.city || '',
         projectType: body.projectType || 'interior',
         status: body.status || 'lead',
-        jobDate: body.jobDate ? new Date(body.jobDate) : new Date(),
-        scheduledStartDate: body.scheduledStartDate ? new Date(body.scheduledStartDate) : null,
-        scheduledEndDate: body.scheduledEndDate ? new Date(body.scheduledEndDate) : null,
+        jobDate: body.jobDate ? new Date(body.jobDate).toISOString() : new Date().toISOString(),
+        scheduledStartDate: body.scheduledStartDate ? new Date(body.scheduledStartDate).toISOString() : null,
+        scheduledEndDate: body.scheduledEndDate ? new Date(body.scheduledEndDate).toISOString() : null,
         jobValue,
         ...financials,
         salesCommissionPct: body.salesCommissionPct || 0,
@@ -184,17 +196,26 @@ export async function POST(request: NextRequest) {
         salesRepId: body.salesRepId,
         projectManagerId: body.projectManagerId,
         subcontractorId: body.subcontractorId,
-      },
-      include: {
-        lead: true,
-        estimate: true,
-        salesRep: true,
-        projectManager: true,
-        subcontractor: true,
-      },
-    });
+      })
+      .select()
+      .single();
 
-    return NextResponse.json(job, { status: 201 });
+    if (jobError) {
+      throw jobError;
+    }
+
+    // Fetch the complete job with relations
+    const { data: completeJob, error: fetchError } = await supabase
+      .from('Job')
+      .select('*, Lead(*), Estimate(*), salesRep:TeamMember!salesRepId(*), projectManager:TeamMember!projectManagerId(*), Subcontractor(*)')
+      .eq('id', job.id)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    return NextResponse.json(completeJob, { status: 201 });
   } catch (error) {
     console.error('Error creating job:', error);
     return NextResponse.json(

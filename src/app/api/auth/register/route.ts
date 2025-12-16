@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { hashPassword, createSession } from '@/lib/auth';
 import { cookies } from 'next/headers';
+import type { User } from '@/types/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,10 +24,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const supabase = createServerSupabaseClient();
+
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    const { data: existingUser } = await supabase
+      .from('User')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single();
 
     if (existingUser) {
       return NextResponse.json(
@@ -36,14 +41,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user
-    const user = await prisma.user.create({
-      data: {
+    const { data: user, error: createError } = await supabase
+      .from('User')
+      .insert({
         email: email.toLowerCase(),
         passwordHash: hashPassword(password),
         name,
         role: 'user',
-      },
-    });
+      })
+      .select()
+      .single<User>();
+
+    if (createError || !user) {
+      throw new Error('Failed to create user');
+    }
 
     // Create session
     const session = await createSession(user.id);
@@ -54,7 +65,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      expires: session.expiresAt,
+      expires: new Date(session.expiresAt),
       path: '/',
     });
 

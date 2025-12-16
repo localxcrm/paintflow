@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/price-book/rooms/[id] - Get a single room price
 export async function GET(
@@ -7,17 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const roomPrice = await prisma.roomPrice.findUnique({
-      where: { id },
-    });
+    const { data: roomPrice, error } = await supabase
+      .from('RoomPrice')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!roomPrice) {
-      return NextResponse.json(
-        { error: 'Room price not found' },
-        { status: 404 }
-      );
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Room price not found' },
+          { status: 404 }
+        );
+      }
+      throw error;
     }
 
     return NextResponse.json(roomPrice);
@@ -36,21 +42,30 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const roomPrice = await prisma.roomPrice.update({
-      where: { id },
-      data: {
-        ...(body.roomType !== undefined && { roomType: body.roomType }),
-        ...(body.size !== undefined && { size: body.size }),
-        ...(body.typicalSqft !== undefined && { typicalSqft: body.typicalSqft }),
-        ...(body.wallsOnly !== undefined && { wallsOnly: body.wallsOnly }),
-        ...(body.wallsTrim !== undefined && { wallsTrim: body.wallsTrim }),
-        ...(body.wallsTrimCeiling !== undefined && { wallsTrimCeiling: body.wallsTrimCeiling }),
-        ...(body.fullRefresh !== undefined && { fullRefresh: body.fullRefresh }),
-      },
-    });
+    const updateData: any = { updatedAt: new Date().toISOString() };
+
+    if (body.roomType !== undefined) updateData.roomType = body.roomType;
+    if (body.size !== undefined) updateData.size = body.size;
+    if (body.typicalSqft !== undefined) updateData.typicalSqft = body.typicalSqft;
+    if (body.wallsOnly !== undefined) updateData.wallsOnly = body.wallsOnly;
+    if (body.wallsTrim !== undefined) updateData.wallsTrim = body.wallsTrim;
+    if (body.wallsTrimCeiling !== undefined) updateData.wallsTrimCeiling = body.wallsTrimCeiling;
+    if (body.fullRefresh !== undefined) updateData.fullRefresh = body.fullRefresh;
+
+    const { data: roomPrice, error } = await supabase
+      .from('RoomPrice')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json(roomPrice);
   } catch (error) {
@@ -68,11 +83,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.roomPrice.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('RoomPrice')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

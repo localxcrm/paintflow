@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/settings/portfolio/[id] - Get a single portfolio image
 export async function GET(
@@ -7,17 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const portfolioImage = await prisma.portfolioImage.findUnique({
-      where: { id },
-    });
+    const { data: portfolioImage, error } = await supabase
+      .from('PortfolioImage')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!portfolioImage) {
-      return NextResponse.json(
-        { error: 'Portfolio image not found' },
-        { status: 404 }
-      );
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Portfolio image not found' },
+          { status: 404 }
+        );
+      }
+      throw error;
     }
 
     return NextResponse.json(portfolioImage);
@@ -36,11 +42,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.portfolioImage.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('PortfolioImage')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

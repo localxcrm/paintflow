@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/price-book/addons/[id] - Get a single addon
 export async function GET(
@@ -7,17 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const addon = await prisma.addon.findUnique({
-      where: { id },
-    });
+    const { data: addon, error } = await supabase
+      .from('Addon')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!addon) {
-      return NextResponse.json(
-        { error: 'Addon not found' },
-        { status: 404 }
-      );
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Addon not found' },
+          { status: 404 }
+        );
+      }
+      throw error;
     }
 
     return NextResponse.json(addon);
@@ -36,18 +42,27 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const addon = await prisma.addon.update({
-      where: { id },
-      data: {
-        ...(body.name !== undefined && { name: body.name }),
-        ...(body.category !== undefined && { category: body.category }),
-        ...(body.unit !== undefined && { unit: body.unit }),
-        ...(body.basePrice !== undefined && { basePrice: body.basePrice }),
-      },
-    });
+    const updateData: any = { updatedAt: new Date().toISOString() };
+
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.category !== undefined) updateData.category = body.category;
+    if (body.unit !== undefined) updateData.unit = body.unit;
+    if (body.basePrice !== undefined) updateData.basePrice = body.basePrice;
+
+    const { data: addon, error } = await supabase
+      .from('Addon')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json(addon);
   } catch (error) {
@@ -65,11 +80,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.addon.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Addon')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

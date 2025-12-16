@@ -1,5 +1,6 @@
-import { prisma } from './prisma';
+import { createServerSupabaseClient } from './supabase';
 import { cookies } from 'next/headers';
+import type { User, Session, SessionWithUser } from '@/types/database';
 
 // Simple hash function for demo purposes
 // In production, use bcrypt or argon2
@@ -38,8 +39,9 @@ export function getSessionExpiry(): Date {
 }
 
 // Get current user from session
-export async function getCurrentUser() {
+export async function getCurrentUser(): Promise<User | null> {
   try {
+    const supabase = createServerSupabaseClient();
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get('paintpro_session')?.value;
 
@@ -47,56 +49,72 @@ export async function getCurrentUser() {
       return null;
     }
 
-    const session = await prisma.session.findUnique({
-      where: { token: sessionToken },
-      include: { user: true },
-    });
+    const { data: session, error } = await supabase
+      .from('Session')
+      .select('*, User(*)')
+      .eq('token', sessionToken)
+      .single<SessionWithUser>();
 
-    if (!session || session.expiresAt < new Date()) {
+    if (error || !session) {
       return null;
     }
 
-    return session.user;
+    // Check if session is expired
+    if (new Date(session.expiresAt) < new Date()) {
+      return null;
+    }
+
+    return session.User;
   } catch {
     return null;
   }
 }
 
 // Create session for user
-export async function createSession(userId: string) {
+export async function createSession(userId: string): Promise<Session> {
+  const supabase = createServerSupabaseClient();
   const token = generateSessionToken();
   const expiresAt = getSessionExpiry();
 
-  const session = await prisma.session.create({
-    data: {
+  const { data: session, error } = await supabase
+    .from('Session')
+    .insert({
       token,
       userId,
-      expiresAt,
-    },
-  });
+      expiresAt: expiresAt.toISOString(),
+    })
+    .select()
+    .single<Session>();
+
+  if (error || !session) {
+    throw new Error('Failed to create session');
+  }
 
   return session;
 }
 
 // Delete session
-export async function deleteSession(token: string) {
+export async function deleteSession(token: string): Promise<boolean> {
   try {
-    await prisma.session.delete({
-      where: { token },
-    });
-    return true;
+    const supabase = createServerSupabaseClient();
+
+    const { error } = await supabase
+      .from('Session')
+      .delete()
+      .eq('token', token);
+
+    return !error;
   } catch {
     return false;
   }
 }
 
 // Clean up expired sessions
-export async function cleanupExpiredSessions() {
-  await prisma.session.deleteMany({
-    where: {
-      expiresAt: {
-        lt: new Date(),
-      },
-    },
-  });
+export async function cleanupExpiredSessions(): Promise<void> {
+  const supabase = createServerSupabaseClient();
+
+  await supabase
+    .from('Session')
+    .delete()
+    .lt('expiresAt', new Date().toISOString());
 }

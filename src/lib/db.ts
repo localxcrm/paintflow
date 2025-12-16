@@ -1,15 +1,16 @@
-import { PrismaClient } from '@prisma/client';
+// Database helper for Supabase
+// This file provides a simple wrapper similar to Prisma's API
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+import { createServerSupabaseClient } from './supabase';
+
+// Export the Supabase client creator for direct use
+export function getSupabaseClient() {
+  return createServerSupabaseClient();
+}
+
+// Convenience export for common pattern
+export const db = {
+  get client() {
+    return createServerSupabaseClient();
+  }
 };
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  });
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
-
-export default prisma;
