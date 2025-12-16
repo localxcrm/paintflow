@@ -207,6 +207,12 @@ export default function NewEstimatePage() {
     ));
   };
 
+  const updateItemLocation = (id: string, location: string) => {
+    setLineItems(lineItems.map(item =>
+      item.id === id ? { ...item, location } : item
+    ));
+  };
+
   const toggleRiskModifier = (id: string) => {
     setRiskModifiers(
       riskModifiers.map((m) =>
@@ -508,7 +514,14 @@ export default function NewEstimatePage() {
                   <TableBody>
                     {lineItems.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.location}</TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.location}
+                            onChange={(e) => updateItemLocation(item.id, e.target.value)}
+                            className="h-8 text-sm font-medium w-[140px]"
+                            placeholder="Location"
+                          />
+                        </TableCell>
                         <TableCell>
                           <Input
                             value={item.description}

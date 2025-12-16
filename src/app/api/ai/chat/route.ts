@@ -250,8 +250,9 @@ function parseEstimateRequest(message: string, priceBook: PriceBookContext): Sug
   const items: SuggestedLineItem[] = [];
   const lowerMessage = message.toLowerCase();
 
-  // Room type patterns
+  // Room type patterns - English and Portuguese
   const roomPatterns = [
+    // English patterns
     { regex: /(\d+)\s*(?:bed(?:room)?s?)/gi, type: 'Bedroom' },
     { regex: /(\d+)\s*(?:bath(?:room)?s?)/gi, type: 'Bathroom' },
     { regex: /(\d+)\s*(?:kitchen)/gi, type: 'Kitchen' },
@@ -259,24 +260,40 @@ function parseEstimateRequest(message: string, priceBook: PriceBookContext): Sug
     { regex: /(\d+)\s*(?:dining\s*room)/gi, type: 'Dining Room' },
     { regex: /(\d+)\s*(?:office)/gi, type: 'Office' },
     { regex: /(\d+)\s*(?:hallway)/gi, type: 'Hallway' },
+    // Portuguese patterns
+    { regex: /(\d+)\s*(?:quartos?|dormit[oó]rios?)/gi, type: 'Bedroom' },
+    { regex: /(\d+)\s*(?:banheiros?|lavabos?)/gi, type: 'Bathroom' },
+    { regex: /(\d+)\s*(?:cozinhas?)/gi, type: 'Kitchen' },
+    { regex: /(\d+)\s*(?:salas?\s*(?:de\s*estar)?)/gi, type: 'Living Room' },
+    { regex: /(\d+)\s*(?:salas?\s*de\s*jantar)/gi, type: 'Dining Room' },
+    { regex: /(\d+)\s*(?:escrit[oó]rios?|home\s*office)/gi, type: 'Office' },
+    { regex: /(\d+)\s*(?:corredores?)/gi, type: 'Hallway' },
   ];
 
-  // Detect size
+  // Detect size - English and Portuguese
   let size = 'medium';
-  if (lowerMessage.includes('small')) size = 'small';
-  if (lowerMessage.includes('large')) size = 'large';
+  if (lowerMessage.includes('small') || lowerMessage.includes('pequeno') || lowerMessage.includes('pequena')) {
+    size = 'small';
+  }
+  if (lowerMessage.includes('large') || lowerMessage.includes('grande')) {
+    size = 'large';
+  }
 
-  // Detect scope
+  // Detect scope - English and Portuguese
   let scope = 'walls_trim';
-  if (lowerMessage.includes('walls only') || lowerMessage.includes('just walls')) {
+  if (lowerMessage.includes('walls only') || lowerMessage.includes('just walls') ||
+      lowerMessage.includes('só parede') || lowerMessage.includes('apenas parede') ||
+      lowerMessage.includes('somente parede')) {
     scope = 'walls_only';
-  } else if (lowerMessage.includes('ceiling') || lowerMessage.includes('full refresh')) {
+  } else if (lowerMessage.includes('ceiling') || lowerMessage.includes('full refresh') ||
+             lowerMessage.includes('teto') || lowerMessage.includes('forro')) {
     scope = 'walls_trim_ceiling';
-  } else if (lowerMessage.includes('full') || lowerMessage.includes('everything')) {
+  } else if (lowerMessage.includes('full') || lowerMessage.includes('everything') ||
+             lowerMessage.includes('completo') || lowerMessage.includes('tudo')) {
     scope = 'full_refresh';
   }
 
-  // Extract rooms
+  // Extract rooms and create INDIVIDUAL items for each room
   for (const pattern of roomPatterns) {
     const matches = lowerMessage.matchAll(pattern.regex);
     for (const match of matches) {
@@ -294,14 +311,17 @@ function parseEstimateRequest(message: string, priceBook: PriceBookContext): Sug
         if (scope === 'walls_trim_ceiling') unitPrice = priceEntry.prices.wallsTrimCeiling;
         if (scope === 'full_refresh') unitPrice = priceEntry.prices.fullRefresh;
 
-        items.push({
-          description: `${size.charAt(0).toUpperCase() + size.slice(1)} ${pattern.type} - ${scope.replace(/_/g, ' ')}`,
-          location: pattern.type,
-          scope,
-          quantity,
-          unitPrice,
-          lineTotal: quantity * unitPrice,
-        });
+        // Create individual line items for each room (not quantity > 1)
+        for (let i = 1; i <= quantity; i++) {
+          items.push({
+            description: `${size.charAt(0).toUpperCase() + size.slice(1)} ${pattern.type} - ${scope.replace(/_/g, ' ')}`,
+            location: `${pattern.type} ${i}`,
+            scope,
+            quantity: 1,
+            unitPrice,
+            lineTotal: unitPrice,
+          });
+        }
       }
     }
   }
