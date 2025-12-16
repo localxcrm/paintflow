@@ -160,10 +160,12 @@ export async function createChatCompletion(
 }
 
 // Helper function to transcribe audio using Whisper
-export async function transcribeAudio(audioFile: File): Promise<string> {
+export async function transcribeAudio(audioFile: File, language?: string): Promise<string> {
   const transcription = await openai.audio.transcriptions.create({
     file: audioFile,
     model: 'whisper-1',
+    language: language || 'pt', // Default to Portuguese (pt) for Brazilian users
+    prompt: 'Esta é uma descrição de um orçamento de pintura residencial ou comercial. Transcreva em português brasileiro.',
   });
 
   return transcription.text;

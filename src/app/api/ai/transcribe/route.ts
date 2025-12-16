@@ -6,6 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File;
+    const language = formData.get('language') as string | null;
 
     if (!audioFile) {
       return NextResponse.json(
@@ -15,7 +16,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Transcribe the audio using OpenAI Whisper
-    const transcription = await transcribeAudio(audioFile);
+    // Default language is Portuguese (pt) - can be overridden via form data
+    const transcription = await transcribeAudio(audioFile, language || undefined);
 
     return NextResponse.json({
       text: transcription,
