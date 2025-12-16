@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/meetings/[id] - Get a single meeting
 export async function GET(
@@ -7,18 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const meeting = await prisma.meeting.findUnique({
-      where: { id },
-    });
+    const { data: meeting, error } = await supabase
+      .from('Meeting')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!meeting) {
+    if (error && error.code === 'PGRST116') {
       return NextResponse.json(
         { error: 'Meeting not found' },
         { status: 404 }
       );
     }
+
+    if (error) throw error;
 
     return NextResponse.json(meeting);
   } catch (error) {
@@ -36,21 +41,27 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const meeting = await prisma.meeting.update({
-      where: { id },
-      data: {
-        ...(body.meetingDate !== undefined && { meetingDate: new Date(body.meetingDate) }),
-        ...(body.meetingType !== undefined && { meetingType: body.meetingType }),
-        ...(body.attendees !== undefined && { attendees: body.attendees }),
-        ...(body.ratingAvg !== undefined && { ratingAvg: body.ratingAvg }),
-        ...(body.segueNotes !== undefined && { segueNotes: body.segueNotes }),
-        ...(body.headlines !== undefined && { headlines: body.headlines }),
-        ...(body.notes !== undefined && { notes: body.notes }),
-      },
-    });
+    const updateData: Record<string, unknown> = {};
+    if (body.meetingDate !== undefined) updateData.meetingDate = new Date(body.meetingDate).toISOString();
+    if (body.meetingType !== undefined) updateData.meetingType = body.meetingType;
+    if (body.attendees !== undefined) updateData.attendees = body.attendees;
+    if (body.ratingAvg !== undefined) updateData.ratingAvg = body.ratingAvg;
+    if (body.segueNotes !== undefined) updateData.segueNotes = body.segueNotes;
+    if (body.headlines !== undefined) updateData.headlines = body.headlines;
+    if (body.notes !== undefined) updateData.notes = body.notes;
+
+    const { data: meeting, error } = await supabase
+      .from('Meeting')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(meeting);
   } catch (error) {
@@ -68,11 +79,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.meeting.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Meeting')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

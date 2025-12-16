@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/issues/[id] - Get a single issue
 export async function GET(
@@ -7,18 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const issue = await prisma.issue.findUnique({
-      where: { id },
-    });
+    const { data: issue, error } = await supabase
+      .from('Issue')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!issue) {
+    if (error && error.code === 'PGRST116') {
       return NextResponse.json(
         { error: 'Issue not found' },
         { status: 404 }
       );
     }
+
+    if (error) throw error;
 
     return NextResponse.json(issue);
   } catch (error) {
@@ -36,20 +41,26 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const issue = await prisma.issue.update({
-      where: { id },
-      data: {
-        ...(body.title !== undefined && { title: body.title }),
-        ...(body.description !== undefined && { description: body.description }),
-        ...(body.issueType !== undefined && { issueType: body.issueType }),
-        ...(body.priority !== undefined && { priority: body.priority }),
-        ...(body.status !== undefined && { status: body.status }),
-        ...(body.resolution !== undefined && { resolution: body.resolution }),
-      },
-    });
+    const updateData: Record<string, unknown> = {};
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.issueType !== undefined) updateData.issueType = body.issueType;
+    if (body.priority !== undefined) updateData.priority = body.priority;
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.resolution !== undefined) updateData.resolution = body.resolution;
+
+    const { data: issue, error } = await supabase
+      .from('Issue')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(issue);
   } catch (error) {
@@ -67,11 +78,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.issue.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Issue')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,29 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/todos - Get all todos
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const owner = searchParams.get('owner');
     const status = searchParams.get('status');
 
-    const where: Record<string, unknown> = {};
+    let query = supabase
+      .from('Todo')
+      .select('*')
+      .order('status', { ascending: true })
+      .order('dueDate', { ascending: true });
 
     if (owner) {
-      where.owner = owner;
+      query = query.eq('owner', owner);
     }
 
     if (status) {
-      where.status = status;
+      query = query.eq('status', status);
     }
 
-    const todos = await prisma.todo.findMany({
-      where,
-      orderBy: [{ status: 'asc' }, { dueDate: 'asc' }],
-    });
+    const { data: todos, error } = await query;
 
-    return NextResponse.json(todos);
+    if (error) throw error;
+
+    return NextResponse.json(todos || []);
   } catch (error) {
     console.error('Error fetching todos:', error);
     return NextResponse.json(
@@ -36,16 +40,21 @@ export async function GET(request: NextRequest) {
 // POST /api/traction/todos - Create a new todo
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const todo = await prisma.todo.create({
-      data: {
+    const { data: todo, error } = await supabase
+      .from('Todo')
+      .insert({
         title: body.title,
         owner: body.owner,
-        dueDate: new Date(body.dueDate),
+        dueDate: new Date(body.dueDate).toISOString(),
         status: body.status || 'pending',
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(todo, { status: 201 });
   } catch (error) {

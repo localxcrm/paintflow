@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // POST /api/ai/chat - Send a message to AI assistant
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
     const { sessionId, message } = body;
 
@@ -15,33 +16,54 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create conversation
-    let conversation = await prisma.aIConversation.findFirst({
-      where: { sessionId },
-      include: { messages: { orderBy: { createdAt: 'asc' } } },
-    });
+    const { data: existingConversation, error: conversationError } = await supabase
+      .from('AIConversation')
+      .select('*')
+      .eq('sessionId', sessionId)
+      .single();
 
-    if (!conversation) {
-      conversation = await prisma.aIConversation.create({
-        data: { sessionId },
-        include: { messages: true },
-      });
+    let conversation;
+    if (conversationError && conversationError.code === 'PGRST116') {
+      // Conversation doesn't exist, create it
+      const { data: newConversation, error: createError } = await supabase
+        .from('AIConversation')
+        .insert({ sessionId })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      conversation = newConversation;
+    } else if (conversationError) {
+      throw conversationError;
+    } else {
+      conversation = existingConversation;
     }
 
     // Save user message
-    await prisma.aIMessage.create({
-      data: {
+    const { error: messageError } = await supabase
+      .from('AIMessage')
+      .insert({
         conversationId: conversation.id,
         role: 'user',
         content: message,
-      },
-    });
+      });
+
+    if (messageError) throw messageError;
 
     // Get price book data for context
-    const [roomPrices, exteriorPrices, addons] = await Promise.all([
-      prisma.roomPrice.findMany(),
-      prisma.exteriorPrice.findMany(),
-      prisma.addon.findMany(),
+    const [roomPricesResult, exteriorPricesResult, addonsResult] = await Promise.all([
+      supabase.from('RoomPrice').select('*'),
+      supabase.from('ExteriorPrice').select('*'),
+      supabase.from('Addon').select('*'),
     ]);
+
+    if (roomPricesResult.error) throw roomPricesResult.error;
+    if (exteriorPricesResult.error) throw exteriorPricesResult.error;
+    if (addonsResult.error) throw addonsResult.error;
+
+    const roomPrices = roomPricesResult.data || [];
+    const exteriorPrices = exteriorPricesResult.data || [];
+    const addons = addonsResult.data || [];
 
     // Build context for AI
     const priceBookContext = {
@@ -77,15 +99,19 @@ export async function POST(request: NextRequest) {
     const aiResponse = generateAIResponse(message, suggestedLineItems, riskModifiers, priceBookContext);
 
     // Save AI response
-    const aiMessage = await prisma.aIMessage.create({
-      data: {
+    const { data: aiMessage, error: aiMessageError } = await supabase
+      .from('AIMessage')
+      .insert({
         conversationId: conversation.id,
         role: 'assistant',
         content: aiResponse.content,
         suggestedLineItems: JSON.parse(JSON.stringify(aiResponse.lineItems)),
         suggestedRiskModifiers: aiResponse.riskModifiers,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (aiMessageError) throw aiMessageError;
 
     return NextResponse.json({
       message: aiMessage,
@@ -104,6 +130,7 @@ export async function POST(request: NextRequest) {
 // GET /api/ai/chat - Get conversation history
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
 
@@ -114,16 +141,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const conversation = await prisma.aIConversation.findFirst({
-      where: { sessionId },
-      include: {
-        messages: {
-          orderBy: { createdAt: 'asc' },
-        },
-      },
-    });
+    const { data: conversation, error: conversationError } = await supabase
+      .from('AIConversation')
+      .select('*')
+      .eq('sessionId', sessionId)
+      .single();
 
-    return NextResponse.json(conversation || { messages: [] });
+    if (conversationError && conversationError.code === 'PGRST116') {
+      // Conversation doesn't exist
+      return NextResponse.json({ messages: [] });
+    } else if (conversationError) {
+      throw conversationError;
+    }
+
+    // Get messages for this conversation
+    const { data: messages, error: messagesError } = await supabase
+      .from('AIMessage')
+      .select('*')
+      .eq('conversationId', conversation.id)
+      .order('createdAt', { ascending: true });
+
+    if (messagesError) throw messagesError;
+
+    return NextResponse.json({ ...conversation, messages: messages || [] });
   } catch (error) {
     console.error('Error fetching conversation:', error);
     return NextResponse.json(

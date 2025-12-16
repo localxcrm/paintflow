@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/todos/[id] - Get a single todo
 export async function GET(
@@ -7,18 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const todo = await prisma.todo.findUnique({
-      where: { id },
-    });
+    const { data: todo, error } = await supabase
+      .from('Todo')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!todo) {
+    if (error && error.code === 'PGRST116') {
       return NextResponse.json(
         { error: 'Todo not found' },
         { status: 404 }
       );
     }
+
+    if (error) throw error;
 
     return NextResponse.json(todo);
   } catch (error) {
@@ -36,18 +41,24 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const todo = await prisma.todo.update({
-      where: { id },
-      data: {
-        ...(body.title !== undefined && { title: body.title }),
-        ...(body.owner !== undefined && { owner: body.owner }),
-        ...(body.dueDate !== undefined && { dueDate: new Date(body.dueDate) }),
-        ...(body.status !== undefined && { status: body.status }),
-      },
-    });
+    const updateData: Record<string, unknown> = {};
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.owner !== undefined) updateData.owner = body.owner;
+    if (body.dueDate !== undefined) updateData.dueDate = new Date(body.dueDate).toISOString();
+    if (body.status !== undefined) updateData.status = body.status;
+
+    const { data: todo, error } = await supabase
+      .from('Todo')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(todo);
   } catch (error) {
@@ -65,11 +76,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.todo.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Todo')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

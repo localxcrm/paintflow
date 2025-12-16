@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/rocks - Get all rocks
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const quarter = searchParams.get('quarter');
     const year = searchParams.get('year');
@@ -11,34 +12,38 @@ export async function GET(request: NextRequest) {
     const rockType = searchParams.get('rockType');
     const status = searchParams.get('status');
 
-    const where: Record<string, unknown> = {};
+    let query = supabase
+      .from('Rock')
+      .select('*')
+      .order('year', { ascending: false })
+      .order('quarter', { ascending: false })
+      .order('dueDate', { ascending: true });
 
     if (quarter) {
-      where.quarter = parseInt(quarter);
+      query = query.eq('quarter', parseInt(quarter));
     }
 
     if (year) {
-      where.year = parseInt(year);
+      query = query.eq('year', parseInt(year));
     }
 
     if (owner) {
-      where.owner = owner;
+      query = query.eq('owner', owner);
     }
 
     if (rockType) {
-      where.rockType = rockType;
+      query = query.eq('rockType', rockType);
     }
 
     if (status) {
-      where.status = status;
+      query = query.eq('status', status);
     }
 
-    const rocks = await prisma.rock.findMany({
-      where,
-      orderBy: [{ year: 'desc' }, { quarter: 'desc' }, { dueDate: 'asc' }],
-    });
+    const { data: rocks, error } = await query;
 
-    return NextResponse.json(rocks);
+    if (error) throw error;
+
+    return NextResponse.json(rocks || []);
   } catch (error) {
     console.error('Error fetching rocks:', error);
     return NextResponse.json(
@@ -51,10 +56,12 @@ export async function GET(request: NextRequest) {
 // POST /api/traction/rocks - Create a new rock
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const rock = await prisma.rock.create({
-      data: {
+    const { data: rock, error } = await supabase
+      .from('Rock')
+      .insert({
         title: body.title,
         description: body.description,
         owner: body.owner,
@@ -62,9 +69,12 @@ export async function POST(request: NextRequest) {
         quarter: body.quarter,
         year: body.year,
         status: body.status || 'on_track',
-        dueDate: new Date(body.dueDate),
-      },
-    });
+        dueDate: new Date(body.dueDate).toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(rock, { status: 201 });
   } catch (error) {

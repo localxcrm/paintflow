@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/people-analyzer/[id] - Get a single people analyzer record
 export async function GET(
@@ -7,18 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const record = await prisma.peopleAnalyzer.findUnique({
-      where: { id },
-    });
+    const { data: record, error } = await supabase
+      .from('PeopleAnalyzer')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!record) {
+    if (error && error.code === 'PGRST116') {
       return NextResponse.json(
         { error: 'People analyzer record not found' },
         { status: 404 }
       );
     }
+
+    if (error) throw error;
 
     return NextResponse.json(record);
   } catch (error) {
@@ -36,22 +41,28 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const record = await prisma.peopleAnalyzer.update({
-      where: { id },
-      data: {
-        ...(body.personName !== undefined && { personName: body.personName }),
-        ...(body.reviewDate !== undefined && { reviewDate: new Date(body.reviewDate) }),
-        ...(body.coreValueRatings !== undefined && { coreValueRatings: body.coreValueRatings }),
-        ...(body.gwcGetsIt !== undefined && { gwcGetsIt: body.gwcGetsIt }),
-        ...(body.gwcWantsIt !== undefined && { gwcWantsIt: body.gwcWantsIt }),
-        ...(body.gwcCapacity !== undefined && { gwcCapacity: body.gwcCapacity }),
-        ...(body.overallStatus !== undefined && { overallStatus: body.overallStatus }),
-        ...(body.notes !== undefined && { notes: body.notes }),
-      },
-    });
+    const updateData: Record<string, unknown> = {};
+    if (body.personName !== undefined) updateData.personName = body.personName;
+    if (body.reviewDate !== undefined) updateData.reviewDate = new Date(body.reviewDate).toISOString();
+    if (body.coreValueRatings !== undefined) updateData.coreValueRatings = body.coreValueRatings;
+    if (body.gwcGetsIt !== undefined) updateData.gwcGetsIt = body.gwcGetsIt;
+    if (body.gwcWantsIt !== undefined) updateData.gwcWantsIt = body.gwcWantsIt;
+    if (body.gwcCapacity !== undefined) updateData.gwcCapacity = body.gwcCapacity;
+    if (body.overallStatus !== undefined) updateData.overallStatus = body.overallStatus;
+    if (body.notes !== undefined) updateData.notes = body.notes;
+
+    const { data: record, error } = await supabase
+      .from('PeopleAnalyzer')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(record);
   } catch (error) {
@@ -69,11 +80,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.peopleAnalyzer.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('PeopleAnalyzer')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

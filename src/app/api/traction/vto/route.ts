@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/vto - Get the VTO (Vision/Traction Organizer)
 export async function GET() {
   try {
-    // Get the single VTO record or create default
-    let vto = await prisma.vTO.findFirst();
+    const supabase = createServerSupabaseClient();
 
-    if (!vto) {
-      vto = await prisma.vTO.create({
-        data: {
+    // Get the single VTO record or create default
+    const { data: vto, error } = await supabase
+      .from('VTO')
+      .select('*')
+      .limit(1)
+      .single();
+
+    if (error && error.code === 'PGRST116') {
+      // VTO doesn't exist, create default
+      const { data: newVto, error: createError } = await supabase
+        .from('VTO')
+        .insert({
           coreValues: [],
           coreFocusPurpose: '',
           coreFocusNiche: '',
@@ -25,9 +33,15 @@ export async function GET() {
           provenProcess: '',
           guarantee: '',
           longTermIssues: [],
-        },
-      });
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      return NextResponse.json(newVto);
     }
+
+    if (error) throw error;
 
     return NextResponse.json(vto);
   } catch (error) {
@@ -42,14 +56,23 @@ export async function GET() {
 // PATCH /api/traction/vto - Update the VTO
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
     // Get existing VTO or create one
-    let vto = await prisma.vTO.findFirst();
+    const { data: existingVto, error: fetchError } = await supabase
+      .from('VTO')
+      .select('*')
+      .limit(1)
+      .single();
 
-    if (!vto) {
-      vto = await prisma.vTO.create({
-        data: {
+    let vto;
+
+    if (fetchError && fetchError.code === 'PGRST116') {
+      // VTO doesn't exist, create it
+      const { data: newVto, error: createError } = await supabase
+        .from('VTO')
+        .insert({
           coreValues: body.coreValues || [],
           coreFocusPurpose: body.coreFocusPurpose || '',
           coreFocusNiche: body.coreFocusNiche || '',
@@ -65,29 +88,42 @@ export async function PATCH(request: NextRequest) {
           provenProcess: body.provenProcess || '',
           guarantee: body.guarantee || '',
           longTermIssues: body.longTermIssues || [],
-        },
-      });
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      vto = newVto;
+    } else if (fetchError) {
+      throw fetchError;
     } else {
-      vto = await prisma.vTO.update({
-        where: { id: vto.id },
-        data: {
-          ...(body.coreValues !== undefined && { coreValues: body.coreValues }),
-          ...(body.coreFocusPurpose !== undefined && { coreFocusPurpose: body.coreFocusPurpose }),
-          ...(body.coreFocusNiche !== undefined && { coreFocusNiche: body.coreFocusNiche }),
-          ...(body.tenYearTarget !== undefined && { tenYearTarget: body.tenYearTarget }),
-          ...(body.threeYearRevenue !== undefined && { threeYearRevenue: body.threeYearRevenue }),
-          ...(body.threeYearProfit !== undefined && { threeYearProfit: body.threeYearProfit }),
-          ...(body.threeYearPicture !== undefined && { threeYearPicture: body.threeYearPicture }),
-          ...(body.oneYearRevenue !== undefined && { oneYearRevenue: body.oneYearRevenue }),
-          ...(body.oneYearProfit !== undefined && { oneYearProfit: body.oneYearProfit }),
-          ...(body.oneYearGoals !== undefined && { oneYearGoals: body.oneYearGoals }),
-          ...(body.targetMarket !== undefined && { targetMarket: body.targetMarket }),
-          ...(body.threeUniques !== undefined && { threeUniques: body.threeUniques }),
-          ...(body.provenProcess !== undefined && { provenProcess: body.provenProcess }),
-          ...(body.guarantee !== undefined && { guarantee: body.guarantee }),
-          ...(body.longTermIssues !== undefined && { longTermIssues: body.longTermIssues }),
-        },
-      });
+      // VTO exists, update it
+      const updateData: Record<string, unknown> = {};
+      if (body.coreValues !== undefined) updateData.coreValues = body.coreValues;
+      if (body.coreFocusPurpose !== undefined) updateData.coreFocusPurpose = body.coreFocusPurpose;
+      if (body.coreFocusNiche !== undefined) updateData.coreFocusNiche = body.coreFocusNiche;
+      if (body.tenYearTarget !== undefined) updateData.tenYearTarget = body.tenYearTarget;
+      if (body.threeYearRevenue !== undefined) updateData.threeYearRevenue = body.threeYearRevenue;
+      if (body.threeYearProfit !== undefined) updateData.threeYearProfit = body.threeYearProfit;
+      if (body.threeYearPicture !== undefined) updateData.threeYearPicture = body.threeYearPicture;
+      if (body.oneYearRevenue !== undefined) updateData.oneYearRevenue = body.oneYearRevenue;
+      if (body.oneYearProfit !== undefined) updateData.oneYearProfit = body.oneYearProfit;
+      if (body.oneYearGoals !== undefined) updateData.oneYearGoals = body.oneYearGoals;
+      if (body.targetMarket !== undefined) updateData.targetMarket = body.targetMarket;
+      if (body.threeUniques !== undefined) updateData.threeUniques = body.threeUniques;
+      if (body.provenProcess !== undefined) updateData.provenProcess = body.provenProcess;
+      if (body.guarantee !== undefined) updateData.guarantee = body.guarantee;
+      if (body.longTermIssues !== undefined) updateData.longTermIssues = body.longTermIssues;
+
+      const { data: updatedVto, error: updateError } = await supabase
+        .from('VTO')
+        .update(updateData)
+        .eq('id', existingVto.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      vto = updatedVto;
     }
 
     return NextResponse.json(vto);

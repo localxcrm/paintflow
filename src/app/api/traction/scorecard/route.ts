@@ -1,44 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/scorecard - Get all scorecard metrics with entries
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const owner = searchParams.get('owner');
     const category = searchParams.get('category');
     const weeksBack = parseInt(searchParams.get('weeksBack') || '13');
 
-    const where: Record<string, unknown> = {};
-
-    if (owner) {
-      where.owner = owner;
-    }
-
-    if (category) {
-      where.category = category;
-    }
-
     // Calculate the date range for entries
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - weeksBack * 7);
 
-    const metrics = await prisma.scorecardMetric.findMany({
-      where,
-      include: {
-        entries: {
-          where: {
-            weekEndingDate: {
-              gte: startDate,
-            },
-          },
-          orderBy: { weekEndingDate: 'desc' },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
+    let query = supabase
+      .from('ScorecardMetric')
+      .select('*')
+      .order('name', { ascending: true });
 
-    return NextResponse.json(metrics);
+    if (owner) {
+      query = query.eq('owner', owner);
+    }
+
+    if (category) {
+      query = query.eq('category', category);
+    }
+
+    const { data: metrics, error: metricsError } = await query;
+
+    if (metricsError) throw metricsError;
+
+    // For each metric, fetch its entries
+    const metricsWithEntries = await Promise.all(
+      (metrics || []).map(async (metric) => {
+        const { data: entries, error: entriesError } = await supabase
+          .from('ScorecardEntry')
+          .select('*')
+          .eq('metricId', metric.id)
+          .gte('weekEndingDate', startDate.toISOString())
+          .order('weekEndingDate', { ascending: false });
+
+        if (entriesError) throw entriesError;
+
+        return {
+          ...metric,
+          entries: entries || [],
+        };
+      })
+    );
+
+    return NextResponse.json(metricsWithEntries);
   } catch (error) {
     console.error('Error fetching scorecard:', error);
     return NextResponse.json(
@@ -51,23 +63,26 @@ export async function GET(request: NextRequest) {
 // POST /api/traction/scorecard - Create a new scorecard metric
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const metric = await prisma.scorecardMetric.create({
-      data: {
+    const { data: metric, error } = await supabase
+      .from('ScorecardMetric')
+      .insert({
         name: body.name,
         owner: body.owner,
         goalValue: body.goalValue,
         goalType: body.goalType || 'number',
         goalDirection: body.goalDirection || 'above',
         category: body.category || 'leading',
-      },
-      include: {
-        entries: true,
-      },
-    });
+      })
+      .select()
+      .single();
 
-    return NextResponse.json(metric, { status: 201 });
+    if (error) throw error;
+
+    // Return metric with empty entries array
+    return NextResponse.json({ ...metric, entries: [] }, { status: 201 });
   } catch (error) {
     console.error('Error creating scorecard metric:', error);
     return NextResponse.json(

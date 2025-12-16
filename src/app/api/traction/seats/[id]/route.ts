@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/seats/[id] - Get a single seat
 export async function GET(
@@ -7,24 +7,45 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    const seat = await prisma.seat.findUnique({
-      where: { id },
-      include: {
-        reportsTo: true,
-        directReports: true,
-      },
-    });
+    const { data: seat, error } = await supabase
+      .from('Seat')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!seat) {
+    if (error && error.code === 'PGRST116') {
       return NextResponse.json(
         { error: 'Seat not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(seat);
+    if (error) throw error;
+
+    // Fetch related seats
+    let reportsTo = null;
+    if (seat.reportsToId) {
+      const { data: reportsToSeat } = await supabase
+        .from('Seat')
+        .select('*')
+        .eq('id', seat.reportsToId)
+        .single();
+      reportsTo = reportsToSeat;
+    }
+
+    const { data: directReports } = await supabase
+      .from('Seat')
+      .select('*')
+      .eq('reportsToId', seat.id);
+
+    return NextResponse.json({
+      ...seat,
+      reportsTo,
+      directReports: directReports || [],
+    });
   } catch (error) {
     console.error('Error fetching seat:', error);
     return NextResponse.json(
@@ -40,30 +61,52 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
 
-    const seat = await prisma.seat.update({
-      where: { id },
-      data: {
-        ...(body.seatName !== undefined && { seatName: body.seatName }),
-        ...(body.roleDescription !== undefined && { roleDescription: body.roleDescription }),
-        ...(body.responsibilities !== undefined && { responsibilities: body.responsibilities }),
-        ...(body.personName !== undefined && { personName: body.personName }),
-        ...(body.personId !== undefined && { personId: body.personId }),
-        ...(body.reportsToId !== undefined && { reportsToId: body.reportsToId }),
-        ...(body.gwcGetsIt !== undefined && { gwcGetsIt: body.gwcGetsIt }),
-        ...(body.gwcWantsIt !== undefined && { gwcWantsIt: body.gwcWantsIt }),
-        ...(body.gwcCapacity !== undefined && { gwcCapacity: body.gwcCapacity }),
-        ...(body.isRightPersonRightSeat !== undefined && { isRightPersonRightSeat: body.isRightPersonRightSeat }),
-      },
-      include: {
-        reportsTo: true,
-        directReports: true,
-      },
-    });
+    const updateData: Record<string, unknown> = {};
+    if (body.seatName !== undefined) updateData.seatName = body.seatName;
+    if (body.roleDescription !== undefined) updateData.roleDescription = body.roleDescription;
+    if (body.responsibilities !== undefined) updateData.responsibilities = body.responsibilities;
+    if (body.personName !== undefined) updateData.personName = body.personName;
+    if (body.personId !== undefined) updateData.personId = body.personId;
+    if (body.reportsToId !== undefined) updateData.reportsToId = body.reportsToId;
+    if (body.gwcGetsIt !== undefined) updateData.gwcGetsIt = body.gwcGetsIt;
+    if (body.gwcWantsIt !== undefined) updateData.gwcWantsIt = body.gwcWantsIt;
+    if (body.gwcCapacity !== undefined) updateData.gwcCapacity = body.gwcCapacity;
+    if (body.isRightPersonRightSeat !== undefined) updateData.isRightPersonRightSeat = body.isRightPersonRightSeat;
 
-    return NextResponse.json(seat);
+    const { data: seat, error } = await supabase
+      .from('Seat')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Fetch related seats
+    let reportsTo = null;
+    if (seat.reportsToId) {
+      const { data: reportsToSeat } = await supabase
+        .from('Seat')
+        .select('*')
+        .eq('id', seat.reportsToId)
+        .single();
+      reportsTo = reportsToSeat;
+    }
+
+    const { data: directReports } = await supabase
+      .from('Seat')
+      .select('*')
+      .eq('reportsToId', seat.id);
+
+    return NextResponse.json({
+      ...seat,
+      reportsTo,
+      directReports: directReports || [],
+    });
   } catch (error) {
     console.error('Error updating seat:', error);
     return NextResponse.json(
@@ -79,11 +122,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createServerSupabaseClient();
     const { id } = await params;
 
-    await prisma.seat.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Seat')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

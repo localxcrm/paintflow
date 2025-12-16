@@ -1,29 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/traction/people-analyzer - Get all people analyzer records
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const personId = searchParams.get('personId');
     const overallStatus = searchParams.get('overallStatus');
 
-    const where: Record<string, unknown> = {};
+    let query = supabase
+      .from('PeopleAnalyzer')
+      .select('*')
+      .order('reviewDate', { ascending: false });
 
     if (personId) {
-      where.personId = personId;
+      query = query.eq('personId', personId);
     }
 
     if (overallStatus) {
-      where.overallStatus = overallStatus;
+      query = query.eq('overallStatus', overallStatus);
     }
 
-    const records = await prisma.peopleAnalyzer.findMany({
-      where,
-      orderBy: { reviewDate: 'desc' },
-    });
+    const { data: records, error } = await query;
 
-    return NextResponse.json(records);
+    if (error) throw error;
+
+    return NextResponse.json(records || []);
   } catch (error) {
     console.error('Error fetching people analyzer records:', error);
     return NextResponse.json(
@@ -36,21 +39,26 @@ export async function GET(request: NextRequest) {
 // POST /api/traction/people-analyzer - Create a new people analyzer record
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const record = await prisma.peopleAnalyzer.create({
-      data: {
+    const { data: record, error } = await supabase
+      .from('PeopleAnalyzer')
+      .insert({
         personName: body.personName,
         personId: body.personId,
-        reviewDate: body.reviewDate ? new Date(body.reviewDate) : new Date(),
+        reviewDate: body.reviewDate ? new Date(body.reviewDate).toISOString() : new Date().toISOString(),
         coreValueRatings: body.coreValueRatings || {},
         gwcGetsIt: body.gwcGetsIt ?? true,
         gwcWantsIt: body.gwcWantsIt ?? true,
         gwcCapacity: body.gwcCapacity ?? true,
         overallStatus: body.overallStatus || 'right_person_right_seat',
         notes: body.notes,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(record, { status: 201 });
   } catch (error) {

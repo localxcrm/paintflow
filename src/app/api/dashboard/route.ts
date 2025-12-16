@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/dashboard - Get dashboard KPIs and summary data
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'month'; // week, month, quarter, year
 
@@ -29,32 +30,46 @@ export async function GET(request: NextRequest) {
 
     // Fetch all necessary data in parallel
     const [
-      leads,
-      estimates,
-      jobs,
-      businessSettings,
+      leadsResult,
+      estimatesResult,
+      jobsResult,
+      businessSettingsResult,
     ] = await Promise.all([
       // Leads data
-      prisma.lead.findMany({
-        where: {
-          leadDate: { gte: startDate },
-        },
-      }),
+      supabase
+        .from('Lead')
+        .select('*')
+        .gte('leadDate', startDate.toISOString()),
       // Estimates data
-      prisma.estimate.findMany({
-        where: {
-          estimateDate: { gte: startDate },
-        },
-      }),
+      supabase
+        .from('Estimate')
+        .select('*')
+        .gte('estimateDate', startDate.toISOString()),
       // Jobs data (all for financial calculations)
-      prisma.job.findMany({
-        where: {
-          jobDate: { gte: startDate },
-        },
-      }),
+      supabase
+        .from('Job')
+        .select('*')
+        .gte('jobDate', startDate.toISOString()),
       // Business settings
-      prisma.businessSettings.findFirst(),
+      supabase
+        .from('BusinessSettings')
+        .select('*')
+        .limit(1)
+        .single(),
     ]);
+
+    if (leadsResult.error) throw leadsResult.error;
+    if (estimatesResult.error) throw estimatesResult.error;
+    if (jobsResult.error) throw jobsResult.error;
+    // BusinessSettings might not exist, so don't throw on PGRST116 (not found)
+    if (businessSettingsResult.error && businessSettingsResult.error.code !== 'PGRST116') {
+      throw businessSettingsResult.error;
+    }
+
+    const leads = leadsResult.data || [];
+    const estimates = estimatesResult.data || [];
+    const jobs = jobsResult.data || [];
+    const businessSettings = businessSettingsResult.data;
 
     // Calculate Lead KPIs
     const totalLeads = leads.length;
