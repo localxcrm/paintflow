@@ -95,3 +95,36 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// DELETE /api/leads - Delete multiple leads (bulk delete)
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = createServerSupabaseClient();
+    const body = await request.json();
+    const { ids } = body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { error: 'ids array is required' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from('Lead')
+      .delete()
+      .in('id', ids);
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({ success: true, deletedCount: ids.length });
+  } catch (error) {
+    console.error('Error deleting leads:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete leads' },
+      { status: 500 }
+    );
+  }
+}
