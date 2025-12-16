@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
     // Convert text to speech using OpenAI TTS
     const audioBuffer = await textToSpeech(message.content);
 
-    // Return audio as MP3
-    return new NextResponse(audioBuffer, {
+    // Return audio as MP3 (convert Buffer to Uint8Array for NextResponse)
+    return new NextResponse(new Uint8Array(audioBuffer), {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuffer.length.toString(),
@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
     // Convert text to speech using OpenAI TTS
     const audioBuffer = await textToSpeech(text);
 
-    // Return audio as MP3
-    return new NextResponse(audioBuffer, {
+    // Return audio as MP3 (convert Buffer to Uint8Array for NextResponse)
+    return new NextResponse(new Uint8Array(audioBuffer), {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuffer.length.toString(),

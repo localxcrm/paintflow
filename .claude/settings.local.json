@@ -14,7 +14,8 @@
       "Bash(npm run db:seed:*)",
       "Bash(git config:*)",
       "Bash(npm run build:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npx tsc --noEmit)"
     ]
   }
 }
