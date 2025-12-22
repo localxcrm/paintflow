@@ -172,7 +172,7 @@ export default function MarketingPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  R$ {(grandTotal.amount / 1000).toFixed(0)}K
+                  ${(grandTotal.amount / 1000).toFixed(0)}K
                 </p>
                 <p className="text-xs text-slate-500">Total investido</p>
               </div>
@@ -199,7 +199,7 @@ export default function MarketingPage() {
                 <Megaphone className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">R$ {avgCPL.toFixed(0)}</p>
+                <p className="text-2xl font-bold">${avgCPL.toFixed(0)}</p>
                 <p className="text-xs text-slate-500">Custo por lead</p>
               </div>
             </div>
@@ -335,11 +335,11 @@ export default function MarketingPage() {
                   <TableRow key={source}>
                     <TableCell className="font-medium">{source}</TableCell>
                     <TableCell className="text-right">
-                      R$ {data.amount.toLocaleString('pt-BR')}
+                      ${data.amount.toLocaleString('en-US')}
                     </TableCell>
                     <TableCell className="text-right">{data.leads}</TableCell>
                     <TableCell className="text-right">
-                      R$ {data.leads > 0 ? (data.amount / data.leads).toFixed(0) : '-'}
+                      ${data.leads > 0 ? (data.amount / data.leads).toFixed(0) : '-'}
                     </TableCell>
                     <TableCell className="text-right">
                       {grandTotal.amount > 0
@@ -353,10 +353,10 @@ export default function MarketingPage() {
                 <TableRow className="font-bold bg-slate-50">
                   <TableCell>Total</TableCell>
                   <TableCell className="text-right">
-                    R$ {grandTotal.amount.toLocaleString('pt-BR')}
+                    ${grandTotal.amount.toLocaleString('en-US')}
                   </TableCell>
                   <TableCell className="text-right">{grandTotal.leads}</TableCell>
-                  <TableCell className="text-right">R$ {avgCPL.toFixed(0)}</TableCell>
+                  <TableCell className="text-right">${avgCPL.toFixed(0)}</TableCell>
                   <TableCell className="text-right">100%</TableCell>
                 </TableRow>
               )}
@@ -401,11 +401,11 @@ export default function MarketingPage() {
                           {months[parseInt(month) - 1]}
                         </TableCell>
                         <TableCell className="text-right">
-                          R$ {monthTotal.amount.toLocaleString('pt-BR')}
+                          ${monthTotal.amount.toLocaleString('en-US')}
                         </TableCell>
                         <TableCell className="text-right">{monthTotal.leads}</TableCell>
                         <TableCell className="text-right">
-                          R$ {monthTotal.leads > 0 ? (monthTotal.amount / monthTotal.leads).toFixed(0) : '-'}
+                          ${monthTotal.leads > 0 ? (monthTotal.amount / monthTotal.leads).toFixed(0) : '-'}
                         </TableCell>
                       </TableRow>
                     );
@@ -423,11 +423,11 @@ export default function MarketingPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-slate-500">Investimento anual:</span>
-              <span className="font-medium ml-2">R$ 80.000</span>
+              <span className="font-medium ml-2">$80,000</span>
             </div>
             <div>
               <span className="text-slate-500">CPL meta:</span>
-              <span className="font-medium ml-2">~R$ 230/lead</span>
+              <span className="font-medium ml-2">~$230/lead</span>
             </div>
             <div>
               <span className="text-slate-500">ROI esperado:</span>

@@ -227,8 +227,8 @@ export default function VendasPage() {
                 <DollarSign className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">R$ {(totals.revenue / 1000).toFixed(0)}K</p>
-                <p className="text-xs text-slate-500">de R$ {(monthlyGoals.revenue / 1000).toFixed(0)}K</p>
+                <p className="text-2xl font-bold">${(totals.revenue / 1000).toFixed(0)}K</p>
+                <p className="text-xs text-slate-500">de ${(monthlyGoals.revenue / 1000).toFixed(0)}K</p>
               </div>
             </div>
           </CardContent>
@@ -363,7 +363,7 @@ export default function VendasPage() {
                       <TableCell className="text-right">{entry.estimates}</TableCell>
                       <TableCell className="text-right">{entry.sales}</TableCell>
                       <TableCell className="text-right">
-                        R$ {entry.revenue.toLocaleString('pt-BR')}
+                        ${entry.revenue.toLocaleString('en-US')}
                       </TableCell>
                       <TableCell className="text-right">{closingRate}%</TableCell>
                     </TableRow>
@@ -377,7 +377,7 @@ export default function VendasPage() {
                   <TableCell className="text-right">{totals.estimates}</TableCell>
                   <TableCell className="text-right">{totals.sales}</TableCell>
                   <TableCell className="text-right">
-                    R$ {totals.revenue.toLocaleString('pt-BR')}
+                    ${totals.revenue.toLocaleString('en-US')}
                   </TableCell>
                   <TableCell className="text-right">
                     {totals.estimates > 0
@@ -410,7 +410,7 @@ export default function VendasPage() {
             </div>
             <div>
               <span className="text-slate-500">Faturamento:</span>
-              <span className="font-medium ml-2">R$ 28.500/semana</span>
+              <span className="font-medium ml-2">$28,500/semana</span>
             </div>
           </div>
         </CardContent>

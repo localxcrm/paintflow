@@ -17,17 +17,17 @@ interface ProgressCardProps {
 function formatValue(value: number, format: 'number' | 'currency' | 'percent' = 'number'): string {
   if (format === 'currency') {
     if (value >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
+      return `$${(value / 1000000).toFixed(1)}M`;
     }
     if (value >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}K`;
+      return `$${(value / 1000).toFixed(0)}K`;
     }
-    return `R$ ${value.toLocaleString('pt-BR')}`;
+    return `$${value.toLocaleString('en-US')}`;
   }
   if (format === 'percent') {
     return `${value.toFixed(1)}%`;
   }
-  return value.toLocaleString('pt-BR');
+  return value.toLocaleString('en-US');
 }
 
 export function ProgressCard({

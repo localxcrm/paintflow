@@ -5,452 +5,434 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Target, TrendingUp, Calendar, CheckCircle, AlertCircle, Save } from 'lucide-react';
-import { cn } from '@/lib/utils';
+  Target,
+  Calculator,
+  CheckCircle2,
+  Circle,
+  Plus,
+  Trash2,
+  Save,
+  ArrowRight,
+} from 'lucide-react';
+import { toast } from 'sonner';
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+// Preset targets
+const PRESETS = [
+  { label: '$500K', value: 500000 },
+  { label: '$1M', value: 1000000 },
+  { label: '$1.5M', value: 1500000 },
+  { label: '$2M', value: 2000000 },
 ];
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-  }).format(amount);
+// Calculate goals based on annual revenue target (JR Reis formula)
+function calculateGoals(annualTarget: number) {
+  const avgTicket = 9500;
+  const closingRate = 0.30;
+  const productionWeeks = 35;
+  const marketingPercent = 0.08;
+
+  const jobsPerYear = Math.round(annualTarget / avgTicket);
+  const jobsPerWeek = jobsPerYear / productionWeeks;
+  const leadsPerYear = Math.round(jobsPerYear / closingRate);
+  const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
+  const revenuePerWeek = annualTarget / productionWeeks;
+  const marketingAnnual = annualTarget * marketingPercent;
+
+  return {
+    annual: {
+      revenue: annualTarget,
+      jobs: jobsPerYear,
+      leads: leadsPerYear,
+      marketing: marketingAnnual,
+    },
+    monthly: {
+      revenue: Math.round(annualTarget / 12),
+      jobs: Math.round(jobsPerYear / 12),
+      leads: Math.round(leadsPerYear / 12),
+      marketing: Math.round(marketingAnnual / 12),
+    },
+    weekly: {
+      revenue: Math.round(revenuePerWeek),
+      jobs: Math.round(jobsPerWeek * 10) / 10, // 1 decimal
+      leads: leadsPerWeek,
+      marketing: Math.round(marketingAnnual / 52),
+    },
+    quarterly: {
+      revenue: Math.round(annualTarget / 4),
+      jobs: Math.round(jobsPerYear / 4),
+      leads: Math.round(leadsPerYear / 4),
+      marketing: Math.round(marketingAnnual / 4),
+    },
+  };
 }
 
-interface MonthlyTarget {
-  id?: string;
-  month: number;
-  year: number;
-  quarter: number;
-  leadsGoal: number;
-  leadsActual: number;
-  appointmentsGoal: number;
-  appointmentsActual: number;
-  salesGoal: number;
-  salesActual: number;
-  salesValueGoal: number;
-  salesValueActual: number;
-  revenueGoal: number;
-  revenueActual: number;
-  grossProfitGoal: number;
-  grossProfitActual: number;
-  reviewsGoal: number;
-  reviewsActual: number;
-  marketingSpendGoal: number;
-  marketingSpendActual: number;
+function formatCurrency(value: number, compact = false) {
+  if (compact && value >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`;
+  }
+  if (compact && value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}K`;
+  }
+  return `$${value.toLocaleString('en-US')}`;
 }
+
+interface Rock {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+interface VTOData {
+  annualTarget: number;
+  coreValues: string;
+  coreFocus: string;
+  tenYearTarget: string;
+  threeYearPicture: string;
+  rocks: Rock[];
+}
+
+const defaultVTO: VTOData = {
+  annualTarget: 1000000,
+  coreValues: '',
+  coreFocus: '',
+  tenYearTarget: '',
+  threeYearPicture: '',
+  rocks: [
+    { id: '1', title: '', completed: false },
+    { id: '2', title: '', completed: false },
+    { id: '3', title: '', completed: false },
+  ],
+};
 
 export default function GoalsPage() {
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [targets, setTargets] = useState<MonthlyTarget[]>([]);
-  const [yearlyTotals, setYearlyTotals] = useState<Record<string, number>>({});
-  const [annualGoals, setAnnualGoals] = useState({
-    leads: 800,
-    sales: 250,
-    revenue: 1000000,
-    grossProfit: 450000,
-    reviews: 100,
-    marketingSpend: 100000,
-  });
-  const [isLoading, setIsLoading] = useState(true);
+  const [vto, setVto] = useState<VTOData>(defaultVTO);
+  const [customTarget, setCustomTarget] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  const goals = calculateGoals(vto.annualTarget);
+
+  // Load from localStorage
   useEffect(() => {
-    fetchData();
-  }, [year]);
-
-  const fetchData = async () => {
-    try {
-      const res = await fetch(`/api/targets?type=monthly&year=${year}`);
-      const data = await res.json();
-      setTargets(data.targets || []);
-      setYearlyTotals(data.yearlyTotals || {});
-    } catch (error) {
-      console.error('Error fetching targets:', error);
-    } finally {
-      setIsLoading(false);
+    const saved = localStorage.getItem('paintpro_vto');
+    if (saved) {
+      try {
+        setVto(JSON.parse(saved));
+      } catch (e) {
+        console.error('Error loading VTO:', e);
+      }
     }
-  };
+  }, []);
 
-  const handleGenerateTargets = async () => {
+  // Save to localStorage
+  const handleSave = () => {
     setIsSaving(true);
     try {
-      // First initialize seasonal curves
-      await fetch('/api/seasonal-curves', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year }),
-      });
-
-      // Then generate targets
-      await fetch('/api/targets', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year, annualGoals }),
-      });
-
-      fetchData();
-    } catch (error) {
-      console.error('Error generating targets:', error);
+      localStorage.setItem('paintpro_vto', JSON.stringify(vto));
+      toast.success('Configurações salvas!');
+    } catch (e) {
+      toast.error('Erro ao salvar');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleUpdateTarget = async (month: number, field: string, value: number) => {
-    const target = targets.find(t => t.month === month) || {
-      month,
-      year,
-      quarter: Math.ceil(month / 3),
-    };
+  const handlePresetClick = (value: number) => {
+    setVto({ ...vto, annualTarget: value });
+    setCustomTarget('');
+  };
 
-    try {
-      await fetch('/api/targets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...target,
-          [field]: value,
-          type: 'monthly',
-        }),
-      });
-      fetchData();
-    } catch (error) {
-      console.error('Error updating target:', error);
+  const handleCustomTarget = () => {
+    const value = parseInt(customTarget.replace(/[^0-9]/g, ''));
+    if (value && value > 0) {
+      setVto({ ...vto, annualTarget: value });
     }
   };
 
-  const getProgressColor = (actual: number, goal: number) => {
-    if (goal === 0) return 'bg-slate-200';
-    const pct = (actual / goal) * 100;
-    if (pct >= 100) return 'bg-green-500';
-    if (pct >= 75) return 'bg-blue-500';
-    if (pct >= 50) return 'bg-amber-500';
-    return 'bg-red-500';
+  const addRock = () => {
+    setVto({
+      ...vto,
+      rocks: [...vto.rocks, { id: Date.now().toString(), title: '', completed: false }],
+    });
   };
 
-  const getProgressPct = (actual: number, goal: number) => {
-    if (goal === 0) return 0;
-    return Math.min((actual / goal) * 100, 100);
+  const removeRock = (id: string) => {
+    setVto({
+      ...vto,
+      rocks: vto.rocks.filter((r) => r.id !== id),
+    });
   };
 
-  const currentMonth = new Date().getMonth() + 1;
+  const updateRock = (id: string, field: 'title' | 'completed', value: string | boolean) => {
+    setVto({
+      ...vto,
+      rocks: vto.rocks.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
+    });
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Goals & Targets</h1>
-          <p className="text-slate-500">Set and track your business goals</p>
+          <h1 className="text-2xl font-bold text-slate-900">Metas & VTO</h1>
+          <p className="text-slate-500">Configure sua meta anual e planejamento</p>
         </div>
-        <div className="flex gap-2">
-          <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[2024, 2025, 2026].map(y => (
-                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Button onClick={handleSave} disabled={isSaving}>
+          <Save className="w-4 h-4 mr-2" />
+          {isSaving ? 'Salvando...' : 'Salvar'}
+        </Button>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="setup">Annual Setup</TabsTrigger>
-          <TabsTrigger value="monthly">Monthly Detail</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6 mt-6">
-          {/* YTD Progress Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { label: 'Leads', goalKey: 'leadsGoal', actualKey: 'leadsActual', format: (v: number) => v.toString() },
-              { label: 'Sales', goalKey: 'salesGoal', actualKey: 'salesActual', format: (v: number) => v.toString() },
-              { label: 'Revenue', goalKey: 'revenueGoal', actualKey: 'revenueActual', format: formatCurrency },
-              { label: 'Gross Profit', goalKey: 'grossProfitGoal', actualKey: 'grossProfitActual', format: formatCurrency },
-              { label: 'Reviews', goalKey: 'reviewsGoal', actualKey: 'reviewsActual', format: (v: number) => v.toString() },
-              { label: 'Marketing Spend', goalKey: 'marketingSpendGoal', actualKey: 'marketingSpendActual', format: formatCurrency },
-            ].map((metric) => {
-              const goal = yearlyTotals[metric.goalKey] || 0;
-              const actual = yearlyTotals[metric.actualKey] || 0;
-              const pct = getProgressPct(actual, goal);
-              const isOnTrack = pct >= (currentMonth / 12) * 100 * 0.9;
-
-              return (
-                <Card key={metric.label}>
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-sm text-slate-500">{metric.label}</p>
-                      {isOnTrack ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <AlertCircle className="h-5 w-5 text-amber-500" />
-                      )}
-                    </div>
-                    <div className="flex justify-between items-end mb-2">
-                      <p className="text-2xl font-bold">{metric.format(actual)}</p>
-                      <p className="text-sm text-slate-500">/ {metric.format(goal)}</p>
-                    </div>
-                    <Progress value={pct} className="h-2" />
-                    <p className="text-xs text-slate-400 mt-1">{pct.toFixed(0)}% of annual goal</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
+      {/* Annual Target Selection */}
+      <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-white">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Target className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <CardTitle>Meta de Faturamento Anual</CardTitle>
+              <CardDescription>Selecione ou digite sua meta</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Preset Buttons */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {PRESETS.map((preset) => (
+              <Button
+                key={preset.value}
+                variant={vto.annualTarget === preset.value ? 'default' : 'outline'}
+                className={`h-14 text-lg font-bold ${
+                  vto.annualTarget === preset.value
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'border-2'
+                }`}
+                onClick={() => handlePresetClick(preset.value)}
+              >
+                {preset.label}
+              </Button>
+            ))}
           </div>
 
-          {/* Monthly Progress Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Progress</CardTitle>
-              <CardDescription>Goals vs Actuals by month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="sticky left-0 bg-white">Month</TableHead>
-                      <TableHead className="text-center">Leads</TableHead>
-                      <TableHead className="text-center">Sales</TableHead>
-                      <TableHead className="text-center">Revenue</TableHead>
-                      <TableHead className="text-center">Gross Profit</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {MONTHS.map((month, i) => {
-                      const target = targets.find(t => t.month === i + 1);
-                      const isPast = i + 1 < currentMonth;
-                      const isCurrent = i + 1 === currentMonth;
+          {/* Custom Input */}
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                placeholder="Ou digite um valor personalizado..."
+                value={customTarget}
+                onChange={(e) => setCustomTarget(e.target.value)}
+                className="h-12"
+              />
+            </div>
+            <Button onClick={handleCustomTarget} variant="outline" className="h-12">
+              Aplicar
+            </Button>
+          </div>
 
-                      return (
-                        <TableRow key={month} className={cn(isCurrent && 'bg-blue-50')}>
-                          <TableCell className={cn("font-medium sticky left-0", isCurrent ? 'bg-blue-50' : 'bg-white')}>
-                            {month}
-                            {isCurrent && <span className="ml-2 text-xs text-blue-600">(Current)</span>}
-                          </TableCell>
-                          {[
-                            { g: target?.leadsGoal || 0, a: target?.leadsActual || 0 },
-                            { g: target?.salesGoal || 0, a: target?.salesActual || 0 },
-                            { g: target?.revenueGoal || 0, a: target?.revenueActual || 0, currency: true },
-                            { g: target?.grossProfitGoal || 0, a: target?.grossProfitActual || 0, currency: true },
-                          ].map((cell, j) => (
-                            <TableCell key={j} className="text-center">
-                              <div className="space-y-1">
-                                <div className="text-sm">
-                                  <span className={cn(
-                                    'font-medium',
-                                    isPast && cell.a >= cell.g && 'text-green-600',
-                                    isPast && cell.a < cell.g && 'text-red-600'
-                                  )}>
-                                    {cell.currency ? formatCurrency(cell.a) : cell.a}
-                                  </span>
-                                  <span className="text-slate-400"> / {cell.currency ? formatCurrency(cell.g) : cell.g}</span>
-                                </div>
-                                <Progress
-                                  value={getProgressPct(cell.a, cell.g)}
-                                  className="h-1"
-                                />
-                              </div>
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+          {/* Current Selection */}
+          <div className="bg-white rounded-lg p-4 border">
+            <p className="text-sm text-slate-500 mb-1">Meta selecionada:</p>
+            <p className="text-4xl font-bold text-blue-600">
+              {formatCurrency(vto.annualTarget)}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Calculated Goals */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Calculator className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <CardTitle>Metas Calculadas (Fórmula $1M)</CardTitle>
+              <CardDescription>
+                Baseado em: Ticket médio $9,500 | Taxa fechamento 30% | 35 semanas de produção
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4 font-medium text-slate-500">Período</th>
+                  <th className="text-right py-3 px-4 font-medium text-slate-500">Faturamento</th>
+                  <th className="text-right py-3 px-4 font-medium text-slate-500">Jobs</th>
+                  <th className="text-right py-3 px-4 font-medium text-slate-500">Leads</th>
+                  <th className="text-right py-3 px-4 font-medium text-slate-500">Marketing</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b hover:bg-slate-50">
+                  <td className="py-3 px-4 font-medium">Semanal</td>
+                  <td className="py-3 px-4 text-right">{formatCurrency(goals.weekly.revenue, true)}</td>
+                  <td className="py-3 px-4 text-right">{goals.weekly.jobs}</td>
+                  <td className="py-3 px-4 text-right">{goals.weekly.leads}</td>
+                  <td className="py-3 px-4 text-right">{formatCurrency(goals.weekly.marketing, true)}</td>
+                </tr>
+                <tr className="border-b hover:bg-slate-50">
+                  <td className="py-3 px-4 font-medium">Mensal</td>
+                  <td className="py-3 px-4 text-right">{formatCurrency(goals.monthly.revenue, true)}</td>
+                  <td className="py-3 px-4 text-right">{goals.monthly.jobs}</td>
+                  <td className="py-3 px-4 text-right">{goals.monthly.leads}</td>
+                  <td className="py-3 px-4 text-right">{formatCurrency(goals.monthly.marketing, true)}</td>
+                </tr>
+                <tr className="border-b hover:bg-slate-50">
+                  <td className="py-3 px-4 font-medium">Trimestral</td>
+                  <td className="py-3 px-4 text-right">{formatCurrency(goals.quarterly.revenue, true)}</td>
+                  <td className="py-3 px-4 text-right">{goals.quarterly.jobs}</td>
+                  <td className="py-3 px-4 text-right">{goals.quarterly.leads}</td>
+                  <td className="py-3 px-4 text-right">{formatCurrency(goals.quarterly.marketing, true)}</td>
+                </tr>
+                <tr className="bg-blue-50 font-bold">
+                  <td className="py-3 px-4">Anual</td>
+                  <td className="py-3 px-4 text-right text-blue-600">
+                    {formatCurrency(goals.annual.revenue, true)}
+                  </td>
+                  <td className="py-3 px-4 text-right">{goals.annual.jobs}</td>
+                  <td className="py-3 px-4 text-right">{goals.annual.leads}</td>
+                  <td className="py-3 px-4 text-right">{formatCurrency(goals.annual.marketing, true)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quarterly Rocks */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <CheckCircle2 className="w-6 h-6 text-purple-600" />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="setup" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Annual Goals for {year}</CardTitle>
-              <CardDescription>Set your annual targets and generate monthly breakdowns with seasonal weighting</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div>
-                  <Label>Annual Leads Target</Label>
-                  <Input
-                    type="number"
-                    value={annualGoals.leads}
-                    onChange={(e) => setAnnualGoals({...annualGoals, leads: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-                <div>
-                  <Label>Annual Sales Target (#)</Label>
-                  <Input
-                    type="number"
-                    value={annualGoals.sales}
-                    onChange={(e) => setAnnualGoals({...annualGoals, sales: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-                <div>
-                  <Label>Annual Revenue Target ($)</Label>
-                  <Input
-                    type="number"
-                    value={annualGoals.revenue}
-                    onChange={(e) => setAnnualGoals({...annualGoals, revenue: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-                <div>
-                  <Label>Annual Gross Profit Target ($)</Label>
-                  <Input
-                    type="number"
-                    value={annualGoals.grossProfit}
-                    onChange={(e) => setAnnualGoals({...annualGoals, grossProfit: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-                <div>
-                  <Label>Annual Reviews Target</Label>
-                  <Input
-                    type="number"
-                    value={annualGoals.reviews}
-                    onChange={(e) => setAnnualGoals({...annualGoals, reviews: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-                <div>
-                  <Label>Annual Marketing Budget ($)</Label>
-                  <Input
-                    type="number"
-                    value={annualGoals.marketingSpend}
-                    onChange={(e) => setAnnualGoals({...annualGoals, marketingSpend: parseInt(e.target.value) || 0})}
-                  />
-                </div>
+              <div>
+                <CardTitle>Rocks deste Trimestre</CardTitle>
+                <CardDescription>3-7 prioridades para os próximos 90 dias</CardDescription>
               </div>
-
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Derived Metrics (based on your inputs)</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <p className="text-slate-500">Closing Rate</p>
-                    <p className="font-medium">{annualGoals.leads > 0 ? ((annualGoals.sales / annualGoals.leads) * 100).toFixed(1) : 0}%</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Avg Sale Value</p>
-                    <p className="font-medium">{annualGoals.sales > 0 ? formatCurrency(annualGoals.revenue / annualGoals.sales) : '$0'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Gross Margin</p>
-                    <p className="font-medium">{annualGoals.revenue > 0 ? ((annualGoals.grossProfit / annualGoals.revenue) * 100).toFixed(1) : 0}%</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Marketing ROI</p>
-                    <p className="font-medium">{annualGoals.marketingSpend > 0 ? (annualGoals.revenue / annualGoals.marketingSpend).toFixed(1) : 0}:1</p>
-                  </div>
-                </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={addRock}>
+              <Plus className="w-4 h-4 mr-1" />
+              Adicionar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {vto.rocks.map((rock, index) => (
+              <div key={rock.id} className="flex items-center gap-3">
+                <button
+                  onClick={() => updateRock(rock.id, 'completed', !rock.completed)}
+                  className="flex-shrink-0"
+                >
+                  {rock.completed ? (
+                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  ) : (
+                    <Circle className="w-6 h-6 text-slate-300 hover:text-slate-400" />
+                  )}
+                </button>
+                <Input
+                  value={rock.title}
+                  onChange={(e) => updateRock(rock.id, 'title', e.target.value)}
+                  placeholder={`Rock ${index + 1}...`}
+                  className={rock.completed ? 'line-through text-slate-500' : ''}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeRock(rock.id)}
+                  className="flex-shrink-0 text-slate-400 hover:text-red-500"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
-
-              <Button onClick={handleGenerateTargets} disabled={isSaving} className="w-full">
-                <Save className="h-4 w-4 mr-2" />
-                {isSaving ? 'Generating...' : 'Generate Monthly Targets (with seasonal weighting)'}
-              </Button>
-
-              <p className="text-sm text-slate-500 text-center">
-                This will create monthly targets using industry-standard seasonal weights for painting businesses
-                (higher in spring/summer, lower in winter).
+            ))}
+            {vto.rocks.length === 0 && (
+              <p className="text-center text-slate-500 py-4">
+                Nenhum rock definido. Clique em "Adicionar" para começar.
               </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="monthly" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Edit Monthly Targets</CardTitle>
-              <CardDescription>Fine-tune individual month targets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Leads Goal</TableHead>
-                      <TableHead>Sales Goal</TableHead>
-                      <TableHead>Revenue Goal</TableHead>
-                      <TableHead>GP Goal</TableHead>
-                      <TableHead>Reviews Goal</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {MONTHS.map((month, i) => {
-                      const target = targets.find(t => t.month === i + 1);
-                      return (
-                        <TableRow key={month}>
-                          <TableCell className="font-medium">{month}</TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              className="w-20"
-                              value={target?.leadsGoal || 0}
-                              onChange={(e) => handleUpdateTarget(i + 1, 'leadsGoal', parseInt(e.target.value) || 0)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              className="w-20"
-                              value={target?.salesGoal || 0}
-                              onChange={(e) => handleUpdateTarget(i + 1, 'salesGoal', parseInt(e.target.value) || 0)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              className="w-28"
-                              value={target?.revenueGoal || 0}
-                              onChange={(e) => handleUpdateTarget(i + 1, 'revenueGoal', parseInt(e.target.value) || 0)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              className="w-28"
-                              value={target?.grossProfitGoal || 0}
-                              onChange={(e) => handleUpdateTarget(i + 1, 'grossProfitGoal', parseInt(e.target.value) || 0)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              className="w-20"
-                              value={target?.reviewsGoal || 0}
-                              onChange={(e) => handleUpdateTarget(i + 1, 'reviewsGoal', parseInt(e.target.value) || 0)}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* VTO Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Visão & Valores (VTO)</CardTitle>
+          <CardDescription>Defina a visão de longo prazo do seu negócio</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Valores Fundamentais</Label>
+              <Textarea
+                value={vto.coreValues}
+                onChange={(e) => setVto({ ...vto, coreValues: e.target.value })}
+                placeholder="Ex: Qualidade, Integridade, Confiabilidade..."
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label>Foco Principal</Label>
+              <Textarea
+                value={vto.coreFocus}
+                onChange={(e) => setVto({ ...vto, coreFocus: e.target.value })}
+                placeholder="O que fazemos: Pintura Residencial e Comercial&#10;Quem servimos: Proprietários em [Cidade]"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label>Meta 10 Anos</Label>
+              <Textarea
+                value={vto.tenYearTarget}
+                onChange={(e) => setVto({ ...vto, tenYearTarget: e.target.value })}
+                placeholder="Ex: $10M faturamento, 50 funcionários..."
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label>Visão 3 Anos</Label>
+              <Textarea
+                value={vto.threeYearPicture}
+                onChange={(e) => setVto({ ...vto, threeYearPicture: e.target.value })}
+                placeholder="Ex: $3M faturamento, 15 funcionários, 2 equipes..."
+                rows={3}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Formula Reference */}
+      <Card className="bg-slate-50">
+        <CardContent className="p-4">
+          <h3 className="font-semibold text-slate-700 mb-3">Sobre a Fórmula $1M (JR Reis)</h3>
+          <div className="text-sm text-slate-600 space-y-2">
+            <p>
+              <strong>Jobs = Faturamento ÷ Ticket Médio ($9,500)</strong>
+            </p>
+            <p>
+              <strong>Leads = Jobs ÷ Taxa de Fechamento (30%)</strong>
+            </p>
+            <p>
+              <strong>Marketing = 8% do Faturamento</strong>
+            </p>
+            <p>
+              <strong>Semanas de Produção = 35</strong> (exclui feriados e temporada baixa)
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
