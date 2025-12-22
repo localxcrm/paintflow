@@ -419,15 +419,15 @@ export default function MarketingPage() {
       {/* Reference */}
       <Card className="bg-slate-50">
         <CardContent className="p-4">
-          <h3 className="font-semibold text-slate-700 mb-2">Meta de Marketing (Fórmula $1M)</h3>
+          <h3 className="font-semibold text-slate-700 mb-2">Referência de Marketing</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
-              <span className="text-slate-500">Investimento anual:</span>
-              <span className="font-medium ml-2">$80,000</span>
+              <span className="text-slate-500">Investimento ideal:</span>
+              <span className="font-medium ml-2">8% do faturamento</span>
             </div>
             <div>
               <span className="text-slate-500">CPL meta:</span>
-              <span className="font-medium ml-2">~$230/lead</span>
+              <span className="font-medium ml-2">Menor possível</span>
             </div>
             <div>
               <span className="text-slate-500">ROI esperado:</span>

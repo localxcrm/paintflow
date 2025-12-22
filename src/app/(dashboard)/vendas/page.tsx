@@ -33,6 +33,59 @@ interface WeeklyEntry {
   createdAt?: string;
 }
 
+interface FormulaParams {
+  avgTicket: number;
+  closingRate: number;
+  marketingPercent: number;
+  productionWeeks: number;
+}
+
+interface VTOData {
+  annualTarget: number;
+  formulaParams: FormulaParams;
+}
+
+const defaultVTO: VTOData = {
+  annualTarget: 1000000,
+  formulaParams: {
+    avgTicket: 9500,
+    closingRate: 30,
+    marketingPercent: 8,
+    productionWeeks: 35,
+  },
+};
+
+// Calculate goals based on annual revenue target and formula parameters
+function calculateGoals(annualTarget: number, params: FormulaParams) {
+  const { avgTicket, closingRate, productionWeeks } = params;
+
+  const jobsPerYear = Math.round(annualTarget / avgTicket);
+  const jobsPerWeek = jobsPerYear / productionWeeks;
+  const leadsPerYear = Math.round(jobsPerYear / (closingRate / 100));
+  const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
+  const revenuePerWeek = annualTarget / productionWeeks;
+
+  return {
+    monthly: {
+      revenue: Math.round(annualTarget / 12),
+      jobs: Math.round(jobsPerYear / 12),
+      leads: Math.round(leadsPerYear / 12),
+    },
+    weekly: {
+      revenue: Math.round(revenuePerWeek),
+      jobs: Math.round(jobsPerWeek * 10) / 10,
+      leads: leadsPerWeek,
+    },
+  };
+}
+
+function formatCurrency(value: number, compact = false) {
+  if (compact && value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}K`;
+  }
+  return `$${value.toLocaleString('en-US')}`;
+}
+
 const currentYear = new Date().getFullYear();
 const months = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -73,6 +126,7 @@ export default function VendasPage() {
   const [entries, setEntries] = useState<WeeklyEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [vto, setVto] = useState<VTOData>(defaultVTO);
   const [formData, setFormData] = useState<WeeklyEntry>({
     weekStart: '',
     leads: 0,
@@ -82,6 +136,27 @@ export default function VendasPage() {
   });
 
   const weeks = getWeeksInMonth(selectedYear, selectedMonth);
+  const goals = calculateGoals(vto.annualTarget, vto.formulaParams);
+
+  // Load VTO settings from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('paintpro_vto');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setVto({
+          ...defaultVTO,
+          ...parsed,
+          formulaParams: {
+            ...defaultVTO.formulaParams,
+            ...parsed.formulaParams,
+          },
+        });
+      } catch (e) {
+        console.error('Error loading VTO:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchEntries();
@@ -129,12 +204,20 @@ export default function VendasPage() {
     { leads: 0, estimates: 0, sales: 0, revenue: 0 }
   );
 
-  // Goals based on $1M formula
+  // Monthly goals from VTO settings
   const monthlyGoals = {
-    leads: 40,
-    estimates: 40,
-    sales: 12,
-    revenue: 114000,
+    leads: goals.monthly.leads,
+    estimates: goals.monthly.leads, // Same as leads (every lead should get an estimate)
+    sales: goals.monthly.jobs,
+    revenue: goals.monthly.revenue,
+  };
+
+  // Weekly goals from VTO settings
+  const weeklyGoals = {
+    leads: goals.weekly.leads,
+    estimates: goals.weekly.leads,
+    sales: goals.weekly.jobs,
+    revenue: goals.weekly.revenue,
   };
 
   return (
@@ -227,8 +310,8 @@ export default function VendasPage() {
                 <DollarSign className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">${(totals.revenue / 1000).toFixed(0)}K</p>
-                <p className="text-xs text-slate-500">de ${(monthlyGoals.revenue / 1000).toFixed(0)}K</p>
+                <p className="text-2xl font-bold">{formatCurrency(totals.revenue, true)}</p>
+                <p className="text-xs text-slate-500">de {formatCurrency(monthlyGoals.revenue, true)}</p>
               </div>
             </div>
           </CardContent>
@@ -290,7 +373,7 @@ export default function VendasPage() {
                   />
                 </div>
                 <div>
-                  <Label>Faturamento (R$)</Label>
+                  <Label>Faturamento ($)</Label>
                   <Input
                     type="number"
                     min="0"
@@ -394,23 +477,23 @@ export default function VendasPage() {
       {/* Weekly Goals Reference */}
       <Card className="bg-slate-50">
         <CardContent className="p-4">
-          <h3 className="font-semibold text-slate-700 mb-2">Metas Semanais (Fórmula $1M)</h3>
+          <h3 className="font-semibold text-slate-700 mb-2">Metas Semanais</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-slate-500">Leads:</span>
-              <span className="font-medium ml-2">10/semana</span>
+              <span className="font-medium ml-2">{weeklyGoals.leads}/semana</span>
             </div>
             <div>
               <span className="text-slate-500">Orçamentos:</span>
-              <span className="font-medium ml-2">10/semana</span>
+              <span className="font-medium ml-2">{weeklyGoals.estimates}/semana</span>
             </div>
             <div>
               <span className="text-slate-500">Vendas:</span>
-              <span className="font-medium ml-2">3/semana</span>
+              <span className="font-medium ml-2">{weeklyGoals.sales}/semana</span>
             </div>
             <div>
               <span className="text-slate-500">Faturamento:</span>
-              <span className="font-medium ml-2">$28,500/semana</span>
+              <span className="font-medium ml-2">{formatCurrency(weeklyGoals.revenue)}/semana</span>
             </div>
           </div>
         </CardContent>
