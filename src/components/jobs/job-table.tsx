@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -24,8 +23,6 @@ import {
   formatDate,
   getStatusColor,
   getProfitFlagColor,
-  getPaymentStatusColor,
-  getPaymentStatusLabel,
 } from '@/lib/utils/job-calculations';
 import { MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
 
@@ -41,9 +38,9 @@ interface JobTableProps {
 
 const statusLabels: Record<JobStatus, string> = {
   lead: 'Lead',
-  got_the_job: 'Got the Job',
-  scheduled: 'Scheduled',
-  completed: 'Completed',
+  got_the_job: 'Fechado',
+  scheduled: 'Agendado',
+  completed: 'Concluído',
 };
 
 export function JobTable({
@@ -61,21 +58,21 @@ export function JobTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50">
-              <TableHead className="font-semibold">Client</TableHead>
-              <TableHead className="font-semibold">Date</TableHead>
-              <TableHead className="font-semibold text-right">Job Value</TableHead>
+              <TableHead className="font-semibold">Cliente</TableHead>
+              <TableHead className="font-semibold">Data</TableHead>
+              <TableHead className="font-semibold text-right">Valor</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
-              <TableHead className="font-semibold">Sales Rep</TableHead>
-              <TableHead className="font-semibold">PM</TableHead>
-              <TableHead className="font-semibold">Subcontractor</TableHead>
-              <TableHead className="font-semibold text-center">Deposit</TableHead>
-              <TableHead className="font-semibold text-center">Job Paid</TableHead>
-              <TableHead className="font-semibold text-right">Sales Comm</TableHead>
-              <TableHead className="font-semibold text-center">Paid</TableHead>
-              <TableHead className="font-semibold text-right">PM Comm</TableHead>
-              <TableHead className="font-semibold text-center">Paid</TableHead>
-              <TableHead className="font-semibold text-right">Sub Price</TableHead>
-              <TableHead className="font-semibold text-center">Paid</TableHead>
+              <TableHead className="font-semibold">Vendedor</TableHead>
+              <TableHead className="font-semibold">GP</TableHead>
+              <TableHead className="font-semibold">Sub</TableHead>
+              <TableHead className="font-semibold text-center">Sinal</TableHead>
+              <TableHead className="font-semibold text-center">Pago</TableHead>
+              <TableHead className="font-semibold text-right">Com. Vendas</TableHead>
+              <TableHead className="font-semibold text-center">Pago</TableHead>
+              <TableHead className="font-semibold text-right">Com. GP</TableHead>
+              <TableHead className="font-semibold text-center">Pago</TableHead>
+              <TableHead className="font-semibold text-right">Valor Sub</TableHead>
+              <TableHead className="font-semibold text-center">Pago</TableHead>
               <TableHead className="font-semibold">Flag</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -179,15 +176,15 @@ export function JobTable({
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem className="gap-2">
                         <Eye className="h-4 w-4" />
-                        View Details
+                        Ver Detalhes
                       </DropdownMenuItem>
                       <DropdownMenuItem className="gap-2">
                         <Edit className="h-4 w-4" />
-                        Edit Job
+                        Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem className="gap-2 text-red-600">
                         <Trash2 className="h-4 w-4" />
-                        Delete
+                        Excluir
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -199,7 +196,7 @@ export function JobTable({
       </div>
       {jobs.length === 0 && (
         <div className="text-center py-12 text-slate-500">
-          No jobs found matching your filters.
+          Nenhum trabalho encontrado com os filtros selecionados.
         </div>
       )}
     </div>

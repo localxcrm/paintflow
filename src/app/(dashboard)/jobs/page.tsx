@@ -128,12 +128,12 @@ export default function JobsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Job Tracker</h1>
-          <p className="text-slate-500">Track jobs, payments, and commissions</p>
+          <h1 className="text-2xl font-bold text-slate-900">Gerenciador de Trabalhos</h1>
+          <p className="text-slate-500">Acompanhe trabalhos, pagamentos e comissões</p>
         </div>
         <Button className="gap-2">
           <Plus className="h-4 w-4" />
-          New Job
+          Novo Trabalho
         </Button>
       </div>
 
@@ -164,7 +164,7 @@ export default function JobsPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-slate-900">
-            All Jobs ({filteredJobs.length})
+            Todos os Trabalhos ({filteredJobs.length})
           </h2>
         </div>
         <JobTable

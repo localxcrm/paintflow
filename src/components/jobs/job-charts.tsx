@@ -25,7 +25,7 @@ export function JobCharts({ valueByStatus, distribution }: JobChartsProps) {
       {/* Bar Chart - Job Value by Status */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Job Value by Status</CardTitle>
+          <CardTitle className="text-base font-medium">Valor por Status</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[250px]">
@@ -44,7 +44,7 @@ export function JobCharts({ valueByStatus, distribution }: JobChartsProps) {
                   tickFormatter={(value) => formatCurrency(value, true)}
                 />
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), 'Value']}
+                  formatter={(value: number) => [formatCurrency(value), 'Valor']}
                   contentStyle={{
                     backgroundColor: 'white',
                     border: '1px solid #e2e8f0',
@@ -66,7 +66,7 @@ export function JobCharts({ valueByStatus, distribution }: JobChartsProps) {
       {/* Pie Chart - Jobs by Status */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Jobs by Status</CardTitle>
+          <CardTitle className="text-base font-medium">Trabalhos por Status</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[250px] flex items-center">

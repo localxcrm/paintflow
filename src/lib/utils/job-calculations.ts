@@ -142,9 +142,9 @@ export function getJobValueByStatus(jobs: Job[]): { status: string; value: numbe
 
   const statusLabels: Record<JobStatus, string> = {
     lead: 'Lead',
-    got_the_job: 'Got the Job',
-    scheduled: 'Scheduled',
-    completed: 'Completed',
+    got_the_job: 'Fechado',
+    scheduled: 'Agendado',
+    completed: 'Concluído',
   };
 
   return statuses.map(status => ({
@@ -165,9 +165,9 @@ export function getJobsDistribution(jobs: Job[]): { name: string; value: number;
 
   const statusLabels: Record<JobStatus, string> = {
     lead: 'Lead',
-    got_the_job: 'Got the Job',
-    scheduled: 'Scheduled',
-    completed: 'Completed',
+    got_the_job: 'Fechado',
+    scheduled: 'Agendado',
+    completed: 'Concluído',
   };
 
   const counts = new Map<JobStatus, number>();

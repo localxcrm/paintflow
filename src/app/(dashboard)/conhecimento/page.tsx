@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
@@ -14,13 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import {
   Plus,
   Search,
@@ -32,16 +24,7 @@ import {
   ChevronRight,
   Edit,
   Trash2,
-  Image,
-  Video,
   CheckSquare,
-  Bold,
-  List,
-  ListOrdered,
-  Save,
-  X,
-  Upload,
-  Link,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,7 +48,7 @@ interface Article {
 
 const categories = [
   { id: 'vendas', label: 'Vendas', icon: Users, color: 'bg-blue-50 text-blue-600' },
-  { id: 'producao', label: 'Produção', icon: Wrench, color: 'bg-green-50 text-green-600' },
+  { id: 'producao', label: 'Producao', icon: Wrench, color: 'bg-green-50 text-green-600' },
   { id: 'admin', label: 'Administrativo', icon: FileText, color: 'bg-purple-50 text-purple-600' },
   { id: 'marketing', label: 'Marketing', icon: Megaphone, color: 'bg-yellow-50 text-yellow-600' },
 ];
@@ -78,37 +61,36 @@ const sampleArticles: Article[] = [
     category: 'vendas',
     content: `# Como Atender o Telefone
 
-## Passo 1: Atenda em até 3 toques
+## Passo 1: Atenda em ate 3 toques
 - Sempre atenda com um sorriso (isso transparece na voz)
-- Seja profissional e amigável
+- Seja profissional e amigavel
 
-## Passo 2: Saudação Padrão
-"Bom dia/tarde! [Nome da Empresa], [Seu Nome] falando. Como posso ajudá-lo?"
+## Passo 2: Saudacao Padrao
+"Bom dia/tarde! [Nome da Empresa], [Seu Nome] falando. Como posso ajuda-lo?"
 
-## Passo 3: Colete as Informações
+## Passo 3: Colete as Informacoes
 - Nome completo do cliente
 - Telefone de contato
-- Endereço do serviço
-- Tipo de serviço desejado
-- Melhor horário para visita
+- Endereco do servico
+- Tipo de servico desejado
+- Melhor horario para visita
+
+:::dica
+Nunca diga "nao sei" - diga "vou verificar e retorno"
+:::
 
 ## Passo 4: Agende a Visita
-- Ofereça 2-3 opções de horário
-- Confirme o endereço
-- Envie confirmação por WhatsApp
-
-## Dicas Importantes
-- Nunca diga "não sei" - diga "vou verificar e retorno"
-- Sempre anote todas as informações
-- Agradeça pela ligação`,
+- Ofereca 2-3 opcoes de horario
+- Confirme o endereco
+- Envie confirmacao por WhatsApp`,
     checklist: [
-      { id: '1', text: 'Atender em até 3 toques', checked: false },
-      { id: '2', text: 'Usar saudação padrão', checked: false },
+      { id: '1', text: 'Atender em ate 3 toques', checked: false },
+      { id: '2', text: 'Usar saudacao padrao', checked: false },
       { id: '3', text: 'Coletar nome completo', checked: false },
       { id: '4', text: 'Coletar telefone', checked: false },
-      { id: '5', text: 'Coletar endereço', checked: false },
+      { id: '5', text: 'Coletar endereco', checked: false },
       { id: '6', text: 'Agendar visita', checked: false },
-      { id: '7', text: 'Enviar confirmação WhatsApp', checked: false },
+      { id: '7', text: 'Enviar confirmacao WhatsApp', checked: false },
     ],
     images: [],
     videoUrl: '',
@@ -117,37 +99,40 @@ const sampleArticles: Article[] = [
   },
   {
     id: '2',
-    title: 'Processo de Orçamento',
+    title: 'Processo de Orcamento',
     category: 'vendas',
-    content: `# Processo de Orçamento
+    content: `# Processo de Orcamento
 
 ## Antes da Visita
-1. Revise as informações do cliente
-2. Prepare o material de apresentação
+1. Revise as informacoes do cliente
+2. Prepare o material de apresentacao
 3. Chegue 5 minutos antes
+
+:::importante
+Sempre chegue no horario combinado!
+:::
 
 ## Durante a Visita
 1. Apresente-se profissionalmente
-2. Faça um tour completo da área
+2. Faca um tour completo da area
 3. Tire fotos de todos os ambientes
-4. Pergunte sobre preferências de cores
+4. Pergunte sobre preferencias de cores
 5. Identifique problemas (mofo, descascando, etc.)
 
-## Cálculo do Orçamento
-- Use a tabela de preços padrão
+## Calculo do Orcamento
+- Use a tabela de precos padrao
 - Considere complexidade do trabalho
-- Inclua margem de 30% mínima
+- Inclua margem de 30% minima
 
-## Apresentação
-- Envie em até 24 horas
-- Use o modelo padrão
-- Destaque os diferenciais`,
+:::aviso
+Nunca de desconto maior que 10% sem aprovacao
+:::`,
     checklist: [
-      { id: '1', text: 'Revisar informações do cliente', checked: false },
+      { id: '1', text: 'Revisar informacoes do cliente', checked: false },
       { id: '2', text: 'Preparar material', checked: false },
       { id: '3', text: 'Tirar fotos', checked: false },
       { id: '4', text: 'Identificar problemas', checked: false },
-      { id: '5', text: 'Calcular orçamento', checked: false },
+      { id: '5', text: 'Calcular orcamento', checked: false },
       { id: '6', text: 'Enviar em 24h', checked: false },
     ],
     images: [],
@@ -161,37 +146,36 @@ const sampleArticles: Article[] = [
     category: 'producao',
     content: `# Checklist de Qualidade
 
-## Antes de Começar
-- Área protegida com lona
-- Móveis cobertos
-- Fitas de proteção aplicadas
-- Superfícies limpas
+## Antes de Comecar
+- Area protegida com lona
+- Moveis cobertos
+- Fitas de protecao aplicadas
+- Superficies limpas
 
 ## Durante o Trabalho
-- Aplicação uniforme
+- Aplicacao uniforme
 - Sem escorridos
-- Demãos corretas aplicadas
+- Demaos corretas aplicadas
 - Tempo de secagem respeitado
 
-## Finalização
+:::dica
+Sempre tire fotos antes, durante e depois do trabalho
+:::
+
+## Finalizacao
 - Limpeza completa do local
 - Retoques finais feitos
 - Fitas removidas cuidadosamente
-- Fotos do resultado final
-
-## Entrega
-- Cliente acompanha a inspeção
-- Lista de pendências (se houver)
-- Assinatura de aprovação`,
+- Fotos do resultado final`,
     checklist: [
-      { id: '1', text: 'Área protegida com lona', checked: false },
-      { id: '2', text: 'Móveis cobertos', checked: false },
-      { id: '3', text: 'Fitas de proteção aplicadas', checked: false },
-      { id: '4', text: 'Aplicação uniforme', checked: false },
+      { id: '1', text: 'Area protegida com lona', checked: false },
+      { id: '2', text: 'Moveis cobertos', checked: false },
+      { id: '3', text: 'Fitas de protecao aplicadas', checked: false },
+      { id: '4', text: 'Aplicacao uniforme', checked: false },
       { id: '5', text: 'Sem escorridos', checked: false },
       { id: '6', text: 'Limpeza completa', checked: false },
       { id: '7', text: 'Fotos do resultado', checked: false },
-      { id: '8', text: 'Assinatura de aprovação', checked: false },
+      { id: '8', text: 'Assinatura de aprovacao', checked: false },
     ],
     images: [],
     videoUrl: '',
@@ -200,25 +184,11 @@ const sampleArticles: Article[] = [
   },
 ];
 
-const emptyArticle: Omit<Article, 'id' | 'createdAt' | 'updatedAt'> = {
-  title: '',
-  category: '',
-  content: '',
-  checklist: [],
-  images: [],
-  videoUrl: '',
-};
-
 export default function ConhecimentoPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
-  const [formData, setFormData] = useState(emptyArticle);
-  const [newChecklistItem, setNewChecklistItem] = useState('');
-  const [newImageUrl, setNewImageUrl] = useState('');
 
   // Load from localStorage
   useEffect(() => {
@@ -226,11 +196,13 @@ export default function ConhecimentoPage() {
     if (saved) {
       try {
         setArticles(JSON.parse(saved));
-      } catch (e) {
+      } catch {
         setArticles(sampleArticles);
+        localStorage.setItem('paintpro_knowledge', JSON.stringify(sampleArticles));
       }
     } else {
       setArticles(sampleArticles);
+      localStorage.setItem('paintpro_knowledge', JSON.stringify(sampleArticles));
     }
   }, []);
 
@@ -250,132 +222,12 @@ export default function ConhecimentoPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const openEditor = (article?: Article) => {
-    if (article) {
-      setEditingArticle(article);
-      setFormData({
-        title: article.title,
-        category: article.category,
-        content: article.content,
-        checklist: [...article.checklist],
-        images: [...article.images],
-        videoUrl: article.videoUrl,
-      });
-    } else {
-      setEditingArticle(null);
-      setFormData(emptyArticle);
-    }
-    setIsEditorOpen(true);
-  };
-
-  const handleSave = () => {
-    if (!formData.title || !formData.category) {
-      toast.error('Preencha título e categoria');
-      return;
-    }
-
-    const now = new Date().toISOString();
-
-    if (editingArticle) {
-      // Update existing
-      const updated = articles.map((a) =>
-        a.id === editingArticle.id
-          ? { ...a, ...formData, updatedAt: now }
-          : a
-      );
-      saveArticles(updated);
-      setSelectedArticle({ ...editingArticle, ...formData, updatedAt: now });
-      toast.success('SOP atualizado!');
-    } else {
-      // Create new
-      const newArticle: Article = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: now,
-        updatedAt: now,
-      };
-      saveArticles([...articles, newArticle]);
-      setSelectedArticle(newArticle);
-      toast.success('SOP criado!');
-    }
-
-    setIsEditorOpen(false);
-    setEditingArticle(null);
-    setFormData(emptyArticle);
-  };
-
   const handleDelete = (id: string) => {
     if (confirm('Tem certeza que deseja excluir este SOP?')) {
       saveArticles(articles.filter((a) => a.id !== id));
       setSelectedArticle(null);
-      toast.success('SOP excluído');
+      toast.success('SOP excluido');
     }
-  };
-
-  const addChecklistItem = () => {
-    if (!newChecklistItem.trim()) return;
-    setFormData({
-      ...formData,
-      checklist: [
-        ...formData.checklist,
-        { id: Date.now().toString(), text: newChecklistItem, checked: false },
-      ],
-    });
-    setNewChecklistItem('');
-  };
-
-  const removeChecklistItem = (id: string) => {
-    setFormData({
-      ...formData,
-      checklist: formData.checklist.filter((item) => item.id !== id),
-    });
-  };
-
-  const addImage = () => {
-    if (!newImageUrl.trim()) return;
-    setFormData({
-      ...formData,
-      images: [...formData.images, newImageUrl],
-    });
-    setNewImageUrl('');
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) {
-        toast.error('Por favor, selecione apenas arquivos de imagem');
-        return;
-      }
-
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('Imagem muito grande. Máximo 5MB');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        setFormData((prev) => ({
-          ...prev,
-          images: [...prev.images, base64],
-        }));
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // Reset input
-    e.target.value = '';
-  };
-
-  const removeImage = (index: number) => {
-    setFormData({
-      ...formData,
-      images: formData.images.filter((_, i) => i !== index),
-    });
   };
 
   const toggleChecklistItem = (articleId: string, itemId: string) => {
@@ -406,24 +258,108 @@ export default function ConhecimentoPage() {
     return match ? `https://www.youtube.com/embed/${match[1]}` : null;
   };
 
-  const insertFormatting = (prefix: string, suffix = '') => {
-    const textarea = document.getElementById('content-editor') as HTMLTextAreaElement;
-    if (!textarea) return;
+  // Render content with callouts support
+  const renderContent = (text: string) => {
+    const lines = text.split('\n');
+    const elements: React.ReactNode[] = [];
+    let i = 0;
+    let inCallout = false;
+    let calloutType = '';
+    let calloutContent: string[] = [];
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = formData.content;
-    const selectedText = text.substring(start, end);
+    while (i < lines.length) {
+      const line = lines[i];
 
-    const newText =
-      text.substring(0, start) + prefix + selectedText + suffix + text.substring(end);
+      // Check for callout start
+      if (line.startsWith(':::dica') || line.startsWith(':::aviso') || line.startsWith(':::importante')) {
+        inCallout = true;
+        calloutType = line.replace(':::', '').trim();
+        calloutContent = [];
+        i++;
+        continue;
+      }
 
-    setFormData({ ...formData, content: newText });
+      // Check for callout end
+      if (line === ':::' && inCallout) {
+        const bgColor = calloutType === 'dica' ? 'bg-green-50 border-green-200' :
+                       calloutType === 'aviso' ? 'bg-yellow-50 border-yellow-200' :
+                       'bg-red-50 border-red-200';
+        const icon = calloutType === 'dica' ? '💡' :
+                    calloutType === 'aviso' ? '⚠️' : '❗';
+        const title = calloutType === 'dica' ? 'Dica' :
+                     calloutType === 'aviso' ? 'Aviso' : 'Importante';
 
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, end + prefix.length);
-    }, 0);
+        elements.push(
+          <div key={`callout-${i}`} className={`p-4 rounded-lg border ${bgColor} my-3`}>
+            <div className="font-semibold flex items-center gap-2 mb-1">
+              <span>{icon}</span>
+              <span>{title}</span>
+            </div>
+            <div className="text-sm">
+              {calloutContent.map((c, idx) => (
+                <p key={idx}>{c}</p>
+              ))}
+            </div>
+          </div>
+        );
+        inCallout = false;
+        i++;
+        continue;
+      }
+
+      // Collect callout content
+      if (inCallout) {
+        calloutContent.push(line);
+        i++;
+        continue;
+      }
+
+      // Regular markdown parsing
+      if (line.startsWith('# ')) {
+        elements.push(
+          <h1 key={i} className="text-xl font-bold mt-4 mb-2">
+            {line.replace('# ', '')}
+          </h1>
+        );
+      } else if (line.startsWith('## ')) {
+        elements.push(
+          <h2 key={i} className="text-lg font-semibold mt-4 mb-2">
+            {line.replace('## ', '')}
+          </h2>
+        );
+      } else if (line.startsWith('### ')) {
+        elements.push(
+          <h3 key={i} className="text-base font-semibold mt-3 mb-1">
+            {line.replace('### ', '')}
+          </h3>
+        );
+      } else if (line.startsWith('- ')) {
+        elements.push(
+          <li key={i} className="ml-4 list-disc">
+            {line.replace('- ', '')}
+          </li>
+        );
+      } else if (line.match(/^\d+\. /)) {
+        elements.push(
+          <li key={i} className="ml-4 list-decimal">
+            {line.replace(/^\d+\. /, '')}
+          </li>
+        );
+      } else if (line.trim() === '') {
+        elements.push(<br key={i} />);
+      } else {
+        // Handle bold and italic
+        let processed = line;
+        processed = processed.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        processed = processed.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        elements.push(
+          <p key={i} dangerouslySetInnerHTML={{ __html: processed }} />
+        );
+      }
+      i++;
+    }
+
+    return elements;
   };
 
   return (
@@ -432,12 +368,14 @@ export default function ConhecimentoPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Base de Conhecimento</h1>
-          <p className="text-slate-500">SOPs e procedimentos do negócio</p>
+          <p className="text-slate-500">SOPs e procedimentos do negocio</p>
         </div>
-        <Button onClick={() => openEditor()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo SOP
-        </Button>
+        <Link href="/conhecimento/novo">
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo SOP
+          </Button>
+        </Link>
       </div>
 
       {/* Search and Filter */}
@@ -558,10 +496,12 @@ export default function ConhecimentoPage() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEditor(selectedArticle)}>
-                    <Edit className="w-4 h-4 mr-1" />
-                    Editar
-                  </Button>
+                  <Link href={`/conhecimento/${selectedArticle.id}/editar`}>
+                    <Button variant="outline" size="sm">
+                      <Edit className="w-4 h-4 mr-1" />
+                      Editar
+                    </Button>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -600,47 +540,7 @@ export default function ConhecimentoPage() {
 
                 {/* Content */}
                 <div className="prose prose-sm max-w-none">
-                  {selectedArticle.content.split('\n').map((line, i) => {
-                    if (line.startsWith('# ')) {
-                      return (
-                        <h1 key={i} className="text-xl font-bold mt-4 mb-2">
-                          {line.replace('# ', '')}
-                        </h1>
-                      );
-                    }
-                    if (line.startsWith('## ')) {
-                      return (
-                        <h2 key={i} className="text-lg font-semibold mt-4 mb-2">
-                          {line.replace('## ', '')}
-                        </h2>
-                      );
-                    }
-                    if (line.startsWith('### ')) {
-                      return (
-                        <h3 key={i} className="text-base font-semibold mt-3 mb-1">
-                          {line.replace('### ', '')}
-                        </h3>
-                      );
-                    }
-                    if (line.startsWith('- ')) {
-                      return (
-                        <li key={i} className="ml-4">
-                          {line.replace('- ', '')}
-                        </li>
-                      );
-                    }
-                    if (line.match(/^\d+\. /)) {
-                      return (
-                        <li key={i} className="ml-4 list-decimal">
-                          {line.replace(/^\d+\. /, '')}
-                        </li>
-                      );
-                    }
-                    if (line.trim() === '') {
-                      return <br key={i} />;
-                    }
-                    return <p key={i}>{line}</p>;
-                  })}
+                  {renderContent(selectedArticle.content)}
                 </div>
 
                 {/* Checklist */}
@@ -687,232 +587,6 @@ export default function ConhecimentoPage() {
           )}
         </div>
       </div>
-
-      {/* Editor Dialog */}
-      <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-        <DialogContent className="max-w-[90vw] w-[90vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingArticle ? 'Editar SOP' : 'Criar Novo SOP'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6 mt-4">
-            {/* Basic Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Título</Label>
-                <Input
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Ex: Como fazer orçamento"
-                />
-              </div>
-              <div>
-                <Label>Categoria</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(v) => setFormData({ ...formData, category: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Video URL */}
-            <div>
-              <Label className="flex items-center gap-2">
-                <Video className="w-4 h-4" />
-                Vídeo do YouTube (opcional)
-              </Label>
-              <Input
-                value={formData.videoUrl}
-                onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
-                placeholder="https://www.youtube.com/watch?v=..."
-              />
-            </div>
-
-            {/* Images */}
-            <div>
-              <Label className="flex items-center gap-2">
-                <Image className="w-4 h-4" />
-                Imagens
-              </Label>
-              <div className="flex gap-2 mt-2">
-                {/* File Upload Button */}
-                <label className="flex-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <div className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                    <Upload className="w-5 h-5 text-slate-500" />
-                    <span className="text-sm text-slate-600">Fazer Upload de Imagens</span>
-                  </div>
-                </label>
-              </div>
-              {/* URL Alternative */}
-              <div className="flex gap-2 mt-2">
-                <div className="flex items-center gap-1 text-xs text-slate-500">
-                  <Link className="w-3 h-3" />
-                  Ou cole URL:
-                </div>
-                <Input
-                  value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
-                  placeholder="https://exemplo.com/imagem.jpg"
-                  className="flex-1 h-8 text-sm"
-                />
-                <Button type="button" variant="outline" size="sm" onClick={addImage}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-              {formData.images.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {formData.images.map((img, i) => (
-                    <div key={i} className="relative group">
-                      <img
-                        src={img}
-                        alt={`Preview ${i + 1}`}
-                        className="w-full h-20 object-cover rounded"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(i)}
-                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Content Editor */}
-            <div>
-              <Label>Conteúdo</Label>
-              <div className="flex gap-1 mb-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('# ')}
-                  title="Título"
-                >
-                  H1
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('## ')}
-                  title="Subtítulo"
-                >
-                  H2
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('**', '**')}
-                  title="Negrito"
-                >
-                  <Bold className="w-4 h-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('- ')}
-                  title="Lista"
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => insertFormatting('1. ')}
-                  title="Lista Numerada"
-                >
-                  <ListOrdered className="w-4 h-4" />
-                </Button>
-              </div>
-              <Textarea
-                id="content-editor"
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                placeholder="Use # para títulos, ## para subtítulos, - para listas..."
-                rows={12}
-                className="font-mono text-sm"
-              />
-            </div>
-
-            {/* Checklist */}
-            <div>
-              <Label className="flex items-center gap-2">
-                <CheckSquare className="w-4 h-4" />
-                Checklist
-              </Label>
-              <div className="flex gap-2 mt-1">
-                <Input
-                  value={newChecklistItem}
-                  onChange={(e) => setNewChecklistItem(e.target.value)}
-                  placeholder="Adicionar item ao checklist..."
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistItem())}
-                />
-                <Button type="button" variant="outline" onClick={addChecklistItem}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-              {formData.checklist.length > 0 && (
-                <div className="space-y-1 mt-2">
-                  {formData.checklist.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-2 p-2 bg-slate-50 rounded"
-                    >
-                      <CheckSquare className="w-4 h-4 text-slate-400" />
-                      <span className="flex-1 text-sm">{item.text}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeChecklistItem(item.id)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={() => setIsEditorOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSave}>
-                <Save className="w-4 h-4 mr-2" />
-                Salvar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -6,16 +6,17 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Target,
+  Briefcase,
   Megaphone,
   TrendingUp,
   BookOpen,
-  Settings,
   PaintBucket,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
   { href: '/goals', label: 'Metas', icon: Target },
+  { href: '/jobs', label: 'Trabalhos', icon: Briefcase },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/vendas', label: 'Vendas', icon: TrendingUp },
   { href: '/conhecimento', label: 'Conhecimento', icon: BookOpen },
@@ -59,22 +60,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Settings at bottom */}
-      <div className="px-3 py-4 border-t border-slate-700">
-        <Link
-          href="/settings"
-          className={cn(
-            'flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors',
-            pathname === '/settings'
-              ? 'bg-blue-600 text-white'
-              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-          )}
-        >
-          <Settings className="w-5 h-5" />
-          Configurações
-        </Link>
-      </div>
     </aside>
   );
 }

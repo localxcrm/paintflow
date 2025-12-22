@@ -55,7 +55,7 @@ export function JobFilters({
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-white rounded-lg border">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-slate-600">Filters:</span>
+        <span className="text-sm font-medium text-slate-600">Filtros:</span>
       </div>
 
       <Select value={statusFilter} onValueChange={(v) => onStatusChange(v as JobStatus | 'all')}>
@@ -63,32 +63,32 @@ export function JobFilters({
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="all">Todos Status</SelectItem>
           <SelectItem value="lead">Lead</SelectItem>
-          <SelectItem value="got_the_job">Got the Job</SelectItem>
-          <SelectItem value="scheduled">Scheduled</SelectItem>
-          <SelectItem value="completed">Completed</SelectItem>
+          <SelectItem value="got_the_job">Fechado</SelectItem>
+          <SelectItem value="scheduled">Agendado</SelectItem>
+          <SelectItem value="completed">Concluído</SelectItem>
         </SelectContent>
       </Select>
 
       <Select value={paymentFilter} onValueChange={(v) => onPaymentChange(v as PaymentStatus)}>
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Payment" />
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Pagamento" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Payments</SelectItem>
-          <SelectItem value="deposit_pending">Deposit Pending</SelectItem>
-          <SelectItem value="job_unpaid">Job Unpaid</SelectItem>
-          <SelectItem value="fully_paid">Fully Paid</SelectItem>
+          <SelectItem value="all">Todos Pagamentos</SelectItem>
+          <SelectItem value="deposit_pending">Sinal Pendente</SelectItem>
+          <SelectItem value="job_unpaid">Não Pago</SelectItem>
+          <SelectItem value="fully_paid">Pago Total</SelectItem>
         </SelectContent>
       </Select>
 
       <Select value={salesRepFilter} onValueChange={onSalesRepChange}>
         <SelectTrigger className="w-[150px]">
-          <SelectValue placeholder="Sales Rep" />
+          <SelectValue placeholder="Vendedor" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Sales Reps</SelectItem>
+          <SelectItem value="all">Todos Vendedores</SelectItem>
           {salesReps.map((rep) => (
             <SelectItem key={rep.id} value={rep.id}>
               {rep.name}
@@ -99,10 +99,10 @@ export function JobFilters({
 
       <Select value={pmFilter} onValueChange={onPMChange}>
         <SelectTrigger className="w-[150px]">
-          <SelectValue placeholder="PM" />
+          <SelectValue placeholder="GP" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All PMs</SelectItem>
+          <SelectItem value="all">Todos GPs</SelectItem>
           {pms.map((pm) => (
             <SelectItem key={pm.id} value={pm.id}>
               {pm.name}
@@ -113,10 +113,10 @@ export function JobFilters({
 
       <Select value={subcontractorFilter} onValueChange={onSubcontractorChange}>
         <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Subcontractor" />
+          <SelectValue placeholder="Subcontratado" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Subs</SelectItem>
+          <SelectItem value="all">Todos Subs</SelectItem>
           {subcontractors.map((sub) => (
             <SelectItem key={sub.id} value={sub.id}>
               {sub.name}
@@ -133,7 +133,7 @@ export function JobFilters({
           className="gap-1 text-slate-500 hover:text-slate-700"
         >
           <X className="h-4 w-4" />
-          Clear
+          Limpar
         </Button>
       )}
     </div>
