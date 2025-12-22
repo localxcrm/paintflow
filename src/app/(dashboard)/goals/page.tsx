@@ -1,22 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 import {
   Target,
   Calculator,
   CheckCircle2,
   Circle,
-  Plus,
-  Trash2,
   Save,
   Settings,
+  Mountain,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRocks } from '@/hooks/useRocks';
 
 // Preset targets
 const PRESETS = [
@@ -82,12 +85,6 @@ function formatCurrency(value: number, compact = false) {
   return `$${value.toLocaleString('en-US')}`;
 }
 
-interface Rock {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
 interface VTOData {
   annualTarget: number;
   formulaParams: FormulaParams;
@@ -95,7 +92,6 @@ interface VTOData {
   coreFocus: string;
   tenYearTarget: string;
   threeYearPicture: string;
-  rocks: Rock[];
 }
 
 const defaultVTO: VTOData = {
@@ -110,17 +106,16 @@ const defaultVTO: VTOData = {
   coreFocus: '',
   tenYearTarget: '',
   threeYearPicture: '',
-  rocks: [
-    { id: '1', title: '', completed: false },
-    { id: '2', title: '', completed: false },
-    { id: '3', title: '', completed: false },
-  ],
 };
 
 export default function GoalsPage() {
   const [vto, setVto] = useState<VTOData>(defaultVTO);
   const [customTarget, setCustomTarget] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Get rocks from shared hook
+  const { getCurrentQuarterRocks, currentQuarter, currentYear, updateStatus } = useRocks();
+  const quarterRocks = getCurrentQuarterRocks();
 
   const goals = calculateGoals(vto.annualTarget, vto.formulaParams);
 
@@ -131,9 +126,11 @@ export default function GoalsPage() {
       try {
         const parsed = JSON.parse(saved);
         // Merge with defaults to handle missing fields from old saves
+        // Remove old rocks field if present (now using shared rocks)
+        const { rocks, ...rest } = parsed;
         setVto({
           ...defaultVTO,
-          ...parsed,
+          ...rest,
           formulaParams: {
             ...defaultVTO.formulaParams,
             ...parsed.formulaParams,
@@ -150,7 +147,7 @@ export default function GoalsPage() {
     setIsSaving(true);
     try {
       localStorage.setItem('paintpro_vto', JSON.stringify(vto));
-      toast.success('Configurações salvas!');
+      toast.success('Configuracoes salvas!');
     } catch (e) {
       toast.error('Erro ao salvar');
     } finally {
@@ -180,34 +177,18 @@ export default function GoalsPage() {
     });
   };
 
-  const addRock = () => {
-    setVto({
-      ...vto,
-      rocks: [...vto.rocks, { id: Date.now().toString(), title: '', completed: false }],
-    });
-  };
-
-  const removeRock = (id: string) => {
-    setVto({
-      ...vto,
-      rocks: vto.rocks.filter((r) => r.id !== id),
-    });
-  };
-
-  const updateRock = (id: string, field: 'title' | 'completed', value: string | boolean) => {
-    setVto({
-      ...vto,
-      rocks: vto.rocks.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
-    });
-  };
+  // Rocks stats
+  const completedRocks = quarterRocks.filter((r) => r.status === 'complete').length;
+  const totalRocks = quarterRocks.length;
+  const rocksProgress = totalRocks > 0 ? Math.round((completedRocks / totalRocks) * 100) : 0;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Metas & VTO</h1>
-          <p className="text-slate-500">Configure sua meta anual e planejamento</p>
+          <h1 className="text-2xl font-bold text-slate-900">Blueprint 2026</h1>
+          <p className="text-slate-500">Formula $1 Milhao - Configure sua meta anual</p>
         </div>
         <Button onClick={handleSave} disabled={isSaving}>
           <Save className="w-4 h-4 mr-2" />
@@ -280,7 +261,7 @@ export default function GoalsPage() {
               <Settings className="w-6 h-6 text-orange-600" />
             </div>
             <div>
-              <CardTitle>Parâmetros de Cálculo</CardTitle>
+              <CardTitle>Parametros de Calculo</CardTitle>
               <CardDescription>Ajuste os valores base para calcular suas metas</CardDescription>
             </div>
           </div>
@@ -288,14 +269,14 @@ export default function GoalsPage() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <Label>Ticket Médio ($)</Label>
+              <Label>Ticket Medio ($)</Label>
               <Input
                 type="number"
                 min="0"
                 value={vto.formulaParams.avgTicket}
                 onChange={(e) => updateFormulaParam('avgTicket', parseFloat(e.target.value) || 0)}
               />
-              <p className="text-xs text-slate-500 mt-1">Valor médio por job</p>
+              <p className="text-xs text-slate-500 mt-1">Valor medio por job</p>
             </div>
             <div>
               <Label>Taxa de Fechamento (%)</Label>
@@ -320,7 +301,7 @@ export default function GoalsPage() {
               <p className="text-xs text-slate-500 mt-1">% do faturamento</p>
             </div>
             <div>
-              <Label>Semanas de Produção</Label>
+              <Label>Semanas de Producao</Label>
               <Input
                 type="number"
                 min="1"
@@ -354,7 +335,7 @@ export default function GoalsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-slate-500">Período</th>
+                  <th className="text-left py-3 px-4 font-medium text-slate-500">Periodo</th>
                   <th className="text-right py-3 px-4 font-medium text-slate-500">Faturamento</th>
                   <th className="text-right py-3 px-4 font-medium text-slate-500">Jobs</th>
                   <th className="text-right py-3 px-4 font-medium text-slate-500">Leads</th>
@@ -398,59 +379,78 @@ export default function GoalsPage() {
         </CardContent>
       </Card>
 
-      {/* Quarterly Rocks */}
+      {/* Quarterly Rocks Summary */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-100 rounded-lg">
-                <CheckCircle2 className="w-6 h-6 text-purple-600" />
+                <Mountain className="w-6 h-6 text-purple-600" />
               </div>
               <div>
-                <CardTitle>Rocks deste Trimestre</CardTitle>
-                <CardDescription>3-7 prioridades para os próximos 90 dias</CardDescription>
+                <CardTitle>Rocks Q{currentQuarter} {currentYear}</CardTitle>
+                <CardDescription>
+                  {completedRocks} de {totalRocks} concluidos ({rocksProgress}%)
+                </CardDescription>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={addRock}>
-              <Plus className="w-4 h-4 mr-1" />
-              Adicionar
-            </Button>
+            <Link href="/traction/rocks">
+              <Button variant="outline" size="sm">
+                Gerenciar Rocks
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {vto.rocks.map((rock, index) => (
-              <div key={rock.id} className="flex items-center gap-3">
+          <div className="mb-4">
+            <Progress value={rocksProgress} className="h-2" />
+          </div>
+          <div className="space-y-2">
+            {quarterRocks.slice(0, 5).map((rock) => (
+              <div
+                key={rock.id}
+                className="flex items-center gap-3 p-2 rounded hover:bg-slate-50"
+              >
                 <button
-                  onClick={() => updateRock(rock.id, 'completed', !rock.completed)}
+                  onClick={() =>
+                    updateStatus(rock.id, rock.status === 'complete' ? 'on_track' : 'complete')
+                  }
                   className="flex-shrink-0"
                 >
-                  {rock.completed ? (
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  {rock.status === 'complete' ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
                   ) : (
-                    <Circle className="w-6 h-6 text-slate-300 hover:text-slate-400" />
+                    <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />
                   )}
                 </button>
-                <Input
-                  value={rock.title}
-                  onChange={(e) => updateRock(rock.id, 'title', e.target.value)}
-                  placeholder={`Rock ${index + 1}...`}
-                  className={rock.completed ? 'line-through text-slate-500' : ''}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeRock(rock.id)}
-                  className="flex-shrink-0 text-slate-400 hover:text-red-500"
+                <span
+                  className={`flex-1 text-sm ${
+                    rock.status === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'
+                  }`}
                 >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                  {rock.title}
+                </span>
+                {rock.progress > 0 && (
+                  <span className="text-xs text-slate-500">{rock.progress}%</span>
+                )}
               </div>
             ))}
-            {vto.rocks.length === 0 && (
+            {quarterRocks.length === 0 && (
               <p className="text-center text-slate-500 py-4">
-                Nenhum rock definido. Clique em "Adicionar" para começar.
+                Nenhum rock para este trimestre.{' '}
+                <Link href="/traction/rocks" className="text-blue-600 hover:underline">
+                  Adicionar rocks
+                </Link>
               </p>
+            )}
+            {quarterRocks.length > 5 && (
+              <Link
+                href="/traction/rocks"
+                className="block text-center text-sm text-blue-600 hover:underline pt-2"
+              >
+                Ver todos os {quarterRocks.length} rocks
+              </Link>
             )}
           </div>
         </CardContent>
@@ -459,8 +459,8 @@ export default function GoalsPage() {
       {/* VTO Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Visão & Valores (VTO)</CardTitle>
-          <CardDescription>Defina a visão de longo prazo do seu negócio</CardDescription>
+          <CardTitle>Visao & Valores (VTO)</CardTitle>
+          <CardDescription>Defina a visao de longo prazo do seu negocio</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -478,7 +478,7 @@ export default function GoalsPage() {
               <Textarea
                 value={vto.coreFocus}
                 onChange={(e) => setVto({ ...vto, coreFocus: e.target.value })}
-                placeholder="O que fazemos: Pintura Residencial e Comercial&#10;Quem servimos: Proprietários em [Cidade]"
+                placeholder="O que fazemos: Pintura Residencial e Comercial&#10;Quem servimos: Proprietarios em [Cidade]"
                 rows={3}
               />
             </div>
@@ -487,16 +487,16 @@ export default function GoalsPage() {
               <Textarea
                 value={vto.tenYearTarget}
                 onChange={(e) => setVto({ ...vto, tenYearTarget: e.target.value })}
-                placeholder="Ex: $10M faturamento, 50 funcionários..."
+                placeholder="Ex: $10M faturamento, 50 funcionarios..."
                 rows={3}
               />
             </div>
             <div>
-              <Label>Visão 3 Anos</Label>
+              <Label>Visao 3 Anos</Label>
               <Textarea
                 value={vto.threeYearPicture}
                 onChange={(e) => setVto({ ...vto, threeYearPicture: e.target.value })}
-                placeholder="Ex: $3M faturamento, 15 funcionários, 2 equipes..."
+                placeholder="Ex: $3M faturamento, 15 funcionarios, 2 equipes..."
                 rows={3}
               />
             </div>
@@ -507,19 +507,19 @@ export default function GoalsPage() {
       {/* Formula Reference */}
       <Card className="bg-slate-50">
         <CardContent className="p-4">
-          <h3 className="font-semibold text-slate-700 mb-3">Como as metas são calculadas</h3>
+          <h3 className="font-semibold text-slate-700 mb-3">Como as metas sao calculadas</h3>
           <div className="text-sm text-slate-600 space-y-2">
             <p>
-              <strong>Jobs = Faturamento ÷ Ticket Médio</strong> ({formatCurrency(vto.annualTarget)} ÷ {formatCurrency(vto.formulaParams.avgTicket)} = {goals.annual.jobs} jobs)
+              <strong>Jobs = Faturamento / Ticket Medio</strong> ({formatCurrency(vto.annualTarget)} / {formatCurrency(vto.formulaParams.avgTicket)} = {goals.annual.jobs} jobs)
             </p>
             <p>
-              <strong>Leads = Jobs ÷ Taxa de Fechamento</strong> ({goals.annual.jobs} ÷ {vto.formulaParams.closingRate}% = {goals.annual.leads} leads)
+              <strong>Leads = Jobs / Taxa de Fechamento</strong> ({goals.annual.jobs} / {vto.formulaParams.closingRate}% = {goals.annual.leads} leads)
             </p>
             <p>
               <strong>Marketing = {vto.formulaParams.marketingPercent}% do Faturamento</strong> ({formatCurrency(goals.annual.marketing)}/ano)
             </p>
             <p>
-              <strong>Metas semanais = Anual ÷ {vto.formulaParams.productionWeeks} semanas</strong>
+              <strong>Metas semanais = Anual / {vto.formulaParams.productionWeeks} semanas</strong>
             </p>
           </div>
         </CardContent>

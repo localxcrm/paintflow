@@ -17,44 +17,52 @@ import {
   Target,
   CheckCircle2,
   Circle,
+  Mountain,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRocks } from '@/hooks/useRocks';
 
-// Calculate goals based on annual revenue target
-function calculateGoals(annualTarget: number) {
-  const avgTicket = 9500;
-  const closingRate = 0.30;
-  const productionWeeks = 35;
+// Calculate goals based on annual revenue target and formula params
+interface FormulaParams {
+  avgTicket: number;
+  closingRate: number;
+  marketingPercent: number;
+  productionWeeks: number;
+}
+
+function calculateGoals(annualTarget: number, params: FormulaParams) {
+  const { avgTicket, closingRate, marketingPercent, productionWeeks } = params;
 
   const jobsPerYear = Math.round(annualTarget / avgTicket);
   const jobsPerWeek = jobsPerYear / productionWeeks;
-  const leadsPerWeek = Math.round(jobsPerWeek / closingRate);
+  const leadsPerYear = Math.round(jobsPerYear / (closingRate / 100));
+  const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
   const revenuePerWeek = annualTarget / productionWeeks;
-  const marketingAnnual = annualTarget * 0.08;
+  const marketingAnnual = annualTarget * (marketingPercent / 100);
 
   return {
     annual: {
       revenue: annualTarget,
       jobs: jobsPerYear,
-      leads: Math.round(leadsPerWeek * productionWeeks),
+      leads: leadsPerYear,
       marketing: marketingAnnual,
     },
     monthly: {
       revenue: Math.round(annualTarget / 12),
       jobs: Math.round(jobsPerYear / 12),
-      leads: Math.round((leadsPerWeek * productionWeeks) / 12),
+      leads: Math.round(leadsPerYear / 12),
       marketing: Math.round(marketingAnnual / 12),
     },
     weekly: {
       revenue: Math.round(revenuePerWeek),
-      jobs: Math.round(jobsPerWeek),
+      jobs: Math.round(jobsPerWeek * 10) / 10,
       leads: leadsPerWeek,
       marketing: Math.round(marketingAnnual / 52),
     },
     quarterly: {
       revenue: Math.round(annualTarget / 4),
       jobs: Math.round(jobsPerYear / 4),
-      leads: Math.round((leadsPerWeek * productionWeeks) / 4),
+      leads: Math.round(leadsPerYear / 4),
       marketing: Math.round(marketingAnnual / 4),
     },
   };
@@ -68,29 +76,33 @@ interface DashboardData {
   reviews: { total: number; goal: number; avgRating: number };
 }
 
-interface VTOData {
+interface VTOSettings {
   annualTarget: number;
-  ytdRevenue: number;
-  rocks: { id: string; title: string; completed: boolean }[];
+  formulaParams: FormulaParams;
 }
 
-const defaultVTO: VTOData = {
-  annualTarget: 1000000, // Default $1M
-  ytdRevenue: 0,
-  rocks: [
-    { id: '1', title: 'Contratar 2 novos pintores', completed: false },
-    { id: '2', title: 'Lançar campanha Google Ads', completed: false },
-    { id: '3', title: 'Fechar 3 contratos comerciais', completed: false },
-  ],
+const defaultSettings: VTOSettings = {
+  annualTarget: 1000000,
+  formulaParams: {
+    avgTicket: 9500,
+    closingRate: 30,
+    marketingPercent: 8,
+    productionWeeks: 35,
+  },
 };
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState('month');
-  const [vto, setVto] = useState<VTOData>(defaultVTO);
+  const [settings, setSettings] = useState<VTOSettings>(defaultSettings);
+  const [ytdRevenue, setYtdRevenue] = useState(0);
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const goals = calculateGoals(vto.annualTarget);
+  // Get rocks from shared hook
+  const { getCurrentQuarterRocks, updateStatus, currentQuarter, currentYear } = useRocks();
+  const quarterRocks = getCurrentQuarterRocks();
+
+  const goals = calculateGoals(settings.annualTarget, settings.formulaParams);
 
   const getGoalsForPeriod = () => {
     switch (period) {
@@ -104,6 +116,25 @@ export default function DashboardPage() {
   };
 
   const periodGoals = getGoalsForPeriod();
+
+  // Load VTO settings from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('paintpro_vto');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSettings({
+          annualTarget: parsed.annualTarget || defaultSettings.annualTarget,
+          formulaParams: {
+            ...defaultSettings.formulaParams,
+            ...parsed.formulaParams,
+          },
+        });
+      } catch (e) {
+        console.error('Error loading VTO settings:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -122,7 +153,7 @@ export default function DashboardPage() {
           },
           sales: {
             total: json.jobs?.completed || 0,
-            goal: periodGoals.jobs,
+            goal: Math.round(periodGoals.jobs),
             closingRate: json.salesFunnel?.closingRate || 0,
           },
           revenue: {
@@ -140,11 +171,7 @@ export default function DashboardPage() {
             avgRating: json.reviews?.avgRating || 0,
           },
         });
-        // Update VTO YTD revenue
-        setVto((prev) => ({
-          ...prev,
-          ytdRevenue: json.financials?.totalRevenue || 0,
-        }));
+        setYtdRevenue(json.financials?.totalRevenue || 0);
       }
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -154,7 +181,7 @@ export default function DashboardPage() {
   };
 
   const periodLabel =
-    period === 'week' ? 'Esta Semana' : period === 'month' ? 'Este Mês' : 'Este Trimestre';
+    period === 'week' ? 'Esta Semana' : period === 'month' ? 'Este Mes' : 'Este Trimestre';
 
   const formatCurrency = (value: number, compact = false) => {
     if (compact && value >= 1000000) {
@@ -166,12 +193,16 @@ export default function DashboardPage() {
     return `$${value.toLocaleString('en-US')}`;
   };
 
-  const vtoProgress = vto.annualTarget > 0 ? (vto.ytdRevenue / vto.annualTarget) * 100 : 0;
+  const vtoProgress = settings.annualTarget > 0 ? (ytdRevenue / settings.annualTarget) * 100 : 0;
+
+  // Rocks stats
+  const completedRocks = quarterRocks.filter((r) => r.status === 'complete').length;
+  const totalRocks = quarterRocks.length;
 
   // Use defaults if data hasn't loaded
   const displayData = data || {
     leads: { total: 0, goal: periodGoals.leads },
-    sales: { total: 0, goal: periodGoals.jobs, closingRate: 0 },
+    sales: { total: 0, goal: Math.round(periodGoals.jobs), closingRate: 0 },
     revenue: { total: 0, goal: periodGoals.revenue },
     marketing: { spent: 0, cpl: 0, roi: 0 },
     reviews: { total: 0, goal: 10, avgRating: 0 },
@@ -182,15 +213,15 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Painel</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Blueprint 2026</h1>
           <p className="text-slate-500">
-            Você está no caminho para {formatCurrency(vto.annualTarget, true)}?
+            Formula $1 Milhao - Voce esta no caminho para {formatCurrency(settings.annualTarget, true)}?
           </p>
         </div>
         <Tabs value={period} onValueChange={setPeriod}>
           <TabsList>
             <TabsTrigger value="week">Semana</TabsTrigger>
-            <TabsTrigger value="month">Mês</TabsTrigger>
+            <TabsTrigger value="month">Mes</TabsTrigger>
             <TabsTrigger value="quarter">Trimestre</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -205,7 +236,7 @@ export default function DashboardPage() {
                 <Target className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Sua Visão</h2>
+                <h2 className="text-lg font-bold text-slate-900">Sua Visao</h2>
                 <p className="text-sm text-slate-500">Meta 1 Ano</p>
               </div>
             </div>
@@ -221,10 +252,10 @@ export default function DashboardPage() {
             <div>
               <div className="flex justify-between items-end mb-2">
                 <span className="text-3xl font-bold text-slate-900">
-                  {formatCurrency(vto.ytdRevenue, true)}
+                  {formatCurrency(ytdRevenue, true)}
                 </span>
                 <span className="text-sm text-slate-500">
-                  de {formatCurrency(vto.annualTarget, true)}
+                  de {formatCurrency(settings.annualTarget, true)}
                 </span>
               </div>
               <Progress
@@ -239,26 +270,57 @@ export default function DashboardPage() {
 
             {/* Quarterly Rocks */}
             <div>
-              <h3 className="text-sm font-semibold text-slate-700 mb-2">
-                Rocks deste Trimestre
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                  <Mountain className="w-4 h-4" />
+                  Rocks Q{currentQuarter} {currentYear}
+                </h3>
+                <span className="text-xs text-slate-500">
+                  {completedRocks}/{totalRocks} concluidos
+                </span>
+              </div>
               <div className="space-y-2">
-                {vto.rocks.map((rock) => (
+                {quarterRocks.slice(0, 5).map((rock) => (
                   <div key={rock.id} className="flex items-center gap-2">
-                    {rock.completed ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <Circle className="w-5 h-5 text-slate-300" />
-                    )}
+                    <button
+                      onClick={() =>
+                        updateStatus(rock.id, rock.status === 'complete' ? 'on_track' : 'complete')
+                      }
+                    >
+                      {rock.status === 'complete' ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />
+                      )}
+                    </button>
                     <span
-                      className={`text-sm ${
-                        rock.completed ? 'text-slate-500 line-through' : 'text-slate-700'
+                      className={`text-sm flex-1 ${
+                        rock.status === 'complete' ? 'text-slate-400 line-through' : 'text-slate-700'
                       }`}
                     >
                       {rock.title}
                     </span>
+                    {rock.progress > 0 && (
+                      <span className="text-xs text-slate-500">{rock.progress}%</span>
+                    )}
                   </div>
                 ))}
+                {quarterRocks.length === 0 && (
+                  <p className="text-sm text-slate-500">
+                    Nenhum rock para este trimestre.{' '}
+                    <Link href="/traction/rocks" className="text-blue-600 hover:underline">
+                      Adicionar rocks
+                    </Link>
+                  </p>
+                )}
+                {quarterRocks.length > 5 && (
+                  <Link
+                    href="/traction/rocks"
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Ver todos os {quarterRocks.length} rocks
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -363,7 +425,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Star className="w-5 h-5 text-yellow-500" />
-              Avaliações
+              Avaliacoes
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -374,11 +436,11 @@ export default function DashboardPage() {
                     ? displayData.reviews.avgRating.toFixed(1)
                     : '-'}
                 </p>
-                <p className="text-sm text-slate-500">Nota média</p>
+                <p className="text-sm text-slate-500">Nota media</p>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold text-slate-900">{displayData.reviews.total}</p>
-                <p className="text-sm text-slate-500">de {displayData.reviews.goal} avaliações</p>
+                <p className="text-sm text-slate-500">de {displayData.reviews.goal} avaliacoes</p>
               </div>
             </div>
             <div className="flex gap-1 mt-4">
@@ -401,7 +463,7 @@ export default function DashboardPage() {
       <Card className="bg-slate-50">
         <CardContent className="p-4">
           <h3 className="font-semibold text-slate-700 mb-2">
-            Fórmula para {formatCurrency(vto.annualTarget, true)}
+            Formula para {formatCurrency(settings.annualTarget, true)}
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
@@ -422,7 +484,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-3">
-            Taxa de fechamento: 30% | Ticket médio: $9,500 | 35 semanas de produção
+            Taxa de fechamento: {settings.formulaParams.closingRate}% | Ticket medio: {formatCurrency(settings.formulaParams.avgTicket)} | {settings.formulaParams.productionWeeks} semanas de producao
           </p>
         </CardContent>
       </Card>
