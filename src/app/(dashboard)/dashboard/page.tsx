@@ -5,6 +5,7 @@ import { RevenueChart } from '@/components/dashboard/revenue-chart';
 import { PipelineChart } from '@/components/dashboard/pipeline-chart';
 import { RecentJobs } from '@/components/dashboard/recent-jobs';
 import { UpcomingFollowups, PendingTodos } from '@/components/dashboard/upcoming-followups';
+import { KpiCards } from '@/components/dashboard/kpi-cards';
 import { mockDashboardKPIs } from '@/lib/mock-data';
 import {
   DollarSign,
@@ -108,6 +109,11 @@ export default function DashboardPage() {
           icon={AlertTriangle}
           variant={kpis.flaggedJobsCount > 0 ? 'warning' : 'success'}
         />
+      </div>
+
+      {/* GHL / SaaS KPIs */}
+      <div className="mt-8 pt-8 border-t">
+        <KpiCards />
       </div>
 
       {/* Charts Row */}

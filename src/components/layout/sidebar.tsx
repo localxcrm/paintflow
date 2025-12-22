@@ -21,6 +21,9 @@ import {
   UserCheck,
   ChevronDown,
   PaintBucket,
+  Megaphone,
+  Goal,
+  Link2,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -36,6 +39,12 @@ const mainNavItems = [
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/financials', label: 'Financials', icon: DollarSign },
   { href: '/price-book', label: 'Price Book', icon: BookOpen },
+];
+
+const saasNavItems = [
+  { href: '/goals', label: 'Goals & Targets', icon: Goal },
+  { href: '/marketing', label: 'Marketing', icon: Megaphone },
+  { href: '/settings/integrations', label: 'Integrations', icon: Link2 },
 ];
 
 const tractionNavItems = [
@@ -74,6 +83,32 @@ export function Sidebar() {
             Operations
           </p>
           {mainNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                )}
+              >
+                <Icon className="w-5 h-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* SaaS / KPI Nav */}
+        <div className="mb-6">
+          <p className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            KPIs & Goals
+          </p>
+          {saasNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
             return (

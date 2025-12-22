@@ -31,3 +31,34 @@ export function createServerSupabaseClient() {
     },
   });
 }
+
+// Admin client for server-side operations (singleton pattern)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
+
+export function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      throw new Error('Supabase environment variables are not configured');
+    }
+
+    _supabaseAdmin = createClient(url, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+  }
+  return _supabaseAdmin;
+}
+
+// Export supabaseAdmin as the client directly
+// Using 'any' to bypass strict typing until database types are generated
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const supabaseAdmin: any = {
+  from: (table: string) => getSupabaseAdmin().from(table),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rpc: (fn: string, params?: any) => getSupabaseAdmin().rpc(fn as any, params),
+};
