@@ -34,6 +34,10 @@ export async function GET(request: NextRequest) {
       estimatesResult,
       jobsResult,
       businessSettingsResult,
+      marketingSpendResult,
+      reviewsResult,
+      overheadResult,
+      monthlyTargetsResult,
     ] = await Promise.all([
       // Leads data
       supabase
@@ -56,6 +60,27 @@ export async function GET(request: NextRequest) {
         .select('*')
         .limit(1)
         .single(),
+      // Marketing spend for the period
+      supabase
+        .from('MarketingSpend')
+        .select('*')
+        .eq('year', now.getFullYear()),
+      // Reviews for the period
+      supabase
+        .from('Review')
+        .select('*')
+        .gte('reviewDate', startDate.toISOString()),
+      // Overhead for the period
+      supabase
+        .from('OverheadExpense')
+        .select('*')
+        .eq('year', now.getFullYear()),
+      // Monthly targets for comparison
+      supabase
+        .from('MonthlyTarget')
+        .select('*')
+        .eq('year', now.getFullYear())
+        .eq('month', now.getMonth() + 1),
     ]);
 
     if (leadsResult.error) throw leadsResult.error;
@@ -70,6 +95,10 @@ export async function GET(request: NextRequest) {
     const estimates = estimatesResult.data || [];
     const jobs = jobsResult.data || [];
     const businessSettings = businessSettingsResult.data;
+    const marketingSpend = marketingSpendResult.data || [];
+    const reviews = reviewsResult.data || [];
+    const overhead = overheadResult.data || [];
+    const monthlyTargets = monthlyTargetsResult.data || [];
 
     // Calculate Lead KPIs
     const totalLeads = leads.length;
@@ -138,6 +167,79 @@ export async function GET(request: NextRequest) {
     const targetARDays = businessSettings?.arTargetDays || 7;
     const minGrossProfit = businessSettings?.minGrossProfitPerJob || 900;
 
+    // NEW: Marketing & Efficiency KPIs
+    const totalMarketingSpend = marketingSpend.reduce((sum, spend) => sum + spend.amount, 0);
+    const marketingBySource = marketingSpend.reduce((acc, spend) => {
+      acc[spend.source] = (acc[spend.source] || 0) + spend.amount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Cost Per Lead (CPL)
+    const cpl = totalLeads > 0 ? totalMarketingSpend / totalLeads : 0;
+
+    // ROI (Return on Investment)
+    const roi = totalMarketingSpend > 0 ? totalRevenue / totalMarketingSpend : 0;
+
+    // Net Sales per Lead Index (NSLI)
+    const nsli = totalLeads > 0 ? totalRevenue / totalLeads : 0;
+
+    // Issue Rate (Estimates / Leads) - appointments that got proposals
+    const issueRate = totalLeads > 0 ? (totalEstimates / totalLeads) * 100 : 0;
+
+    // Demo Rate (proposals submitted / appointments)
+    // Using estimate_scheduled leads as proxy for appointments
+    const estimateScheduledLeads = leadsByStatus['estimate_scheduled'] || 0;
+    const estimatedLeads = leadsByStatus['estimated'] || 0;
+    const appointmentsRun = estimateScheduledLeads + estimatedLeads + wonLeads + lostLeads;
+    const demoRate = appointmentsRun > 0 ? (totalEstimates / appointmentsRun) * 100 : 0;
+
+    // Closing Rate (Sales / Proposals)
+    const closingRate = totalEstimates > 0 ? (acceptedEstimates / totalEstimates) * 100 : 0;
+
+    // Average Sale
+    const avgSale = acceptedEstimates > 0
+      ? estimates.filter(e => e.status === 'accepted').reduce((sum, e) => sum + e.totalPrice, 0) / acceptedEstimates
+      : 0;
+
+    // NEW: Review KPIs
+    const totalReviews = reviews.length;
+    const fiveStarReviews = reviews.filter(r => r.rating === 5).length;
+    const avgRating = totalReviews > 0
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews
+      : 0;
+    const reviewRate = completedJobs > 0 ? (totalReviews / completedJobs) * 100 : 0;
+    const pria = appointmentsRun > 0 ? totalReviews / appointmentsRun : 0; // Reviews per appointment
+
+    // NEW: Overhead & Net Profit
+    const totalOverhead = overhead.reduce((sum, exp) => sum + exp.amount, 0);
+    const overheadByCategory = overhead.reduce((acc, exp) => {
+      acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Total Commissions
+    const totalSalesCommissions = jobs.reduce((sum, job) => sum + job.salesCommissionAmount, 0);
+    const totalPmCommissions = jobs.reduce((sum, job) => sum + job.pmCommissionAmount, 0);
+    const totalCommissions = totalSalesCommissions + totalPmCommissions;
+
+    // Contribution Profit (Gross Profit - Commissions)
+    const contributionProfit = totalGrossProfit - totalCommissions;
+    const contributionMargin = totalRevenue > 0 ? (contributionProfit / totalRevenue) * 100 : 0;
+
+    // Net Profit (Gross Profit - Commissions - Marketing - Overhead)
+    const netProfit = totalGrossProfit - totalCommissions - totalMarketingSpend - totalOverhead;
+    const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    // NEW: Goal Attainment (vs Monthly Targets)
+    const currentTarget = monthlyTargets[0];
+    const goalAttainment = currentTarget ? {
+      leads: currentTarget.leadsGoal > 0 ? (totalLeads / currentTarget.leadsGoal) * 100 : 0,
+      sales: currentTarget.salesGoal > 0 ? (acceptedEstimates / currentTarget.salesGoal) * 100 : 0,
+      revenue: currentTarget.revenueGoal > 0 ? (totalRevenue / currentTarget.revenueGoal) * 100 : 0,
+      grossProfit: currentTarget.grossProfitGoal > 0 ? (totalGrossProfit / currentTarget.grossProfitGoal) * 100 : 0,
+      reviews: currentTarget.reviewsGoal > 0 ? (totalReviews / currentTarget.reviewsGoal) * 100 : 0,
+    } : null;
+
     const dashboard = {
       period,
       dateRange: {
@@ -190,6 +292,61 @@ export async function GET(request: NextRequest) {
         summary: profitFlagSummary,
         minGrossProfit,
       },
+      // NEW: Marketing Efficiency KPIs
+      marketing: {
+        totalSpend: Math.round(totalMarketingSpend * 100) / 100,
+        bySource: marketingBySource,
+        cpl: Math.round(cpl * 100) / 100,
+        roi: Math.round(roi * 100) / 100,
+        roiFormatted: `${Math.round(roi * 10) / 10}:1`,
+        percentOfRevenue: totalRevenue > 0 ? Math.round((totalMarketingSpend / totalRevenue) * 1000) / 10 : 0,
+      },
+      // NEW: Sales Funnel Efficiency
+      salesFunnel: {
+        leads: totalLeads,
+        appointmentsRun,
+        proposals: totalEstimates,
+        sales: acceptedEstimates,
+        issueRate: Math.round(issueRate * 10) / 10,
+        demoRate: Math.round(demoRate * 10) / 10,
+        closingRate: Math.round(closingRate * 10) / 10,
+        nsli: Math.round(nsli * 100) / 100,
+        avgSale: Math.round(avgSale * 100) / 100,
+      },
+      // NEW: Reviews & Reputation
+      reviews: {
+        total: totalReviews,
+        fiveStarCount: fiveStarReviews,
+        avgRating: Math.round(avgRating * 10) / 10,
+        reviewRate: Math.round(reviewRate * 10) / 10,
+        pria: Math.round(pria * 100) / 100,
+        fiveStarPct: totalReviews > 0 ? Math.round((fiveStarReviews / totalReviews) * 1000) / 10 : 0,
+      },
+      // NEW: Full P&L Summary
+      profitAndLoss: {
+        revenue: Math.round(totalRevenue * 100) / 100,
+        grossProfit: Math.round(totalGrossProfit * 100) / 100,
+        grossMargin: Math.round(avgGrossMargin * 10) / 10,
+        salesCommissions: Math.round(totalSalesCommissions * 100) / 100,
+        pmCommissions: Math.round(totalPmCommissions * 100) / 100,
+        totalCommissions: Math.round(totalCommissions * 100) / 100,
+        contributionProfit: Math.round(contributionProfit * 100) / 100,
+        contributionMargin: Math.round(contributionMargin * 10) / 10,
+        marketingSpend: Math.round(totalMarketingSpend * 100) / 100,
+        overhead: Math.round(totalOverhead * 100) / 100,
+        overheadByCategory,
+        netProfit: Math.round(netProfit * 100) / 100,
+        netMargin: Math.round(netMargin * 10) / 10,
+      },
+      // NEW: Goal Attainment
+      goalAttainment: goalAttainment ? {
+        leads: Math.round(goalAttainment.leads * 10) / 10,
+        sales: Math.round(goalAttainment.sales * 10) / 10,
+        revenue: Math.round(goalAttainment.revenue * 10) / 10,
+        grossProfit: Math.round(goalAttainment.grossProfit * 10) / 10,
+        reviews: Math.round(goalAttainment.reviews * 10) / 10,
+        hasTargets: true,
+      } : { hasTargets: false },
     };
 
     return NextResponse.json(dashboard);
