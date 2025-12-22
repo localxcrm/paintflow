@@ -1,59 +1,42 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { KPICard } from '@/components/dashboard/kpi-card';
-import { RevenueChart } from '@/components/dashboard/revenue-chart';
-import { PipelineChart } from '@/components/dashboard/pipeline-chart';
-import { RecentJobs } from '@/components/dashboard/recent-jobs';
-import { UpcomingFollowups, PendingTodos } from '@/components/dashboard/upcoming-followups';
-import { mockDashboardKPIs } from '@/lib/mock-data';
+import { ProgressCard } from '@/components/dashboard/progress-card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  DollarSign,
+  Users,
+  FileText,
   TrendingUp,
-  Briefcase,
-  Target,
-  Clock,
-  AlertTriangle,
-  Percent,
   Megaphone,
   Star,
-  Users,
-  ArrowUpRight,
+  Plus,
+  ArrowRight,
 } from 'lucide-react';
-
-function formatCurrency(amount: number, compact = false) {
-  if (compact && amount >= 1000000) {
-    return `$${(amount / 1000000).toFixed(2)}M`;
-  }
-  if (compact && amount >= 1000) {
-    return `$${(amount / 1000).toFixed(0)}K`;
-  }
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+import Link from 'next/link';
 
 interface DashboardData {
-  leads: { total: number; conversionRate: number };
-  estimates: { closeRate: number; avgValue: number };
-  jobs: { completed: number; total: number };
-  financials: { totalRevenue: number; totalGrossProfit: number; avgGrossMargin: number };
-  payments: { avgDaysToCollect: number; totalOutstanding: number };
-  profitFlags: { jobsWithIssues: number };
-  marketing?: { cpl: number; roi: number; totalSpend: number; percentOfRevenue: number };
-  salesFunnel?: { closingRate: number; issueRate: number; nsli: number; avgSale: number };
-  reviews?: { total: number; avgRating: number; fiveStarPct: number };
-  profitAndLoss?: { netProfit: number; netMargin: number; contributionProfit: number };
-  goalAttainment?: { hasTargets: boolean; revenue: number; leads: number; sales: number };
+  leads: { total: number; goal: number };
+  estimates: { total: number; goal: number };
+  sales: { total: number; goal: number; closingRate: number };
+  revenue: { total: number; goal: number };
+  marketing: { spent: number; cpl: number; roi: number };
+  reviews: { total: number; goal: number; avgRating: number };
 }
+
+const defaultData: DashboardData = {
+  leads: { total: 0, goal: 40 },
+  estimates: { total: 0, goal: 40 },
+  sales: { total: 0, goal: 12, closingRate: 0 },
+  revenue: { total: 0, goal: 114000 },
+  marketing: { spent: 0, cpl: 0, roi: 0 },
+  reviews: { total: 0, goal: 10, avgRating: 0 },
+};
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState('month');
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardData>(defaultData);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -62,183 +45,220 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
+      setIsLoading(true);
       const res = await fetch(`/api/dashboard?period=${period}`);
-      const json = await res.json();
-      setData(json);
+      if (res.ok) {
+        const json = await res.json();
+        // Map API response to our simplified data structure
+        setData({
+          leads: {
+            total: json.leads?.total || 0,
+            goal: period === 'week' ? 10 : period === 'month' ? 40 : 120,
+          },
+          estimates: {
+            total: json.estimates?.total || 0,
+            goal: period === 'week' ? 10 : period === 'month' ? 40 : 120,
+          },
+          sales: {
+            total: json.jobs?.completed || 0,
+            goal: period === 'week' ? 3 : period === 'month' ? 12 : 35,
+            closingRate: json.salesFunnel?.closingRate || 0,
+          },
+          revenue: {
+            total: json.financials?.totalRevenue || 0,
+            goal: period === 'week' ? 28500 : period === 'month' ? 114000 : 333000,
+          },
+          marketing: {
+            spent: json.marketing?.totalSpend || 0,
+            cpl: json.marketing?.cpl || 0,
+            roi: json.marketing?.roi || 0,
+          },
+          reviews: {
+            total: json.reviews?.total || 0,
+            goal: period === 'week' ? 2 : period === 'month' ? 10 : 30,
+            avgRating: json.reviews?.avgRating || 0,
+          },
+        });
+      }
     } catch (error) {
-      console.error('Error fetching dashboard:', error);
+      console.error('Erro ao carregar dashboard:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Use mock data as fallback
-  const kpis = mockDashboardKPIs;
+  const periodLabel = period === 'week' ? 'Esta Semana' : period === 'month' ? 'Este Mês' : 'Este Trimestre';
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500">Welcome back! Here&apos;s your business at a glance.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Painel</h1>
+          <p className="text-slate-500">Você está no caminho certo para R$ 1 milhão?</p>
         </div>
         <Tabs value={period} onValueChange={setPeriod}>
           <TabsList>
-            <TabsTrigger value="week">Week</TabsTrigger>
-            <TabsTrigger value="month">Month</TabsTrigger>
-            <TabsTrigger value="quarter">Quarter</TabsTrigger>
-            <TabsTrigger value="year">Year</TabsTrigger>
+            <TabsTrigger value="week">Semana</TabsTrigger>
+            <TabsTrigger value="month">Mês</TabsTrigger>
+            <TabsTrigger value="quarter">Trimestre</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {/* Primary KPI Cards - Revenue & Profit */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Revenue"
-          value={formatCurrency(data?.financials?.totalRevenue ?? kpis.revenueYTD, true)}
-          subtitle={data?.goalAttainment?.hasTargets ? `${data.goalAttainment.revenue.toFixed(0)}% of goal` : `Target: $5M`}
-          icon={DollarSign}
-          trend={{ value: 12.5, isPositive: true }}
-          variant="default"
-        />
-        <KPICard
-          title="Gross Profit"
-          value={formatCurrency(data?.financials?.totalGrossProfit ?? kpis.revenueYTD * 0.42, true)}
-          subtitle={`${(data?.financials?.avgGrossMargin ?? kpis.grossMarginPct).toFixed(1)}% margin`}
-          icon={TrendingUp}
-          trend={{ value: 2.3, isPositive: true }}
-          variant="success"
-        />
-        <KPICard
-          title="Net Profit"
-          value={formatCurrency(data?.profitAndLoss?.netProfit ?? kpis.revenueYTD * 0.08, true)}
-          subtitle={`${(data?.profitAndLoss?.netMargin ?? kpis.netMarginPct).toFixed(1)}% net margin`}
-          icon={ArrowUpRight}
-          trend={{ value: 5.2, isPositive: true }}
-          variant="success"
-        />
-        <KPICard
-          title="Jobs Completed"
-          value={data?.jobs?.completed ?? kpis.jobsCount}
-          subtitle={`Avg: ${formatCurrency(data?.salesFunnel?.avgSale ?? kpis.avgJobSize)}/job`}
-          icon={Briefcase}
-          trend={{ value: 8, isPositive: true }}
-        />
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Link href="/vendas?action=lead">
+          <Button className="w-full h-14 text-base bg-blue-600 hover:bg-blue-700">
+            <Plus className="w-5 h-5 mr-2" />
+            Novo Lead
+          </Button>
+        </Link>
+        <Link href="/vendas?action=sale">
+          <Button variant="outline" className="w-full h-14 text-base border-2">
+            <TrendingUp className="w-5 h-5 mr-2" />
+            Registrar Venda
+          </Button>
+        </Link>
+        <Link href="/marketing">
+          <Button variant="outline" className="w-full h-14 text-base border-2">
+            <Megaphone className="w-5 h-5 mr-2" />
+            Marketing
+          </Button>
+        </Link>
+        <Link href="/conhecimento">
+          <Button variant="outline" className="w-full h-14 text-base border-2">
+            <FileText className="w-5 h-5 mr-2" />
+            SOPs
+          </Button>
+        </Link>
       </div>
 
-      {/* Sales Funnel KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
+      {/* Main KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <ProgressCard
           title="Leads"
-          value={data?.leads?.total ?? kpis.leadsYTD}
-          subtitle={data?.goalAttainment?.hasTargets ? `${data.goalAttainment.leads.toFixed(0)}% of goal` : 'Total leads'}
+          subtitle={periodLabel}
+          current={data.leads.total}
+          goal={data.leads.goal}
           icon={Users}
-          variant="default"
         />
-        <KPICard
-          title="Closing Rate"
-          value={`${(data?.salesFunnel?.closingRate ?? kpis.closeRate).toFixed(1)}%`}
-          subtitle="Proposals to sales"
-          icon={Target}
-          trend={{ value: 3, isPositive: true }}
-          variant="default"
+        <ProgressCard
+          title="Vendas"
+          subtitle={`Taxa de fechamento: ${data.sales.closingRate.toFixed(0)}%`}
+          current={data.sales.total}
+          goal={data.sales.goal}
+          icon={TrendingUp}
         />
-        <KPICard
-          title="NSLI"
-          value={formatCurrency(data?.salesFunnel?.nsli ?? kpis.avgJobSize * 0.4)}
-          subtitle="Net sales per lead"
-          icon={DollarSign}
-          variant="default"
-        />
-        <KPICard
-          title="Avg Sale"
-          value={formatCurrency(data?.salesFunnel?.avgSale ?? kpis.avgJobSize)}
-          subtitle="Per closed deal"
-          icon={DollarSign}
-          variant="default"
+        <ProgressCard
+          title="Faturamento"
+          subtitle={periodLabel}
+          current={data.revenue.total}
+          goal={data.revenue.goal}
+          format="currency"
+          icon={TrendingUp}
         />
       </div>
 
-      {/* Marketing & Reviews KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Marketing ROI"
-          value={`${(data?.marketing?.roi ?? 10).toFixed(1)}:1`}
-          subtitle={`${formatCurrency(data?.marketing?.totalSpend ?? 10000)} spent`}
-          icon={Megaphone}
-          variant="default"
-        />
-        <KPICard
-          title="Cost Per Lead"
-          value={formatCurrency(data?.marketing?.cpl ?? 125)}
-          subtitle={`${(data?.marketing?.percentOfRevenue ?? 10).toFixed(1)}% of revenue`}
-          icon={Megaphone}
-          variant="default"
-        />
-        <KPICard
-          title="Reviews"
-          value={data?.reviews?.total ?? 0}
-          subtitle={`${(data?.reviews?.avgRating ?? 0).toFixed(1)} avg rating`}
-          icon={Star}
-          variant="default"
-        />
-        <KPICard
-          title="5-Star Reviews"
-          value={`${(data?.reviews?.fiveStarPct ?? 0).toFixed(0)}%`}
-          subtitle="Of all reviews"
-          icon={Star}
-          variant={data?.reviews?.fiveStarPct && data.reviews.fiveStarPct >= 80 ? 'success' : 'default'}
-        />
+      {/* Secondary Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Marketing ROI Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-purple-500" />
+              ROI de Marketing
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold text-slate-900">
+                  R$ {data.marketing.spent.toLocaleString('pt-BR')}
+                </p>
+                <p className="text-xs text-slate-500">Investido</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900">
+                  R$ {data.marketing.cpl.toFixed(0)}
+                </p>
+                <p className="text-xs text-slate-500">Custo/Lead</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-green-600">
+                  {data.marketing.roi.toFixed(1)}x
+                </p>
+                <p className="text-xs text-slate-500">ROI</p>
+              </div>
+            </div>
+            <Link href="/marketing" className="block mt-4">
+              <Button variant="ghost" className="w-full text-sm">
+                Ver detalhes <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Reviews Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Star className="w-5 h-5 text-yellow-500" />
+              Avaliações
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-4xl font-bold text-slate-900">
+                  {data.reviews.avgRating > 0 ? data.reviews.avgRating.toFixed(1) : '-'}
+                </p>
+                <p className="text-sm text-slate-500">Nota média</p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-slate-900">
+                  {data.reviews.total}
+                </p>
+                <p className="text-sm text-slate-500">
+                  de {data.reviews.goal} avaliações
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-1 mt-4">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`w-6 h-6 ${
+                    star <= Math.round(data.reviews.avgRating)
+                      ? 'text-yellow-400 fill-yellow-400'
+                      : 'text-slate-200'
+                  }`}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Operational KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Days to Collect"
-          value={(data?.payments?.avgDaysToCollect ?? kpis.avgDaysToCollect).toFixed(1)}
-          subtitle="Target: 7 days"
-          icon={Clock}
-          variant={data?.payments?.avgDaysToCollect && data.payments.avgDaysToCollect <= 7 ? 'success' : 'warning'}
-        />
-        <KPICard
-          title="Outstanding AR"
-          value={formatCurrency(data?.payments?.totalOutstanding ?? 0, true)}
-          subtitle="Unpaid balances"
-          icon={DollarSign}
-          variant="default"
-        />
-        <KPICard
-          title="Gross Margin"
-          value={`${(data?.financials?.avgGrossMargin ?? kpis.grossMarginPct).toFixed(1)}%`}
-          subtitle="Target: 40%"
-          icon={Percent}
-          variant={(data?.financials?.avgGrossMargin ?? kpis.grossMarginPct) >= 40 ? 'success' : 'warning'}
-        />
-        <KPICard
-          title="Flagged Jobs"
-          value={data?.profitFlags?.jobsWithIssues ?? kpis.flaggedJobsCount}
-          subtitle="Need attention"
-          icon={AlertTriangle}
-          variant={(data?.profitFlags?.jobsWithIssues ?? kpis.flaggedJobsCount) > 0 ? 'warning' : 'success'}
-        />
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <RevenueChart />
-        <PipelineChart />
-      </div>
-
-      {/* Recent Jobs */}
-      <RecentJobs />
-
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UpcomingFollowups />
-        <PendingTodos />
-      </div>
+      {/* Formula Reminder */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-blue-900">Fórmula $1 Milhão</h3>
+              <p className="text-sm text-blue-700 mt-1">
+                10 leads/semana → 3 vendas/semana → R$ 28.500/semana → R$ 1M/ano
+              </p>
+              <p className="text-xs text-blue-600 mt-2">
+                Meta de fechamento: 30% | Ticket médio: R$ 9.500
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
