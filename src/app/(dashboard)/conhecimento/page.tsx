@@ -40,6 +40,8 @@ import {
   ListOrdered,
   Save,
   X,
+  Upload,
+  Link,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -336,6 +338,37 @@ export default function ConhecimentoPage() {
       images: [...formData.images, newImageUrl],
     });
     setNewImageUrl('');
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Por favor, selecione apenas arquivos de imagem');
+        return;
+      }
+
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Imagem muito grande. Máximo 5MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        setFormData((prev) => ({
+          ...prev,
+          images: [...prev.images, base64],
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {
@@ -657,7 +690,7 @@ export default function ConhecimentoPage() {
 
       {/* Editor Dialog */}
       <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[90vw] w-[90vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingArticle ? 'Editar SOP' : 'Criar Novo SOP'}
@@ -711,16 +744,37 @@ export default function ConhecimentoPage() {
             <div>
               <Label className="flex items-center gap-2">
                 <Image className="w-4 h-4" />
-                Imagens (URLs)
+                Imagens
               </Label>
-              <div className="flex gap-2 mt-1">
+              <div className="flex gap-2 mt-2">
+                {/* File Upload Button */}
+                <label className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <div className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                    <Upload className="w-5 h-5 text-slate-500" />
+                    <span className="text-sm text-slate-600">Fazer Upload de Imagens</span>
+                  </div>
+                </label>
+              </div>
+              {/* URL Alternative */}
+              <div className="flex gap-2 mt-2">
+                <div className="flex items-center gap-1 text-xs text-slate-500">
+                  <Link className="w-3 h-3" />
+                  Ou cole URL:
+                </div>
                 <Input
                   value={newImageUrl}
                   onChange={(e) => setNewImageUrl(e.target.value)}
                   placeholder="https://exemplo.com/imagem.jpg"
-                  className="flex-1"
+                  className="flex-1 h-8 text-sm"
                 />
-                <Button type="button" variant="outline" onClick={addImage}>
+                <Button type="button" variant="outline" size="sm" onClick={addImage}>
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
