@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
 import {
   Target,
   Calculator,
@@ -15,7 +14,7 @@ import {
   Plus,
   Trash2,
   Save,
-  ArrowRight,
+  Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -27,19 +26,23 @@ const PRESETS = [
   { label: '$2M', value: 2000000 },
 ];
 
-// Calculate goals based on annual revenue target (JR Reis formula)
-function calculateGoals(annualTarget: number) {
-  const avgTicket = 9500;
-  const closingRate = 0.30;
-  const productionWeeks = 35;
-  const marketingPercent = 0.08;
+interface FormulaParams {
+  avgTicket: number;
+  closingRate: number;
+  marketingPercent: number;
+  productionWeeks: number;
+}
+
+// Calculate goals based on annual revenue target and formula parameters
+function calculateGoals(annualTarget: number, params: FormulaParams) {
+  const { avgTicket, closingRate, marketingPercent, productionWeeks } = params;
 
   const jobsPerYear = Math.round(annualTarget / avgTicket);
   const jobsPerWeek = jobsPerYear / productionWeeks;
-  const leadsPerYear = Math.round(jobsPerYear / closingRate);
+  const leadsPerYear = Math.round(jobsPerYear / (closingRate / 100));
   const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
   const revenuePerWeek = annualTarget / productionWeeks;
-  const marketingAnnual = annualTarget * marketingPercent;
+  const marketingAnnual = annualTarget * (marketingPercent / 100);
 
   return {
     annual: {
@@ -56,7 +59,7 @@ function calculateGoals(annualTarget: number) {
     },
     weekly: {
       revenue: Math.round(revenuePerWeek),
-      jobs: Math.round(jobsPerWeek * 10) / 10, // 1 decimal
+      jobs: Math.round(jobsPerWeek * 10) / 10,
       leads: leadsPerWeek,
       marketing: Math.round(marketingAnnual / 52),
     },
@@ -87,6 +90,7 @@ interface Rock {
 
 interface VTOData {
   annualTarget: number;
+  formulaParams: FormulaParams;
   coreValues: string;
   coreFocus: string;
   tenYearTarget: string;
@@ -96,6 +100,12 @@ interface VTOData {
 
 const defaultVTO: VTOData = {
   annualTarget: 1000000,
+  formulaParams: {
+    avgTicket: 9500,
+    closingRate: 30,
+    marketingPercent: 8,
+    productionWeeks: 35,
+  },
   coreValues: '',
   coreFocus: '',
   tenYearTarget: '',
@@ -112,14 +122,23 @@ export default function GoalsPage() {
   const [customTarget, setCustomTarget] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const goals = calculateGoals(vto.annualTarget);
+  const goals = calculateGoals(vto.annualTarget, vto.formulaParams);
 
   // Load from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('paintpro_vto');
     if (saved) {
       try {
-        setVto(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        // Merge with defaults to handle missing fields from old saves
+        setVto({
+          ...defaultVTO,
+          ...parsed,
+          formulaParams: {
+            ...defaultVTO.formulaParams,
+            ...parsed.formulaParams,
+          },
+        });
       } catch (e) {
         console.error('Error loading VTO:', e);
       }
@@ -149,6 +168,16 @@ export default function GoalsPage() {
     if (value && value > 0) {
       setVto({ ...vto, annualTarget: value });
     }
+  };
+
+  const updateFormulaParam = (key: keyof FormulaParams, value: number) => {
+    setVto({
+      ...vto,
+      formulaParams: {
+        ...vto.formulaParams,
+        [key]: value,
+      },
+    });
   };
 
   const addRock = () => {
@@ -243,6 +272,68 @@ export default function GoalsPage() {
         </CardContent>
       </Card>
 
+      {/* Formula Parameters */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <Settings className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <CardTitle>Parâmetros de Cálculo</CardTitle>
+              <CardDescription>Ajuste os valores base para calcular suas metas</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <Label>Ticket Médio ($)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={vto.formulaParams.avgTicket}
+                onChange={(e) => updateFormulaParam('avgTicket', parseFloat(e.target.value) || 0)}
+              />
+              <p className="text-xs text-slate-500 mt-1">Valor médio por job</p>
+            </div>
+            <div>
+              <Label>Taxa de Fechamento (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={vto.formulaParams.closingRate}
+                onChange={(e) => updateFormulaParam('closingRate', parseFloat(e.target.value) || 0)}
+              />
+              <p className="text-xs text-slate-500 mt-1">Leads → Vendas</p>
+            </div>
+            <div>
+              <Label>Marketing (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={vto.formulaParams.marketingPercent}
+                onChange={(e) => updateFormulaParam('marketingPercent', parseFloat(e.target.value) || 0)}
+              />
+              <p className="text-xs text-slate-500 mt-1">% do faturamento</p>
+            </div>
+            <div>
+              <Label>Semanas de Produção</Label>
+              <Input
+                type="number"
+                min="1"
+                max="52"
+                value={vto.formulaParams.productionWeeks}
+                onChange={(e) => updateFormulaParam('productionWeeks', parseInt(e.target.value) || 1)}
+              />
+              <p className="text-xs text-slate-500 mt-1">Semanas ativas/ano</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Calculated Goals */}
       <Card>
         <CardHeader>
@@ -251,9 +342,9 @@ export default function GoalsPage() {
               <Calculator className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <CardTitle>Metas Calculadas (Fórmula $1M)</CardTitle>
+              <CardTitle>Metas Calculadas</CardTitle>
               <CardDescription>
-                Baseado em: Ticket médio $9,500 | Taxa fechamento 30% | 35 semanas de produção
+                Ticket: {formatCurrency(vto.formulaParams.avgTicket)} | Fechamento: {vto.formulaParams.closingRate}% | Marketing: {vto.formulaParams.marketingPercent}% | {vto.formulaParams.productionWeeks} semanas
               </CardDescription>
             </div>
           </div>
@@ -416,19 +507,19 @@ export default function GoalsPage() {
       {/* Formula Reference */}
       <Card className="bg-slate-50">
         <CardContent className="p-4">
-          <h3 className="font-semibold text-slate-700 mb-3">Sobre a Fórmula $1M (JR Reis)</h3>
+          <h3 className="font-semibold text-slate-700 mb-3">Como as metas são calculadas</h3>
           <div className="text-sm text-slate-600 space-y-2">
             <p>
-              <strong>Jobs = Faturamento ÷ Ticket Médio ($9,500)</strong>
+              <strong>Jobs = Faturamento ÷ Ticket Médio</strong> ({formatCurrency(vto.annualTarget)} ÷ {formatCurrency(vto.formulaParams.avgTicket)} = {goals.annual.jobs} jobs)
             </p>
             <p>
-              <strong>Leads = Jobs ÷ Taxa de Fechamento (30%)</strong>
+              <strong>Leads = Jobs ÷ Taxa de Fechamento</strong> ({goals.annual.jobs} ÷ {vto.formulaParams.closingRate}% = {goals.annual.leads} leads)
             </p>
             <p>
-              <strong>Marketing = 8% do Faturamento</strong>
+              <strong>Marketing = {vto.formulaParams.marketingPercent}% do Faturamento</strong> ({formatCurrency(goals.annual.marketing)}/ano)
             </p>
             <p>
-              <strong>Semanas de Produção = 35</strong> (exclui feriados e temporada baixa)
+              <strong>Metas semanais = Anual ÷ {vto.formulaParams.productionWeeks} semanas</strong>
             </p>
           </div>
         </CardContent>
