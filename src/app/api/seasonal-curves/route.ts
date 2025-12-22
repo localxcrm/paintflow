@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // Default seasonal weights based on painting industry patterns
-const DEFAULT_WEIGHTS = {
+const DEFAULT_WEIGHTS: Record<number, number> = {
   1: 0.053,  // January
   2: 0.063,  // February
   3: 0.095,  // March
@@ -20,23 +20,27 @@ const DEFAULT_WEIGHTS = {
 // GET /api/seasonal-curves - Get seasonal curves
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : new Date().getFullYear();
     const metric = searchParams.get('metric');
 
-    const where: Record<string, unknown> = { year };
+    let query = supabase
+      .from('SeasonalCurve')
+      .select('*')
+      .eq('year', year)
+      .order('metric', { ascending: true })
+      .order('month', { ascending: true });
 
     if (metric) {
-      where.metric = metric;
+      query = query.eq('metric', metric);
     }
 
-    const curves = await prisma.seasonalCurve.findMany({
-      where,
-      orderBy: [{ metric: 'asc' }, { month: 'asc' }],
-    });
+    const { data: curves, error } = await query;
+    if (error) throw error;
 
     // Group by metric
-    const curvesByMetric = curves.reduce((acc, curve) => {
+    const curvesByMetric = (curves || []).reduce((acc, curve) => {
       if (!acc[curve.metric]) {
         acc[curve.metric] = [];
       }
@@ -45,7 +49,7 @@ export async function GET(request: NextRequest) {
     }, {} as Record<string, typeof curves>);
 
     return NextResponse.json({
-      curves,
+      curves: curves || [],
       curvesByMetric,
       year,
     });
@@ -61,28 +65,44 @@ export async function GET(request: NextRequest) {
 // POST /api/seasonal-curves - Create or update seasonal curve
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const curve = await prisma.seasonalCurve.upsert({
-      where: {
-        month_year_metric: {
+    // Check if exists
+    const { data: existing } = await supabase
+      .from('SeasonalCurve')
+      .select('id')
+      .eq('month', body.month)
+      .eq('year', body.year)
+      .eq('metric', body.metric)
+      .single();
+
+    let result;
+    if (existing) {
+      const { data, error } = await supabase
+        .from('SeasonalCurve')
+        .update({ weight: body.weight })
+        .eq('id', existing.id)
+        .select()
+        .single();
+      if (error) throw error;
+      result = data;
+    } else {
+      const { data, error } = await supabase
+        .from('SeasonalCurve')
+        .insert({
           month: body.month,
           year: body.year,
           metric: body.metric,
-        },
-      },
-      update: {
-        weight: body.weight,
-      },
-      create: {
-        month: body.month,
-        year: body.year,
-        metric: body.metric,
-        weight: body.weight,
-      },
-    });
+          weight: body.weight,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      result = data;
+    }
 
-    return NextResponse.json(curve, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error('Error saving seasonal curve:', error);
     return NextResponse.json(
@@ -95,6 +115,7 @@ export async function POST(request: NextRequest) {
 // PUT /api/seasonal-curves - Initialize default curves for a year
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
     const { year, metrics = ['leads', 'sales', 'revenue'] } = body;
 
@@ -102,19 +123,29 @@ export async function PUT(request: NextRequest) {
 
     for (const metric of metrics) {
       for (let month = 1; month <= 12; month++) {
-        const curve = await prisma.seasonalCurve.upsert({
-          where: {
-            month_year_metric: { month, year, metric },
-          },
-          update: {},
-          create: {
-            month,
-            year,
-            metric,
-            weight: DEFAULT_WEIGHTS[month as keyof typeof DEFAULT_WEIGHTS],
-          },
-        });
-        createdCurves.push(curve);
+        // Check if exists
+        const { data: existing } = await supabase
+          .from('SeasonalCurve')
+          .select('id')
+          .eq('month', month)
+          .eq('year', year)
+          .eq('metric', metric)
+          .single();
+
+        if (!existing) {
+          const { data, error } = await supabase
+            .from('SeasonalCurve')
+            .insert({
+              month,
+              year,
+              metric,
+              weight: DEFAULT_WEIGHTS[month],
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          createdCurves.push(data);
+        }
       }
     }
 
@@ -134,6 +165,7 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/seasonal-curves - Delete a seasonal curve
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -144,9 +176,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await prisma.seasonalCurve.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('SeasonalCurve')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // Calculate scenario results
 function calculateScenarioResults(scenario: {
@@ -68,21 +68,14 @@ function calculateScenarioResults(scenario: {
   const nsli = scenario.leadsCount > 0 ? revenue / scenario.leadsCount : 0;
 
   return {
-    // Funnel metrics
     appointments,
     sales,
     nsli,
-
-    // Revenue
     revenue,
-
-    // Costs
     cogsLabor,
     cogsMaterials,
     cogsOther,
     totalCogs,
-
-    // Profit levels
     grossProfit,
     grossMarginPct,
     contributionProfit,
@@ -93,12 +86,8 @@ function calculateScenarioResults(scenario: {
     totalExpenses,
     netProfit,
     netMarginPct,
-
-    // Efficiency metrics
     cpl,
     roi,
-
-    // Owner
     ownerTakeHome,
   };
 }
@@ -106,13 +95,18 @@ function calculateScenarioResults(scenario: {
 // GET /api/scenarios - Get all scenarios
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
     if (id) {
-      const scenario = await prisma.scenario.findUnique({
-        where: { id },
-      });
+      const { data: scenario, error } = await supabase
+        .from('Scenario')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
 
       if (!scenario) {
         return NextResponse.json(
@@ -121,7 +115,6 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Calculate results
       const results = calculateScenarioResults(scenario);
 
       return NextResponse.json({
@@ -130,12 +123,15 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const scenarios = await prisma.scenario.findMany({
-      orderBy: [{ isBaseline: 'desc' }, { createdAt: 'desc' }],
-    });
+    const { data: scenarios, error } = await supabase
+      .from('Scenario')
+      .select('*')
+      .order('isBaseline', { ascending: false })
+      .order('createdAt', { ascending: false });
 
-    // Calculate results for each scenario
-    const scenariosWithResults = scenarios.map((scenario) => ({
+    if (error) throw error;
+
+    const scenariosWithResults = (scenarios || []).map((scenario) => ({
       ...scenario,
       results: calculateScenarioResults(scenario),
     }));
@@ -153,21 +149,22 @@ export async function GET(request: NextRequest) {
 // POST /api/scenarios - Create a new scenario
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
     // If this is a baseline, unset other baselines
     if (body.isBaseline) {
-      await prisma.scenario.updateMany({
-        where: { isBaseline: true },
-        data: { isBaseline: false },
-      });
+      await supabase
+        .from('Scenario')
+        .update({ isBaseline: false })
+        .eq('isBaseline', true);
     }
 
-    // Calculate results
     const results = calculateScenarioResults(body);
 
-    const scenario = await prisma.scenario.create({
-      data: {
+    const { data: scenario, error } = await supabase
+      .from('Scenario')
+      .insert({
         name: body.name,
         description: body.description,
         isBaseline: body.isBaseline ?? false,
@@ -193,16 +190,13 @@ export async function POST(request: NextRequest) {
         calculatedCPL: results.cpl,
         calculatedROI: results.roi,
         calculatedOwnerTakeHome: results.ownerTakeHome,
-      },
-    });
+      })
+      .select()
+      .single();
 
-    return NextResponse.json(
-      {
-        scenario,
-        results,
-      },
-      { status: 201 }
-    );
+    if (error) throw error;
+
+    return NextResponse.json({ scenario, results }, { status: 201 });
   } catch (error) {
     console.error('Error creating scenario:', error);
     return NextResponse.json(
@@ -215,6 +209,7 @@ export async function POST(request: NextRequest) {
 // PUT /api/scenarios - Update a scenario
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
     if (!body.id) {
@@ -226,18 +221,18 @@ export async function PUT(request: NextRequest) {
 
     // If this is a baseline, unset other baselines
     if (body.isBaseline) {
-      await prisma.scenario.updateMany({
-        where: { isBaseline: true, id: { not: body.id } },
-        data: { isBaseline: false },
-      });
+      await supabase
+        .from('Scenario')
+        .update({ isBaseline: false })
+        .neq('id', body.id)
+        .eq('isBaseline', true);
     }
 
-    // Calculate results
     const results = calculateScenarioResults(body);
 
-    const scenario = await prisma.scenario.update({
-      where: { id: body.id },
-      data: {
+    const { data: scenario, error } = await supabase
+      .from('Scenario')
+      .update({
         name: body.name,
         description: body.description,
         isBaseline: body.isBaseline,
@@ -263,13 +258,14 @@ export async function PUT(request: NextRequest) {
         calculatedCPL: results.cpl,
         calculatedROI: results.roi,
         calculatedOwnerTakeHome: results.ownerTakeHome,
-      },
-    });
+      })
+      .eq('id', body.id)
+      .select()
+      .single();
 
-    return NextResponse.json({
-      scenario,
-      results,
-    });
+    if (error) throw error;
+
+    return NextResponse.json({ scenario, results });
   } catch (error) {
     console.error('Error updating scenario:', error);
     return NextResponse.json(
@@ -282,6 +278,7 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/scenarios - Delete a scenario
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -292,9 +289,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await prisma.scenario.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('Scenario')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -309,25 +309,28 @@ export async function DELETE(request: NextRequest) {
 // PATCH /api/scenarios - Compare scenarios
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
     const { baselineId, comparisonId } = body;
 
-    const [baseline, comparison] = await Promise.all([
-      prisma.scenario.findUnique({ where: { id: baselineId } }),
-      prisma.scenario.findUnique({ where: { id: comparisonId } }),
+    const [baselineResult, comparisonResult] = await Promise.all([
+      supabase.from('Scenario').select('*').eq('id', baselineId).single(),
+      supabase.from('Scenario').select('*').eq('id', comparisonId).single(),
     ]);
 
-    if (!baseline || !comparison) {
+    if (baselineResult.error || comparisonResult.error) {
       return NextResponse.json(
         { error: 'One or both scenarios not found' },
         { status: 404 }
       );
     }
 
+    const baseline = baselineResult.data;
+    const comparison = comparisonResult.data;
+
     const baselineResults = calculateScenarioResults(baseline);
     const comparisonResults = calculateScenarioResults(comparison);
 
-    // Calculate differences
     const differences = {
       revenue: comparisonResults.revenue - baselineResults.revenue,
       revenuePct: baselineResults.revenue > 0

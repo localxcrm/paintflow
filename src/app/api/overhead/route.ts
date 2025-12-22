@@ -1,55 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 // GET /api/overhead - Get overhead expenses with optional filtering
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : new Date().getFullYear();
     const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : null;
     const category = searchParams.get('category');
 
-    const where: Record<string, unknown> = { year };
+    let query = supabase
+      .from('OverheadExpense')
+      .select('*')
+      .eq('year', year)
+      .order('month', { ascending: true })
+      .order('category', { ascending: true });
 
     if (month) {
-      where.month = month;
+      query = query.eq('month', month);
     }
 
     if (category) {
-      where.category = category;
+      query = query.eq('category', category);
     }
 
-    const [expenses, categoryTotals, monthlyTotals] = await Promise.all([
-      prisma.overheadExpense.findMany({
-        where,
-        orderBy: [{ month: 'asc' }, { category: 'asc' }],
-      }),
-      prisma.overheadExpense.groupBy({
-        by: ['category'],
-        where: { year },
-        _sum: { amount: true },
-      }),
-      prisma.overheadExpense.groupBy({
-        by: ['month'],
-        where: { year },
-        _sum: { amount: true },
-      }),
-    ]);
+    const { data: expenses, error } = await query;
+    if (error) throw error;
 
-    const totalByCategory = categoryTotals.reduce((acc, item) => {
-      acc[item.category] = item._sum.amount || 0;
+    // Calculate totals by category
+    const totalByCategory = (expenses || []).reduce((acc, item) => {
+      acc[item.category] = (acc[item.category] || 0) + item.amount;
       return acc;
     }, {} as Record<string, number>);
 
-    const totalByMonth = monthlyTotals.reduce((acc, item) => {
-      acc[item.month] = item._sum.amount || 0;
+    // Calculate totals by month
+    const totalByMonth = (expenses || []).reduce((acc, item) => {
+      acc[item.month] = (acc[item.month] || 0) + item.amount;
       return acc;
     }, {} as Record<number, number>);
 
-    const grandTotal = Object.values(totalByCategory).reduce((sum, val) => sum + val, 0);
+    const grandTotal = (Object.values(totalByCategory) as number[]).reduce((sum, val) => sum + val, 0);
 
     return NextResponse.json({
-      expenses,
+      expenses: expenses || [],
       totalByCategory,
       totalByMonth,
       grandTotal,
@@ -67,10 +61,12 @@ export async function GET(request: NextRequest) {
 // POST /api/overhead - Create overhead expense
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const expense = await prisma.overheadExpense.create({
-      data: {
+    const { data: expense, error } = await supabase
+      .from('OverheadExpense')
+      .insert({
         category: body.category,
         name: body.name,
         amount: body.amount,
@@ -78,8 +74,11 @@ export async function POST(request: NextRequest) {
         year: body.year,
         isRecurring: body.isRecurring ?? true,
         notes: body.notes,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(expense, { status: 201 });
   } catch (error) {
@@ -94,6 +93,7 @@ export async function POST(request: NextRequest) {
 // PUT /api/overhead - Update overhead expense
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
 
     if (!body.id) {
@@ -103,9 +103,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const expense = await prisma.overheadExpense.update({
-      where: { id: body.id },
-      data: {
+    const { data: expense, error } = await supabase
+      .from('OverheadExpense')
+      .update({
         category: body.category,
         name: body.name,
         amount: body.amount,
@@ -113,8 +113,12 @@ export async function PUT(request: NextRequest) {
         year: body.year,
         isRecurring: body.isRecurring,
         notes: body.notes,
-      },
-    });
+      })
+      .eq('id', body.id)
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(expense);
   } catch (error) {
@@ -129,6 +133,7 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/overhead - Delete overhead expense
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -139,9 +144,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await prisma.overheadExpense.delete({
-      where: { id },
-    });
+    const { error } = await supabase
+      .from('OverheadExpense')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {
