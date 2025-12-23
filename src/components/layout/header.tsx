@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, LogOut } from 'lucide-react';
+import Link from 'next/link';
+import { Menu, LogOut, User, Settings, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,7 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { MobileNav } from './mobile-nav';
 import { authApi } from '@/lib/api';
 
-interface User {
+interface UserData {
   email: string;
   name: string;
   loggedInAt: string;
@@ -26,7 +27,7 @@ interface User {
 
 export function Header() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('paintpro_user');
@@ -36,9 +37,7 @@ export function Header() {
   }, []);
 
   const handleLogout = async () => {
-    // Try API logout
     await authApi.logout();
-    // Clear local storage
     localStorage.removeItem('paintpro_user');
     router.push('/');
   };
@@ -70,7 +69,7 @@ export function Header() {
       {/* Spacer for desktop */}
       <div className="hidden lg:block flex-1" />
 
-      {/* Right side - User menu only */}
+      {/* Right side - User menu */}
       <div className="flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -93,6 +92,25 @@ export function Header() {
                 <span className="text-xs font-normal text-slate-500">{user?.email}</span>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/perfil" className="flex items-center gap-2 cursor-pointer">
+                <User className="w-4 h-4" />
+                Perfil
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/configuracoes" className="flex items-center gap-2 cursor-pointer">
+                <Settings className="w-4 h-4" />
+                Configurações
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/equipe" className="flex items-center gap-2 cursor-pointer">
+                <Users className="w-4 h-4" />
+                Equipe
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
