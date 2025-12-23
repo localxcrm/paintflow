@@ -55,12 +55,11 @@ export async function POST(request: NextRequest) {
       .insert({
         organizationId,
         name: body.name,
-        companyName: body.companyName || null,
         email: body.email,
         phone: body.phone || null,
         specialty: body.specialty || 'both',
-        defaultPayoutPct: body.defaultPayoutPct || 60,
-        color: body.color || 'bg-blue-500',
+        color: body.color || '#10B981',
+        notes: body.notes || null,
         isActive: body.isActive !== false,
       })
       .select()
@@ -102,12 +101,11 @@ export async function PUT(request: NextRequest) {
       .from('Subcontractor')
       .update({
         name: body.name,
-        companyName: body.companyName,
         email: body.email,
         phone: body.phone,
         specialty: body.specialty,
-        defaultPayoutPct: body.defaultPayoutPct,
         color: body.color,
+        notes: body.notes,
         isActive: body.isActive,
         updatedAt: new Date().toISOString(),
       })

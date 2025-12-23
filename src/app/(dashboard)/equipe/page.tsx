@@ -72,14 +72,14 @@ const specialtyLabels: Record<string, string> = {
 };
 
 const colorOptions = [
-    { value: 'bg-blue-500', label: 'Azul' },
-    { value: 'bg-green-500', label: 'Verde' },
-    { value: 'bg-purple-500', label: 'Roxo' },
-    { value: 'bg-orange-500', label: 'Laranja' },
-    { value: 'bg-pink-500', label: 'Rosa' },
-    { value: 'bg-yellow-500', label: 'Amarelo' },
-    { value: 'bg-red-500', label: 'Vermelho' },
-    { value: 'bg-teal-500', label: 'Turquesa' },
+    { value: '#3B82F6', label: 'Azul' },
+    { value: '#10B981', label: 'Verde' },
+    { value: '#8B5CF6', label: 'Roxo' },
+    { value: '#F97316', label: 'Laranja' },
+    { value: '#EC4899', label: 'Rosa' },
+    { value: '#EAB308', label: 'Amarelo' },
+    { value: '#EF4444', label: 'Vermelho' },
+    { value: '#14B8A6', label: 'Turquesa' },
 ];
 
 export default function EquipePage() {
@@ -96,8 +96,7 @@ export default function EquipePage() {
         email: '',
         phone: '',
         role: 'both',
-        defaultCommissionPct: 5,
-        color: 'bg-blue-500',
+        color: '#3B82F6',
     });
 
     // Subcontractor modals
@@ -109,8 +108,7 @@ export default function EquipePage() {
         email: '',
         phone: '',
         specialty: 'both',
-        defaultPayoutPct: 60,
-        color: 'bg-green-500',
+        color: '#10B981',
     });
 
     useEffect(() => {
@@ -151,8 +149,7 @@ export default function EquipePage() {
                 email: member.email || '',
                 phone: member.phone || '',
                 role: member.role || 'both',
-                defaultCommissionPct: member.defaultCommissionPct || 5,
-                color: member.color || 'bg-blue-500',
+                color: member.color || '#3B82F6',
             });
         } else {
             setEditingMember(null);
@@ -161,8 +158,7 @@ export default function EquipePage() {
                 email: '',
                 phone: '',
                 role: 'both',
-                defaultCommissionPct: 5,
-                color: 'bg-blue-500',
+                color: '#3B82F6',
             });
         }
         setIsMemberModalOpen(true);
@@ -183,6 +179,10 @@ export default function EquipePage() {
                     const updated = await res.json();
                     setMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
                     toast.success('Membro atualizado!');
+                    setIsMemberModalOpen(false);
+                } else {
+                    const error = await res.json();
+                    toast.error(error.error || 'Erro ao atualizar membro');
                 }
             } else {
                 // Create
@@ -195,9 +195,12 @@ export default function EquipePage() {
                     const created = await res.json();
                     setMembers(prev => [...prev, created]);
                     toast.success('Membro adicionado!');
+                    setIsMemberModalOpen(false);
+                } else {
+                    const error = await res.json();
+                    toast.error(error.error || 'Erro ao adicionar membro');
                 }
             }
-            setIsMemberModalOpen(false);
         } catch (error) {
             console.error('Error saving member:', error);
             toast.error('Erro ao salvar membro');
@@ -230,8 +233,7 @@ export default function EquipePage() {
                 email: sub.email || '',
                 phone: sub.phone || '',
                 specialty: sub.specialty || 'both',
-                defaultPayoutPct: sub.defaultPayoutPct || 60,
-                color: sub.color || 'bg-green-500',
+                color: sub.color || '#10B981',
             });
         } else {
             setEditingSub(null);
@@ -240,8 +242,7 @@ export default function EquipePage() {
                 email: '',
                 phone: '',
                 specialty: 'both',
-                defaultPayoutPct: 60,
-                color: 'bg-green-500',
+                color: '#10B981',
             });
         }
         setIsSubModalOpen(true);
@@ -262,6 +263,10 @@ export default function EquipePage() {
                     const updated = await res.json();
                     setSubcontractors(prev => prev.map(s => s.id === updated.id ? updated : s));
                     toast.success('Subcontratado atualizado!');
+                    setIsSubModalOpen(false);
+                } else {
+                    const error = await res.json();
+                    toast.error(error.error || 'Erro ao atualizar subcontratado');
                 }
             } else {
                 // Create
@@ -274,9 +279,12 @@ export default function EquipePage() {
                     const created = await res.json();
                     setSubcontractors(prev => [...prev, created]);
                     toast.success('Subcontratado adicionado!');
+                    setIsSubModalOpen(false);
+                } else {
+                    const error = await res.json();
+                    toast.error(error.error || 'Erro ao adicionar subcontratado');
                 }
             }
-            setIsSubModalOpen(false);
         } catch (error) {
             console.error('Error saving subcontractor:', error);
             toast.error('Erro ao salvar subcontratado');
@@ -342,7 +350,10 @@ export default function EquipePage() {
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-12 w-12">
-                                        <AvatarFallback className={`text-white ${member.color || 'bg-blue-600'}`}>
+                                        <AvatarFallback
+                                            className="text-white"
+                                            style={{ backgroundColor: member.color || '#3B82F6' }}
+                                        >
                                             {getInitials(member.name)}
                                         </AvatarFallback>
                                     </Avatar>
@@ -429,7 +440,10 @@ export default function EquipePage() {
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-10 w-10">
-                                        <AvatarFallback className={`text-white text-sm ${sub.color || 'bg-green-600'}`}>
+                                        <AvatarFallback
+                                            className="text-white text-sm"
+                                            style={{ backgroundColor: sub.color || '#10B981' }}
+                                        >
                                             {getInitials(sub.name)}
                                         </AvatarFallback>
                                     </Avatar>
@@ -550,35 +564,29 @@ export default function EquipePage() {
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="commission">Comissao (%)</Label>
-                                <Input
-                                    id="commission"
-                                    type="number"
-                                    value={memberForm.defaultCommissionPct}
-                                    onChange={(e) => setMemberForm(prev => ({ ...prev, defaultCommissionPct: Number(e.target.value) }))}
-                                />
+                                <Label>Cor</Label>
+                                <Select
+                                    value={memberForm.color}
+                                    onValueChange={(value) => setMemberForm(prev => ({ ...prev, color: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {colorOptions.map(c => (
+                                            <SelectItem key={c.value} value={c.value}>
+                                                <div className="flex items-center gap-2">
+                                                    <div
+                                                        className="w-4 h-4 rounded"
+                                                        style={{ backgroundColor: c.value }}
+                                                    />
+                                                    {c.label}
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Cor</Label>
-                            <Select
-                                value={memberForm.color}
-                                onValueChange={(value) => setMemberForm(prev => ({ ...prev, color: value }))}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {colorOptions.map(c => (
-                                        <SelectItem key={c.value} value={c.value}>
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-4 h-4 rounded ${c.value}`} />
-                                                {c.label}
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
                         </div>
                         <div className="flex justify-end gap-2 pt-4">
                             <Button variant="outline" onClick={() => setIsMemberModalOpen(false)}>
@@ -649,35 +657,29 @@ export default function EquipePage() {
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="payout">Payout (%)</Label>
-                                <Input
-                                    id="payout"
-                                    type="number"
-                                    value={subForm.defaultPayoutPct}
-                                    onChange={(e) => setSubForm(prev => ({ ...prev, defaultPayoutPct: Number(e.target.value) }))}
-                                />
+                                <Label>Cor (para calendario/mapa)</Label>
+                                <Select
+                                    value={subForm.color}
+                                    onValueChange={(value) => setSubForm(prev => ({ ...prev, color: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {colorOptions.map(c => (
+                                            <SelectItem key={c.value} value={c.value}>
+                                                <div className="flex items-center gap-2">
+                                                    <div
+                                                        className="w-4 h-4 rounded"
+                                                        style={{ backgroundColor: c.value }}
+                                                    />
+                                                    {c.label}
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Cor (para calendario/mapa)</Label>
-                            <Select
-                                value={subForm.color}
-                                onValueChange={(value) => setSubForm(prev => ({ ...prev, color: value }))}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {colorOptions.map(c => (
-                                        <SelectItem key={c.value} value={c.value}>
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-4 h-4 rounded ${c.value}`} />
-                                                {c.label}
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
                         </div>
                         <div className="flex justify-end gap-2 pt-4">
                             <Button variant="outline" onClick={() => setIsSubModalOpen(false)}>
