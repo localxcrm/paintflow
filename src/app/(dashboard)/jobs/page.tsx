@@ -12,6 +12,7 @@ import {
   JobCreateModal,
   JobDeleteDialog
 } from '@/components/jobs';
+import { PaymentDialog, PaymentDialogType, PaymentDialogData } from '@/components/jobs/payment-dialog';
 import {
   calculateKPIs,
   filterJobsByStatus,
@@ -22,9 +23,17 @@ import {
   getJobValueByStatus,
   getJobsDistribution,
 } from '@/lib/utils/job-calculations';
-import { Job, JobStatus, PaymentStatus } from '@/types';
+import { Job, JobStatus, PaymentStatus, PaymentHistoryItem, PaymentMethod } from '@/types';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface PaymentState {
+  isOpen: boolean;
+  type: PaymentDialogType;
+  jobId: string;
+  amount: number;
+  recipientName?: string;
+}
 
 export default function JobsPage() {
   // Filter state
@@ -43,6 +52,14 @@ export default function JobsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+
+  // Payment dialog state
+  const [paymentState, setPaymentState] = useState<PaymentState>({
+    isOpen: false,
+    type: 'deposit',
+    jobId: '',
+    amount: 0,
+  });
 
   // Apply filters
   const filteredJobs = useMemo(() => {
@@ -71,49 +88,185 @@ export default function JobsPage() {
     setSubcontractorFilter('all');
   };
 
-  // Toggle handlers for checkboxes
+  // Open payment dialog instead of toggling directly
   const handleToggleDepositPaid = (jobId: string, value: boolean) => {
-    setJobs(prev =>
-      prev.map(job =>
-        job.id === jobId
-          ? { ...job, depositPaid: value, balanceDue: value ? job.jobValue - job.depositRequired : job.jobValue }
-          : job
-      )
-    );
+    if (value) {
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        setPaymentState({
+          isOpen: true,
+          type: 'deposit',
+          jobId,
+          amount: job.depositRequired,
+          recipientName: job.clientName,
+        });
+      }
+    } else {
+      // Allow unchecking without dialog
+      setJobs(prev =>
+        prev.map(job =>
+          job.id === jobId
+            ? { ...job, depositPaid: false, balanceDue: job.jobValue }
+            : job
+        )
+      );
+    }
   };
 
   const handleToggleJobPaid = (jobId: string, value: boolean) => {
-    setJobs(prev =>
-      prev.map(job =>
-        job.id === jobId
-          ? { ...job, jobPaid: value, balanceDue: value ? 0 : job.jobValue - (job.depositPaid ? job.depositRequired : 0) }
-          : job
-      )
-    );
+    if (value) {
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        setPaymentState({
+          isOpen: true,
+          type: 'job_payment',
+          jobId,
+          amount: job.balanceDue,
+          recipientName: job.clientName,
+        });
+      }
+    } else {
+      setJobs(prev =>
+        prev.map(job =>
+          job.id === jobId
+            ? { ...job, jobPaid: false, balanceDue: job.jobValue - (job.depositPaid ? job.depositRequired : 0) }
+            : job
+        )
+      );
+    }
   };
 
   const handleToggleSalesCommissionPaid = (jobId: string, value: boolean) => {
-    setJobs(prev =>
-      prev.map(job =>
-        job.id === jobId ? { ...job, salesCommissionPaid: value } : job
-      )
-    );
+    if (value) {
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        setPaymentState({
+          isOpen: true,
+          type: 'sales_commission',
+          jobId,
+          amount: job.salesCommissionAmount,
+          recipientName: job.salesRep?.name,
+        });
+      }
+    } else {
+      setJobs(prev =>
+        prev.map(job =>
+          job.id === jobId ? { ...job, salesCommissionPaid: false } : job
+        )
+      );
+    }
   };
 
   const handleTogglePMCommissionPaid = (jobId: string, value: boolean) => {
-    setJobs(prev =>
-      prev.map(job =>
-        job.id === jobId ? { ...job, pmCommissionPaid: value } : job
-      )
-    );
+    if (value) {
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        setPaymentState({
+          isOpen: true,
+          type: 'pm_commission',
+          jobId,
+          amount: job.pmCommissionAmount,
+          recipientName: job.projectManager?.name,
+        });
+      }
+    } else {
+      setJobs(prev =>
+        prev.map(job =>
+          job.id === jobId ? { ...job, pmCommissionPaid: false } : job
+        )
+      );
+    }
   };
 
   const handleToggleSubPaid = (jobId: string, value: boolean) => {
+    if (value) {
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        setPaymentState({
+          isOpen: true,
+          type: 'subcontractor',
+          jobId,
+          amount: job.subcontractorPrice,
+          recipientName: job.subcontractor?.name,
+        });
+      }
+    } else {
+      setJobs(prev =>
+        prev.map(job =>
+          job.id === jobId ? { ...job, subcontractorPaid: false } : job
+        )
+      );
+    }
+  };
+
+  // Handle payment confirmation
+  const handlePaymentConfirm = (data: PaymentDialogData) => {
+    const { jobId, type } = paymentState;
+
     setJobs(prev =>
-      prev.map(job =>
-        job.id === jobId ? { ...job, subcontractorPaid: value } : job
-      )
+      prev.map(job => {
+        if (job.id !== jobId) return job;
+
+        // Create payment history entry
+        const historyEntry: PaymentHistoryItem = {
+          id: Date.now().toString(),
+          date: data.date,
+          type: type === 'deposit' ? 'deposit' :
+            type === 'job_payment' ? 'final_payment' :
+              type === 'sales_commission' ? 'sales_commission' :
+                type === 'pm_commission' ? 'pm_commission' : 'subcontractor',
+          method: data.method,
+          amount: paymentState.amount,
+          notes: data.notes,
+        };
+
+        const updatedHistory = [...(job.paymentHistory || []), historyEntry];
+
+        switch (type) {
+          case 'deposit':
+            return {
+              ...job,
+              depositPaid: true,
+              depositPaymentMethod: data.method,
+              depositPaymentDate: data.date,
+              balanceDue: job.jobValue - job.depositRequired,
+              paymentHistory: updatedHistory,
+            };
+          case 'job_payment':
+            return {
+              ...job,
+              jobPaid: true,
+              jobPaymentMethod: data.method,
+              jobPaymentDate: data.date,
+              balanceDue: 0,
+              paymentHistory: updatedHistory,
+            };
+          case 'sales_commission':
+            return {
+              ...job,
+              salesCommissionPaid: true,
+              paymentHistory: updatedHistory,
+            };
+          case 'pm_commission':
+            return {
+              ...job,
+              pmCommissionPaid: true,
+              paymentHistory: updatedHistory,
+            };
+          case 'subcontractor':
+            return {
+              ...job,
+              subcontractorPaid: true,
+              paymentHistory: updatedHistory,
+            };
+          default:
+            return job;
+        }
+      })
     );
+
+    setPaymentState(prev => ({ ...prev, isOpen: false }));
+    toast.success('Pagamento registrado com sucesso!');
   };
 
   // Detail Modal handlers
@@ -248,6 +401,16 @@ export default function JobsPage() {
         isOpen={isDeleteDialogOpen}
         onClose={handleCloseDeleteDialog}
         onConfirm={handleConfirmDelete}
+      />
+
+      {/* Payment Dialog */}
+      <PaymentDialog
+        isOpen={paymentState.isOpen}
+        onClose={() => setPaymentState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={handlePaymentConfirm}
+        type={paymentState.type}
+        amount={paymentState.amount}
+        recipientName={paymentState.recipientName}
       />
     </div>
   );
