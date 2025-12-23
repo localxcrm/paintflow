@@ -68,7 +68,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 shadow-lg mb-4">
             <Paintbrush className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">PaintPro</h1>
+          <h1 className="text-3xl font-bold text-slate-900">PaintFlow</h1>
           <p className="text-slate-500 mt-1">Painting Business Management</p>
         </div>
 
@@ -169,7 +169,7 @@ export default function LoginPage() {
                     size="sm"
                     onClick={() => {
                       setFormData({
-                        email: 'demo@paintpro.com',
+                        email: 'demo@paintflow.app',
                         password: 'demo123',
                       });
                     }}
@@ -195,7 +195,7 @@ export default function LoginPage() {
         </p>
 
         <p className="text-center text-xs text-slate-400 mt-4">
-          &copy; {new Date().getFullYear()} PaintPro. All rights reserved.
+          &copy; {new Date().getFullYear()} PaintFlow. All rights reserved.
         </p>
       </div>
     </div>

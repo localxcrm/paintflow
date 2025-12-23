@@ -33,7 +33,7 @@ export function Sidebar() {
           <PaintBucket className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-lg font-bold">PaintPro</h1>
+          <h1 className="text-lg font-bold">PaintFlow</h1>
           <p className="text-xs text-slate-400">Fórmula $1 Milhão</p>
         </div>
       </div>
