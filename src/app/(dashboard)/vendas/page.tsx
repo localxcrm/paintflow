@@ -33,6 +33,26 @@ interface WeeklyEntry {
   createdAt?: string;
 }
 
+// Sales channels
+const SALES_CHANNELS = [
+  { id: 'google', label: 'Google Ads', color: 'bg-blue-500' },
+  { id: 'facebook', label: 'Facebook/Meta', color: 'bg-indigo-500' },
+  { id: 'referral', label: 'Indicação', color: 'bg-green-500' },
+  { id: 'yard_sign', label: 'Placa de Obra', color: 'bg-yellow-500' },
+  { id: 'door_knock', label: 'Door Knock', color: 'bg-orange-500' },
+  { id: 'repeat', label: 'Cliente Repetido', color: 'bg-purple-500' },
+  { id: 'other', label: 'Outro', color: 'bg-slate-500' },
+] as const;
+
+type ChannelId = typeof SALES_CHANNELS[number]['id'];
+
+interface ChannelData {
+  leads: number;
+  estimates: number;
+  sales: number;
+  revenue: number;
+}
+
 interface FormulaParams {
   avgTicket: number;
   leadConversionRate: number; // Lead → Estimate %
@@ -146,6 +166,15 @@ export default function VendasPage() {
     revenue: 0,
   });
 
+  // Channel data state
+  const [channelData, setChannelData] = useState<Record<ChannelId, ChannelData>>(() => {
+    const initial: Partial<Record<ChannelId, ChannelData>> = {};
+    SALES_CHANNELS.forEach((ch) => {
+      initial[ch.id] = { leads: 0, estimates: 0, sales: 0, revenue: 0 };
+    });
+    return initial as Record<ChannelId, ChannelData>;
+  });
+
   const weeks = getWeeksInMonth(selectedYear, selectedMonth);
   const goals = calculateGoals(vto.annualTarget, vto.formulaParams);
 
@@ -165,6 +194,16 @@ export default function VendasPage() {
         });
       } catch (e) {
         console.error('Error loading VTO:', e);
+      }
+    }
+
+    // Load channel data
+    const savedChannels = localStorage.getItem('paintflow_channels');
+    if (savedChannels) {
+      try {
+        setChannelData(JSON.parse(savedChannels));
+      } catch (e) {
+        console.error('Error loading channel data:', e);
       }
     }
   }, []);
@@ -239,6 +278,27 @@ export default function VendasPage() {
     estimates: goals.weekly.estimates,
     sales: goals.weekly.jobs,
     revenue: goals.weekly.revenue,
+  };
+
+  // Channel totals
+  const channelTotals = SALES_CHANNELS.map((ch) => ({
+    ...ch,
+    data: channelData[ch.id],
+    conversionRate: channelData[ch.id].estimates > 0
+      ? Math.round((channelData[ch.id].sales / channelData[ch.id].estimates) * 100)
+      : 0,
+  }));
+
+  const updateChannelData = (channelId: ChannelId, field: keyof ChannelData, value: number) => {
+    const updated = {
+      ...channelData,
+      [channelId]: {
+        ...channelData[channelId],
+        [field]: value,
+      },
+    };
+    setChannelData(updated);
+    localStorage.setItem('paintflow_channels', JSON.stringify(updated));
   };
 
   return (
@@ -523,6 +583,101 @@ export default function VendasPage() {
                   </TableCell>
                 </TableRow>
               )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Channel Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Resultados por Canal</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[160px]">Canal</TableHead>
+                <TableHead className="text-center">Leads</TableHead>
+                <TableHead className="text-center">Orçamentos</TableHead>
+                <TableHead className="text-center">Vendas</TableHead>
+                <TableHead className="text-center">Faturamento</TableHead>
+                <TableHead className="text-center">Taxa Fech.</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {channelTotals.map((ch) => (
+                <TableRow key={ch.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${ch.color}`} />
+                      {ch.label}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      min="0"
+                      className="w-16 text-center h-8"
+                      value={ch.data.leads || ''}
+                      onChange={(e) => updateChannelData(ch.id, 'leads', parseInt(e.target.value) || 0)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      min="0"
+                      className="w-16 text-center h-8"
+                      value={ch.data.estimates || ''}
+                      onChange={(e) => updateChannelData(ch.id, 'estimates', parseInt(e.target.value) || 0)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      min="0"
+                      className="w-16 text-center h-8"
+                      value={ch.data.sales || ''}
+                      onChange={(e) => updateChannelData(ch.id, 'sales', parseInt(e.target.value) || 0)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      min="0"
+                      className="w-24 text-center h-8"
+                      value={ch.data.revenue || ''}
+                      onChange={(e) => updateChannelData(ch.id, 'revenue', parseInt(e.target.value) || 0)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-center font-medium">
+                    {ch.conversionRate}%
+                  </TableCell>
+                </TableRow>
+              ))}
+              {/* Totals Row */}
+              <TableRow className="font-bold bg-slate-50">
+                <TableCell>Total</TableCell>
+                <TableCell className="text-center">
+                  {channelTotals.reduce((sum, ch) => sum + ch.data.leads, 0)}
+                </TableCell>
+                <TableCell className="text-center">
+                  {channelTotals.reduce((sum, ch) => sum + ch.data.estimates, 0)}
+                </TableCell>
+                <TableCell className="text-center">
+                  {channelTotals.reduce((sum, ch) => sum + ch.data.sales, 0)}
+                </TableCell>
+                <TableCell className="text-center">
+                  ${channelTotals.reduce((sum, ch) => sum + ch.data.revenue, 0).toLocaleString()}
+                </TableCell>
+                <TableCell className="text-center">
+                  {(() => {
+                    const totalEst = channelTotals.reduce((sum, ch) => sum + ch.data.estimates, 0);
+                    const totalSales = channelTotals.reduce((sum, ch) => sum + ch.data.sales, 0);
+                    return totalEst > 0 ? Math.round((totalSales / totalEst) * 100) : 0;
+                  })()}%
+                </TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         </CardContent>
