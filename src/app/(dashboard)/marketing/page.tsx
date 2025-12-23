@@ -38,7 +38,7 @@ const months = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
-const marketingSources = [
+const initialSources = [
   'Google Ads',
   'Facebook/Instagram',
   'Placas de Obra',
@@ -52,6 +52,7 @@ export default function MarketingPage() {
   const [entries, setEntries] = useState<MarketingEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [marketingSources, setMarketingSources] = useState<string[]>(initialSources);
   const [formData, setFormData] = useState<MarketingEntry>({
     source: '',
     month: new Date().getMonth() + 1,
@@ -59,6 +60,22 @@ export default function MarketingPage() {
     amount: 0,
     leads: 0,
   });
+
+  // Load channels from settings
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('paintflow_settings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.marketingChannels && parsed.marketingChannels.length > 0) {
+          // Map channel labels to strings for the dropdown
+          setMarketingSources(parsed.marketingChannels.map((c: any) => c.label));
+        }
+      } catch (e) {
+        console.error('Error loading settings:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchEntries();
