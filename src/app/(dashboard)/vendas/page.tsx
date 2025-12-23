@@ -341,8 +341,14 @@ export default function VendasPage() {
     setCurrentChannelData(updated);
   };
 
-  // Calculate totals
-  const totals = entries.reduce(
+  // Filter entries for the selected month/year
+  const monthlyEntries = entries.filter(e => {
+    const d = new Date(e.weekStart);
+    return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+  });
+
+  // Calculate totals for the month
+  const totals = monthlyEntries.reduce(
     (acc, entry) => ({
       leads: acc.leads + entry.leads,
       estimates: acc.estimates + entry.estimates,
@@ -351,6 +357,28 @@ export default function VendasPage() {
     }),
     { leads: 0, estimates: 0, sales: 0, revenue: 0 }
   );
+
+  // Calculate monthly totals by channel for report
+  const monthlyChannelTotals = availableChannels.map(ch => {
+    const chData = monthlyEntries.reduce((acc, entry) => {
+      const entryCh = entry.channels?.[ch.id];
+      if (entryCh) {
+        acc.leads += entryCh.leads || 0;
+        acc.estimates += entryCh.estimates || 0;
+        acc.sales += entryCh.sales || 0;
+        acc.revenue += entryCh.revenue || 0;
+      }
+      return acc;
+    }, { leads: 0, estimates: 0, sales: 0, revenue: 0 });
+
+    return {
+      ...ch,
+      data: chData,
+      conversionRate: chData.estimates > 0
+        ? Math.round((chData.sales / chData.estimates) * 100)
+        : 0
+    };
+  });
 
   // Calculate conversion rates
   const conversionRates = {
@@ -661,14 +689,14 @@ export default function VendasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.length === 0 ? (
+              {monthlyEntries.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                     Nenhum dado registrado para este mês.
                   </TableCell>
                 </TableRow>
               ) : (
-                entries.map((entry) => {
+                monthlyEntries.map((entry) => {
                   const closingRate = entry.estimates > 0
                     ? ((entry.sales / entry.estimates) * 100).toFixed(0)
                     : '0';
@@ -696,10 +724,10 @@ export default function VendasPage() {
         </CardContent>
       </Card>
 
-      {/* Channel Breakdown */}
+      {/* Monthly Channel Report */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Resultados por Canal</CardTitle>
+          <CardTitle className="text-lg">Relatório Mensal por Canal</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -714,7 +742,7 @@ export default function VendasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {channelTotals.map((ch) => (
+              {monthlyChannelTotals.map((ch) => (
                 <TableRow key={ch.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -722,41 +750,11 @@ export default function VendasPage() {
                       {ch.label}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min="0"
-                      className="w-16 text-center h-8"
-                      value={ch.data.leads || ''}
-                      onChange={(e) => updateChannelData(ch.id, 'leads', parseInt(e.target.value) || 0)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min="0"
-                      className="w-16 text-center h-8"
-                      value={ch.data.estimates || ''}
-                      onChange={(e) => updateChannelData(ch.id, 'estimates', parseInt(e.target.value) || 0)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min="0"
-                      className="w-16 text-center h-8"
-                      value={ch.data.sales || ''}
-                      onChange={(e) => updateChannelData(ch.id, 'sales', parseInt(e.target.value) || 0)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min="0"
-                      className="w-24 text-center h-8"
-                      value={ch.data.revenue || ''}
-                      onChange={(e) => updateChannelData(ch.id, 'revenue', parseInt(e.target.value) || 0)}
-                    />
+                  <TableCell className="text-center">{ch.data.leads}</TableCell>
+                  <TableCell className="text-center">{ch.data.estimates}</TableCell>
+                  <TableCell className="text-center">{ch.data.sales}</TableCell>
+                  <TableCell className="text-center">
+                    ${ch.data.revenue.toLocaleString('en-US')}
                   </TableCell>
                   <TableCell className="text-center font-medium">
                     {ch.conversionRate}%
@@ -765,23 +763,23 @@ export default function VendasPage() {
               ))}
               {/* Totals Row */}
               <TableRow className="font-bold bg-slate-50">
-                <TableCell>Total</TableCell>
+                <TableCell>Total do Mês</TableCell>
                 <TableCell className="text-center">
-                  {channelTotals.reduce((sum, ch) => sum + ch.data.leads, 0)}
+                  {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.leads, 0)}
                 </TableCell>
                 <TableCell className="text-center">
-                  {channelTotals.reduce((sum, ch) => sum + ch.data.estimates, 0)}
+                  {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0)}
                 </TableCell>
                 <TableCell className="text-center">
-                  {channelTotals.reduce((sum, ch) => sum + ch.data.sales, 0)}
+                  {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0)}
                 </TableCell>
                 <TableCell className="text-center">
-                  ${channelTotals.reduce((sum, ch) => sum + ch.data.revenue, 0).toLocaleString()}
+                  ${monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.revenue, 0).toLocaleString('en-US')}
                 </TableCell>
                 <TableCell className="text-center">
                   {(() => {
-                    const totalEst = channelTotals.reduce((sum, ch) => sum + ch.data.estimates, 0);
-                    const totalSales = channelTotals.reduce((sum, ch) => sum + ch.data.sales, 0);
+                    const totalEst = monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0);
+                    const totalSales = monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0);
                     return totalEst > 0 ? Math.round((totalSales / totalEst) * 100) : 0;
                   })()}%
                 </TableCell>
