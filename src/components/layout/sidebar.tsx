@@ -11,11 +11,13 @@ import {
   TrendingUp,
   BookOpen,
   PaintBucket,
+  Mountain,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
   { href: '/goals', label: 'Metas', icon: Target },
+  { href: '/rocks', label: 'Rocks', icon: Mountain },
   { href: '/jobs', label: 'Trabalhos', icon: Briefcase },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/vendas', label: 'Vendas', icon: TrendingUp },

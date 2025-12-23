@@ -365,14 +365,14 @@ export default function DashboardPage() {
                 {quarterRocks.length === 0 && (
                   <p className="text-sm text-slate-500">
                     Nenhum rock para este trimestre.{' '}
-                    <Link href="/traction/rocks" className="text-blue-600 hover:underline">
+                    <Link href="/rocks" className="text-blue-600 hover:underline">
                       Adicionar rocks
                     </Link>
                   </p>
                 )}
                 {quarterRocks.length > 5 && (
                   <Link
-                    href="/traction/rocks"
+                    href="/rocks"
                     className="text-xs text-blue-600 hover:underline"
                   >
                     Ver todos os {quarterRocks.length} rocks

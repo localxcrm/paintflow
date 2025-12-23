@@ -394,7 +394,7 @@ export default function GoalsPage() {
                 </CardDescription>
               </div>
             </div>
-            <Link href="/traction/rocks">
+            <Link href="/rocks">
               <Button variant="outline" size="sm">
                 Gerenciar Rocks
                 <ArrowRight className="w-4 h-4 ml-1" />
@@ -439,14 +439,14 @@ export default function GoalsPage() {
             {quarterRocks.length === 0 && (
               <p className="text-center text-slate-500 py-4">
                 Nenhum rock para este trimestre.{' '}
-                <Link href="/traction/rocks" className="text-blue-600 hover:underline">
+                <Link href="/rocks" className="text-blue-600 hover:underline">
                   Adicionar rocks
                 </Link>
               </p>
             )}
             {quarterRocks.length > 5 && (
               <Link
-                href="/traction/rocks"
+                href="/rocks"
                 className="block text-center text-sm text-blue-600 hover:underline pt-2"
               >
                 Ver todos os {quarterRocks.length} rocks
