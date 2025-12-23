@@ -77,7 +77,7 @@ export function JobFilters({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todos Pagamentos</SelectItem>
-          <SelectItem value="deposit_pending">Sinal Pendente</SelectItem>
+          <SelectItem value="deposit_pending">Depósito Pendente</SelectItem>
           <SelectItem value="job_unpaid">Não Pago</SelectItem>
           <SelectItem value="fully_paid">Pago Total</SelectItem>
         </SelectContent>
@@ -99,10 +99,10 @@ export function JobFilters({
 
       <Select value={pmFilter} onValueChange={onPMChange}>
         <SelectTrigger className="w-[150px]">
-          <SelectValue placeholder="GP" />
+          <SelectValue placeholder="PM" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos GPs</SelectItem>
+          <SelectItem value="all">Todos PMs</SelectItem>
           {pms.map((pm) => (
             <SelectItem key={pm.id} value={pm.id}>
               {pm.name}

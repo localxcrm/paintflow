@@ -51,7 +51,7 @@ export function JobKPICards({ kpis }: JobKPICardsProps) {
       bg: 'bg-green-50',
     },
     {
-      title: 'Com. GP Pendente',
+      title: 'Com. PM Pendente',
       value: formatCurrency(kpis.pmCommissionsPending),
       subtitle: 'A pagar',
       icon: Clock,
@@ -59,7 +59,7 @@ export function JobKPICards({ kpis }: JobKPICardsProps) {
       bg: 'bg-orange-50',
     },
     {
-      title: 'Com. GP Pago',
+      title: 'Com. PM Pago',
       value: formatCurrency(kpis.pmCommissionsPaid),
       subtitle: 'Concluído',
       icon: CheckCircle,

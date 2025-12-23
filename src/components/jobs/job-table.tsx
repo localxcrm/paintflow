@@ -34,6 +34,7 @@ interface JobTableProps {
   onTogglePMCommissionPaid: (jobId: string, value: boolean) => void;
   onToggleSubPaid: (jobId: string, value: boolean) => void;
   onJobClick: (job: Job) => void;
+  onDeleteJob?: (job: Job) => void;
 }
 
 const statusLabels: Record<JobStatus, string> = {
@@ -51,6 +52,7 @@ export function JobTable({
   onTogglePMCommissionPaid,
   onToggleSubPaid,
   onJobClick,
+  onDeleteJob,
 }: JobTableProps) {
   return (
     <div className="bg-white rounded-lg border overflow-hidden">
@@ -63,13 +65,13 @@ export function JobTable({
               <TableHead className="font-semibold text-right">Valor</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
               <TableHead className="font-semibold">Vendedor</TableHead>
-              <TableHead className="font-semibold">GP</TableHead>
+              <TableHead className="font-semibold">PM</TableHead>
               <TableHead className="font-semibold">Sub</TableHead>
-              <TableHead className="font-semibold text-center">Sinal</TableHead>
+              <TableHead className="font-semibold text-center">Depósito</TableHead>
               <TableHead className="font-semibold text-center">Pago</TableHead>
               <TableHead className="font-semibold text-right">Com. Vendas</TableHead>
               <TableHead className="font-semibold text-center">Pago</TableHead>
-              <TableHead className="font-semibold text-right">Com. GP</TableHead>
+              <TableHead className="font-semibold text-right">Com. PM</TableHead>
               <TableHead className="font-semibold text-center">Pago</TableHead>
               <TableHead className="font-semibold text-right">Valor Sub</TableHead>
               <TableHead className="font-semibold text-center">Pago</TableHead>
@@ -174,15 +176,18 @@ export function JobTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="gap-2">
+                      <DropdownMenuItem className="gap-2" onClick={() => onJobClick(job)}>
                         <Eye className="h-4 w-4" />
                         Ver Detalhes
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
+                      <DropdownMenuItem className="gap-2" onClick={() => onJobClick(job)}>
                         <Edit className="h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2 text-red-600">
+                      <DropdownMenuItem
+                        className="gap-2 text-red-600"
+                        onClick={() => onDeleteJob?.(job)}
+                      >
                         <Trash2 className="h-4 w-4" />
                         Excluir
                       </DropdownMenuItem>

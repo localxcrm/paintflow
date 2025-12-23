@@ -98,6 +98,7 @@ export interface Subcontractor {
 export type JobStatus = 'lead' | 'got_the_job' | 'scheduled' | 'completed';
 export type ProfitFlag = 'OK' | 'RAISE PRICE' | 'FIX SCOPE';
 export type PaymentStatus = 'all' | 'deposit_pending' | 'job_unpaid' | 'fully_paid';
+export type PaymentMethod = 'cash' | 'check' | 'venmo' | 'zelle' | 'credit_card' | 'bank_transfer' | 'other';
 
 export interface Job {
   id: string;
@@ -134,7 +135,11 @@ export interface Job {
   // Client Payment Tracking
   depositRequired: number;
   depositPaid: boolean;
+  depositPaymentMethod?: PaymentMethod;
+  depositPaymentDate?: string;
   jobPaid: boolean;
+  jobPaymentMethod?: PaymentMethod;
+  jobPaymentDate?: string;
   balanceDue: number;
   invoiceDate?: string;
   paymentReceivedDate?: string;
@@ -159,9 +164,37 @@ export interface Job {
   meetsTargetGm: boolean;
   profitFlag: ProfitFlag;
 
+  // Notes and Comments
+  notes?: string;
+
+  // Photos (before/after)
+  photos?: JobPhoto[];
+
+  // Payment History
+  paymentHistory?: PaymentHistoryItem[];
+
   // Legacy field (keep for backward compatibility)
   crewLeader?: string;
   invoiceAmount?: number; // Alias for jobValue
+}
+
+// Job Photo
+export interface JobPhoto {
+  id: string;
+  url: string;
+  type: 'before' | 'after' | 'progress';
+  description?: string;
+  uploadedAt: string;
+}
+
+// Payment History Item
+export interface PaymentHistoryItem {
+  id: string;
+  date: string;
+  type: 'deposit' | 'final_payment' | 'sales_commission' | 'pm_commission' | 'subcontractor';
+  method: PaymentMethod;
+  amount: number;
+  notes?: string;
 }
 
 // Job KPI Summary Types

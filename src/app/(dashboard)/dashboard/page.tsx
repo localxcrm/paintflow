@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ProgressCard } from '@/components/dashboard/progress-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRocks } from '@/hooks/useRocks';
+import { mockJobs } from '@/lib/mock-data';
+import { Job } from '@/types';
 
 // Calculate goals based on annual revenue target and formula params
 interface FormulaParams {
@@ -199,6 +201,62 @@ export default function DashboardPage() {
   const completedRocks = quarterRocks.filter((r) => r.status === 'complete').length;
   const totalRocks = quarterRocks.length;
 
+  // Calculate seller ranking from jobs
+  const sellerRanking = useMemo(() => {
+    const salesByRep = new Map<string, { name: string; sales: number; value: number }>();
+
+    mockJobs.forEach((job) => {
+      if (job.salesRep) {
+        const existing = salesByRep.get(job.salesRep.id) || { name: job.salesRep.name, sales: 0, value: 0 };
+        salesByRep.set(job.salesRep.id, {
+          name: job.salesRep.name,
+          sales: existing.sales + 1,
+          value: existing.value + job.jobValue,
+        });
+      }
+    });
+
+    return Array.from(salesByRep.values())
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 4)
+      .map((seller, index) => ({ ...seller, rank: index + 1 }));
+  }, []);
+
+  // Calculate monthly trend from jobs
+  const monthlyTrend = useMemo(() => {
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const now = new Date();
+    const last6Months: { month: string; value: number; percent: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const targetMonth = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStart = targetMonth.toISOString().slice(0, 7);
+
+      const monthValue = mockJobs
+        .filter(job => job.jobDate.startsWith(monthStart))
+        .reduce((sum, job) => sum + job.jobValue, 0);
+
+      last6Months.push({
+        month: monthNames[targetMonth.getMonth()],
+        value: monthValue,
+        percent: 0,
+      });
+    }
+
+    const maxValue = Math.max(...last6Months.map(m => m.value), 1);
+    last6Months.forEach(m => {
+      m.percent = (m.value / maxValue) * 100;
+    });
+
+    const totalValue = last6Months.reduce((sum, m) => sum + m.value, 0);
+    const avgValue = totalValue / 6;
+    const firstHalf = last6Months.slice(0, 3).reduce((sum, m) => sum + m.value, 0) / 3;
+    const secondHalf = last6Months.slice(3).reduce((sum, m) => sum + m.value, 0) / 3;
+    const growth = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf) * 100 : 0;
+
+    return { months: last6Months, avgValue, growth };
+  }, []);
+
   // Use defaults if data hasn't loaded
   const displayData = data || {
     leads: { total: 0, goal: periodGoals.leads },
@@ -294,9 +352,8 @@ export default function DashboardPage() {
                       )}
                     </button>
                     <span
-                      className={`text-sm flex-1 ${
-                        rock.status === 'complete' ? 'text-slate-400 line-through' : 'text-slate-700'
-                      }`}
+                      className={`text-sm flex-1 ${rock.status === 'complete' ? 'text-slate-400 line-through' : 'text-slate-700'
+                        }`}
                     >
                       {rock.title}
                     </span>
@@ -447,13 +504,109 @@ export default function DashboardPage() {
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
                   key={star}
-                  className={`w-6 h-6 ${
-                    star <= Math.round(displayData.reviews.avgRating)
-                      ? 'text-yellow-400 fill-yellow-400'
-                      : 'text-slate-200'
-                  }`}
+                  className={`w-6 h-6 ${star <= Math.round(displayData.reviews.avgRating)
+                    ? 'text-yellow-400 fill-yellow-400'
+                    : 'text-slate-200'
+                    }`}
                 />
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Seller Ranking & Trend Chart */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Seller Ranking */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-500" />
+              Ranking de Vendedores
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {sellerRanking.length > 0 ? (
+                sellerRanking.map((seller) => (
+                  <div
+                    key={seller.name}
+                    className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${seller.rank === 1
+                          ? 'bg-yellow-500'
+                          : seller.rank === 2
+                            ? 'bg-slate-400'
+                            : seller.rank === 3
+                              ? 'bg-orange-400'
+                              : 'bg-slate-300'
+                          }`}
+                      >
+                        {seller.rank}
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-900">{seller.name}</p>
+                        <p className="text-xs text-slate-500">{seller.sales} vendas</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-slate-900">
+                        {formatCurrency(seller.value, true)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500 text-center py-4">
+                  Nenhum vendedor com vendas registradas
+                </p>
+              )}
+            </div>
+            <Link href="/jobs" className="block mt-4">
+              <Button variant="ghost" className="w-full text-sm">
+                Ver todos os trabalhos <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Revenue Trend Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-green-500" />
+              Tendência de Faturamento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Simple bar chart */}
+              <div className="flex items-end justify-between h-32 gap-2">
+                {monthlyTrend.months.map((item) => (
+                  <div key={item.month} className="flex-1 flex flex-col items-center gap-1">
+                    <div
+                      className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all hover:from-blue-600 hover:to-blue-500"
+                      style={{ height: `${Math.max(item.percent, 5)}%` }}
+                      title={formatCurrency(item.value)}
+                    />
+                    <span className="text-xs text-slate-500">{item.month}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-sm">
+                <div>
+                  <p className="text-slate-500">Média Mensal</p>
+                  <p className="font-semibold text-slate-900">{formatCurrency(monthlyTrend.avgValue, true)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-slate-500">Crescimento</p>
+                  <p className={`font-semibold ${monthlyTrend.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {monthlyTrend.growth >= 0 ? '+' : ''}{monthlyTrend.growth.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
