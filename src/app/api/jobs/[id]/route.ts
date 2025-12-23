@@ -109,7 +109,7 @@ export async function PATCH(
     }
 
     // Recalculate financials if job value changes
-    let financials: any = {};
+    let financials: Partial<typeof currentJob> = {};
     const jobValue = body.jobValue ?? currentJob.jobValue;
 
     if (body.jobValue !== undefined) {
@@ -141,7 +141,6 @@ export async function PATCH(
     // Update balance due based on deposit status
     let balanceDue = currentJob.balanceDue;
     if (body.depositPaid !== undefined) {
-      const depositRequired = body.depositPaid ? 0 : financials.depositRequired ?? currentJob.depositRequired;
       balanceDue = body.depositPaid ? currentJob.jobValue - currentJob.depositRequired : currentJob.jobValue;
     }
 
@@ -163,6 +162,7 @@ export async function PATCH(
     }
 
     // Build update data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = { updatedAt: new Date().toISOString() };
 
     if (body.clientName !== undefined) updateData.clientName = body.clientName;

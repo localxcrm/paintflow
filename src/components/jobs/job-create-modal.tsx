@@ -90,10 +90,11 @@ export function JobCreateModal({
         const subTotal = jobValue * 0.60;
         const grossProfit = jobValue - subTotal;
 
+        // eslint-disable-next-line react-hooks/purity
+        const timestamp = Date.now();
         const newJob: Job = {
-            // eslint-disable-next-line react-hooks/purity
-            id: Date.now().toString(),
-            jobNumber: `JOB-${Date.now().toString().slice(-6)}`,
+            id: timestamp.toString(),
+            jobNumber: `JOB-${timestamp.toString().slice(-6)}`,
             clientName: formData.clientName,
             address: formData.address,
             city: formData.city,

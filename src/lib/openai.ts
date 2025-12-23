@@ -151,8 +151,8 @@ export async function createChatCompletion(
     model: 'gpt-4-turbo-preview',
     messages: [
       ...systemMessages,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...messages
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ] as any, // Cast to any because OpenAI types can be strict with array spread
     temperature: 0.7,
     max_tokens: 2000,

@@ -32,7 +32,7 @@ export function Header() {
   useEffect(() => {
     const storedUser = localStorage.getItem('paintpro_user');
     if (storedUser) {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUser(JSON.parse(storedUser));
     }
   }, []);

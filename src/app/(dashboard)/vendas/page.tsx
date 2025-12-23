@@ -133,7 +133,7 @@ function getWeeksInMonth(year: number, month: number) {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
 
-  let currentStart = new Date(firstDay);
+  const currentStart = new Date(firstDay);
   // Adjust to Monday
   const dayOfWeek = currentStart.getDay();
   if (dayOfWeek !== 1) {
