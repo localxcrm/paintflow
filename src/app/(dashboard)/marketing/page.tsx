@@ -38,13 +38,19 @@ const months = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
-const initialSources = [
-  'Google Ads',
-  'Facebook/Instagram',
-  'Placas de Obra',
-  'Indicações',
-  'Site/SEO',
-  'Outros',
+interface MarketingChannel {
+  id: string;
+  label: string;
+  color: string;
+}
+
+const DEFAULT_CHANNELS: MarketingChannel[] = [
+  { id: 'google', label: 'Google Ads', color: 'bg-blue-500' },
+  { id: 'facebook', label: 'Facebook/Instagram', color: 'bg-indigo-500' },
+  { id: 'referral', label: 'Indicações', color: 'bg-green-500' },
+  { id: 'yard_sign', label: 'Placas de Obra', color: 'bg-yellow-500' },
+  { id: 'site', label: 'Site/SEO', color: 'bg-slate-500' },
+  { id: 'other', label: 'Outros', color: 'bg-slate-400' },
 ];
 
 export default function MarketingPage() {
@@ -52,7 +58,7 @@ export default function MarketingPage() {
   const [entries, setEntries] = useState<MarketingEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [marketingSources, setMarketingSources] = useState<string[]>(initialSources);
+  const [marketingChannels, setMarketingChannels] = useState<MarketingChannel[]>(DEFAULT_CHANNELS);
   const [formData, setFormData] = useState<MarketingEntry>({
     source: '',
     month: new Date().getMonth() + 1,
@@ -68,14 +74,22 @@ export default function MarketingPage() {
       try {
         const parsed = JSON.parse(savedSettings);
         if (parsed.marketingChannels && parsed.marketingChannels.length > 0) {
-          // Map channel labels to strings for the dropdown
-          setMarketingSources(parsed.marketingChannels.map((c: any) => c.label));
+          setMarketingChannels(parsed.marketingChannels);
         }
       } catch (e) {
         console.error('Error loading settings:', e);
       }
     }
   }, []);
+
+  const getChannelLabel = (sourceId: string) => {
+    const channel = marketingChannels.find(c => c.id === sourceId);
+    // If not found (legacy data or deleted channel), return the ID itself (or label if it was stored as label)
+    // To support legacy data where 'Google Ads' was stored as source:
+    // We check if the source matches any label as well? No, let's keep it simple.
+    // If legacy data stored 'Google Ads', and we don't find ID 'Google Ads', we return 'Google Ads'. Valid.
+    return channel ? channel.label : sourceId;
+  };
 
   useEffect(() => {
     fetchEntries();
@@ -138,6 +152,8 @@ export default function MarketingPage() {
     return acc;
   }, {} as Record<string, { amount: number; leads: number }>);
 
+  // ... (calculations remain similar)
+
   const grandTotal = Object.values(totalsBySource).reduce(
     (acc, val) => ({ amount: acc.amount + val.amount, leads: acc.leads + val.leads }),
     { amount: 0, leads: 0 }
@@ -180,6 +196,7 @@ export default function MarketingPage() {
       </div>
 
       {/* Summary Cards */}
+      {/* ... (Summary cards code remains mostly same, ensuring correct variables) ... */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -258,14 +275,15 @@ export default function MarketingPage() {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {marketingSources.map((source) => (
-                        <SelectItem key={source} value={source}>
-                          {source}
+                      {marketingChannels.map((channel) => (
+                        <SelectItem key={channel.id} value={channel.id}>
+                          {channel.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+                {/* ... rest of form ... */}
                 <div>
                   <Label>Mês</Label>
                   <Select
@@ -350,7 +368,12 @@ export default function MarketingPage() {
               ) : (
                 Object.entries(totalsBySource).map(([source, data]) => (
                   <TableRow key={source}>
-                    <TableCell className="font-medium">{source}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${marketingChannels.find(c => c.id === source)?.color || 'bg-slate-300'}`} />
+                        {getChannelLabel(source)}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       ${data.amount.toLocaleString('en-US')}
                     </TableCell>
