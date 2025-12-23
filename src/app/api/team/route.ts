@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
 
-// GET /api/subcontractors - Get all subcontractors
+// GET /api/team - Get all team members
 export async function GET(request: NextRequest) {
   try {
     const organizationId = getOrganizationIdFromRequest(request);
@@ -12,9 +12,10 @@ export async function GET(request: NextRequest) {
     const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get('active') !== 'false';
+    const role = searchParams.get('role');
 
     let query = supabase
-      .from('Subcontractor')
+      .from('TeamMember')
       .select('*')
       .eq('organizationId', organizationId)
       .order('name', { ascending: true });
@@ -23,23 +24,27 @@ export async function GET(request: NextRequest) {
       query = query.eq('isActive', true);
     }
 
-    const { data: subcontractors, error } = await query;
+    if (role) {
+      query = query.eq('role', role);
+    }
+
+    const { data: teamMembers, error } = await query;
 
     if (error) {
       throw error;
     }
 
-    return NextResponse.json({ subcontractors: subcontractors || [] });
+    return NextResponse.json({ teamMembers: teamMembers || [] });
   } catch (error) {
-    console.error('Error fetching subcontractors:', error);
+    console.error('Error fetching team members:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch subcontractors' },
+      { error: 'Failed to fetch team members' },
       { status: 500 }
     );
   }
 }
 
-// POST /api/subcontractors - Create a new subcontractor
+// POST /api/team - Create a new team member
 export async function POST(request: NextRequest) {
   try {
     const organizationId = getOrganizationIdFromRequest(request);
@@ -50,17 +55,15 @@ export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    const { data: subcontractor, error } = await supabase
-      .from('Subcontractor')
+    const { data: teamMember, error } = await supabase
+      .from('TeamMember')
       .insert({
         organizationId,
         name: body.name,
-        companyName: body.companyName || null,
         email: body.email,
         phone: body.phone || null,
-        specialty: body.specialty || 'both',
-        defaultPayoutPct: body.defaultPayoutPct || 60,
-        color: body.color || 'bg-blue-500',
+        role: body.role || 'sales',
+        defaultCommissionPct: body.defaultCommissionPct || 5,
         isActive: body.isActive !== false,
       })
       .select()
@@ -70,17 +73,17 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json(subcontractor, { status: 201 });
+    return NextResponse.json(teamMember, { status: 201 });
   } catch (error) {
-    console.error('Error creating subcontractor:', error);
+    console.error('Error creating team member:', error);
     return NextResponse.json(
-      { error: 'Failed to create subcontractor' },
+      { error: 'Failed to create team member' },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/subcontractors - Update a subcontractor
+// PUT /api/team - Update a team member
 export async function PUT(request: NextRequest) {
   try {
     const organizationId = getOrganizationIdFromRequest(request);
@@ -93,21 +96,19 @@ export async function PUT(request: NextRequest) {
 
     if (!body.id) {
       return NextResponse.json(
-        { error: 'Subcontractor ID is required' },
+        { error: 'Team member ID is required' },
         { status: 400 }
       );
     }
 
-    const { data: subcontractor, error } = await supabase
-      .from('Subcontractor')
+    const { data: teamMember, error } = await supabase
+      .from('TeamMember')
       .update({
         name: body.name,
-        companyName: body.companyName,
         email: body.email,
         phone: body.phone,
-        specialty: body.specialty,
-        defaultPayoutPct: body.defaultPayoutPct,
-        color: body.color,
+        role: body.role,
+        defaultCommissionPct: body.defaultCommissionPct,
         isActive: body.isActive,
         updatedAt: new Date().toISOString(),
       })
@@ -120,11 +121,11 @@ export async function PUT(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json(subcontractor);
+    return NextResponse.json(teamMember);
   } catch (error) {
-    console.error('Error updating subcontractor:', error);
+    console.error('Error updating team member:', error);
     return NextResponse.json(
-      { error: 'Failed to update subcontractor' },
+      { error: 'Failed to update team member' },
       { status: 500 }
     );
   }

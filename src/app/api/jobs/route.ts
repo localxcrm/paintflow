@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
 
 // Helper function to calculate job financials
-async function calculateJobFinancials(jobValue: number) {
+async function calculateJobFinancials(jobValue: number, organizationId: string) {
   const supabase = createServerSupabaseClient();
 
   const { data: settings } = await supabase
     .from('BusinessSettings')
     .select('*')
+    .eq('organizationId', organizationId)
     .limit(1)
     .single();
 
@@ -51,6 +52,11 @@ async function calculateJobFinancials(jobValue: number) {
 // GET /api/jobs - Get all jobs with optional filtering
 export async function GET(request: NextRequest) {
   try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organization required' }, { status: 400 });
+    }
+
     const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -65,7 +71,8 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabase
       .from('Job')
-      .select('*, Lead(*), Estimate(*), salesRep:TeamMember!salesRepId(*), projectManager:TeamMember!projectManagerId(*), Subcontractor(*)', { count: 'exact' });
+      .select('*, Lead(*), Estimate(*), salesRep:TeamMember!salesRepId(*), projectManager:TeamMember!projectManagerId(*), Subcontractor(*)', { count: 'exact' })
+      .eq('organizationId', organizationId);
 
     // Apply filters
     if (status) {
@@ -122,6 +129,11 @@ export async function GET(request: NextRequest) {
 // POST /api/jobs - Create a new job
 export async function POST(request: NextRequest) {
   try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organization required' }, { status: 400 });
+    }
+
     const supabase = createServerSupabaseClient();
     const body = await request.json();
 
@@ -129,6 +141,7 @@ export async function POST(request: NextRequest) {
     const { data: lastJob } = await supabase
       .from('Job')
       .select('jobNumber')
+      .eq('organizationId', organizationId)
       .order('createdAt', { ascending: false })
       .limit(1)
       .single();
@@ -144,7 +157,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate financials
     const jobValue = body.jobValue || 0;
-    const financials = await calculateJobFinancials(jobValue);
+    const financials = await calculateJobFinancials(jobValue, organizationId);
 
     // Calculate commissions if team members are assigned
     let salesCommissionAmount = 0;
@@ -175,6 +188,7 @@ export async function POST(request: NextRequest) {
     const { data: job, error: jobError } = await supabase
       .from('Job')
       .insert({
+        organizationId,
         jobNumber,
         clientName: body.clientName,
         address: body.address,

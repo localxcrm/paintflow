@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { mockJobs, mockTeamMembers, mockSubcontractors } from '@/lib/mock-data';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   JobKPICards,
@@ -23,8 +22,8 @@ import {
   getJobValueByStatus,
   getJobsDistribution,
 } from '@/lib/utils/job-calculations';
-import { Job, JobStatus, PaymentStatus, PaymentHistoryItem, PaymentMethod } from '@/types';
-import { Plus } from 'lucide-react';
+import { Job, JobStatus, PaymentStatus, PaymentHistoryItem, TeamMember, Subcontractor } from '@/types';
+import { Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PaymentState {
@@ -36,15 +35,18 @@ interface PaymentState {
 }
 
 export default function JobsPage() {
+  // Data state
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   // Filter state
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'all'>('all');
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatus>('all');
   const [salesRepFilter, setSalesRepFilter] = useState<string>('all');
   const [pmFilter, setPmFilter] = useState<string>('all');
   const [subcontractorFilter, setSubcontractorFilter] = useState<string>('all');
-
-  // Jobs state (for inline editing)
-  const [jobs, setJobs] = useState<Job[]>(mockJobs);
 
   // Modal states
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -60,6 +62,49 @@ export default function JobsPage() {
     jobId: '',
     amount: 0,
   });
+
+  // Load data on mount
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const [jobsRes, teamRes, subsRes] = await Promise.all([
+        fetch('/api/jobs'),
+        fetch('/api/team'),
+        fetch('/api/subcontractors')
+      ]);
+
+      if (jobsRes.ok) {
+        const jobsData = await jobsRes.json();
+        // Transform the data to match our Job type
+        const transformedJobs = (jobsData.jobs || []).map((job: Record<string, unknown>) => ({
+          ...job,
+          salesRep: job.salesRep || null,
+          projectManager: job.projectManager || null,
+          subcontractor: job.Subcontractor || null,
+        }));
+        setJobs(transformedJobs);
+      }
+
+      if (teamRes.ok) {
+        const teamData = await teamRes.json();
+        setTeamMembers(teamData.teamMembers || []);
+      }
+
+      if (subsRes.ok) {
+        const subsData = await subsRes.json();
+        setSubcontractors(subsData.subcontractors || []);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Erro ao carregar dados');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Apply filters
   const filteredJobs = useMemo(() => {
@@ -102,7 +147,6 @@ export default function JobsPage() {
         });
       }
     } else {
-      // Allow unchecking without dialog
       setJobs(prev =>
         prev.map(job =>
           job.id === jobId
@@ -297,9 +341,25 @@ export default function JobsPage() {
     setIsCreateModalOpen(false);
   };
 
-  const handleCreateJob = (newJob: Job) => {
-    setJobs(prev => [newJob, ...prev]);
-    toast.success('Trabalho criado com sucesso!');
+  const handleCreateJob = async (newJob: Job) => {
+    try {
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newJob),
+      });
+
+      if (res.ok) {
+        const createdJob = await res.json();
+        setJobs(prev => [createdJob, ...prev]);
+        toast.success('Trabalho criado com sucesso!');
+      } else {
+        toast.error('Erro ao criar trabalho');
+      }
+    } catch (error) {
+      console.error('Error creating job:', error);
+      toast.error('Erro ao criar trabalho');
+    }
   };
 
   // Delete handlers
@@ -313,10 +373,34 @@ export default function JobsPage() {
     setJobToDelete(null);
   };
 
-  const handleConfirmDelete = (jobId: string) => {
-    setJobs(prev => prev.filter(job => job.id !== jobId));
-    toast.success('Trabalho excluído com sucesso!');
+  const handleConfirmDelete = async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setJobs(prev => prev.filter(job => job.id !== jobId));
+        toast.success('Trabalho excluído com sucesso!');
+      } else {
+        toast.error('Erro ao excluir trabalho');
+      }
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      toast.error('Erro ao excluir trabalho');
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center gap-2 text-slate-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Carregando trabalhos...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -341,8 +425,8 @@ export default function JobsPage() {
             salesRepFilter={salesRepFilter}
             pmFilter={pmFilter}
             subcontractorFilter={subcontractorFilter}
-            teamMembers={mockTeamMembers}
-            subcontractors={mockSubcontractors}
+            teamMembers={teamMembers}
+            subcontractors={subcontractors}
             onStatusChange={setStatusFilter}
             onPaymentChange={setPaymentFilter}
             onSalesRepChange={setSalesRepFilter}
@@ -382,8 +466,8 @@ export default function JobsPage() {
         isOpen={isDetailModalOpen}
         onClose={handleCloseDetailModal}
         onSave={handleSaveJob}
-        teamMembers={mockTeamMembers}
-        subcontractors={mockSubcontractors}
+        teamMembers={teamMembers}
+        subcontractors={subcontractors}
       />
 
       {/* Job Create Modal */}
@@ -391,8 +475,8 @@ export default function JobsPage() {
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
         onCreate={handleCreateJob}
-        teamMembers={mockTeamMembers}
-        subcontractors={mockSubcontractors}
+        teamMembers={teamMembers}
+        subcontractors={subcontractors}
       />
 
       {/* Job Delete Dialog */}
