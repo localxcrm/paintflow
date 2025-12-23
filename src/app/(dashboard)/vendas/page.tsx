@@ -204,6 +204,16 @@ export default function VendasPage() {
     { leads: 0, estimates: 0, sales: 0, revenue: 0 }
   );
 
+  // Calculate conversion rates
+  const conversionRates = {
+    leadToEstimate: totals.leads > 0
+      ? Math.round((totals.estimates / totals.leads) * 100)
+      : 0,
+    estimateToSale: totals.estimates > 0
+      ? Math.round((totals.sales / totals.estimates) * 100)
+      : 0,
+  };
+
   // Monthly goals from VTO settings
   const monthlyGoals = {
     leads: goals.monthly.leads,
@@ -312,6 +322,39 @@ export default function VendasPage() {
               <div>
                 <p className="text-2xl font-bold">{formatCurrency(totals.revenue, true)}</p>
                 <p className="text-xs text-slate-500">de {formatCurrency(monthlyGoals.revenue, true)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Conversion Rates */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="border-l-4 border-l-blue-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500">Lead → Orçamento</p>
+                <p className="text-2xl font-bold text-blue-600">{conversionRates.leadToEstimate}%</p>
+              </div>
+              <div className="text-right text-xs text-slate-400">
+                <p>{totals.leads} leads</p>
+                <p>{totals.estimates} orçamentos</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500">Orçamento → Venda</p>
+                <p className="text-2xl font-bold text-green-600">{conversionRates.estimateToSale}%</p>
+                <p className="text-xs text-slate-400">Meta: {vto.formulaParams.closingRate}%</p>
+              </div>
+              <div className="text-right text-xs text-slate-400">
+                <p>{totals.estimates} orçamentos</p>
+                <p>{totals.sales} vendas</p>
               </div>
             </div>
           </CardContent>
