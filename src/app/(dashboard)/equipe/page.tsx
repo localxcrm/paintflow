@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import {
     Dialog,
     DialogContent,
@@ -31,7 +32,10 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Users, Plus, Trash2, Mail, Phone, UserCog, Wrench, Percent } from 'lucide-react';
+import {
+    Users, Plus, Trash2, Mail, Phone, Percent, Wrench,
+    Shield, FileText, Calendar, AlertTriangle, Eye
+} from 'lucide-react';
 import { mockTeamMembers, mockSubcontractors } from '@/lib/mock-data';
 import { toast } from 'sonner';
 
@@ -52,6 +56,13 @@ interface Subcontractor {
     phone?: string;
     specialty: 'interior' | 'exterior' | 'both';
     defaultPayoutPct: number;
+    // Insurance
+    insuranceCompany?: string;
+    insurancePolicyNumber?: string;
+    insuranceExpirationDate?: string;
+    // License
+    licenseNumber?: string; // HIC number
+    licenseExpirationDate?: string;
     isActive: boolean;
 }
 
@@ -65,6 +76,18 @@ const specialtyLabels = {
     interior: 'Interior',
     exterior: 'Exterior',
     both: 'Interior + Exterior',
+};
+
+// Check if date is expired or expiring soon (within 30 days)
+const getExpirationStatus = (dateStr?: string) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const now = new Date();
+    const daysUntil = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysUntil < 0) return 'expired';
+    if (daysUntil <= 30) return 'expiring';
+    return 'valid';
 };
 
 export default function EquipePage() {
@@ -104,12 +127,18 @@ export default function EquipePage() {
     );
     const [isAddSubOpen, setIsAddSubOpen] = useState(false);
     const [deleteSubId, setDeleteSubId] = useState<string | null>(null);
+    const [viewSubId, setViewSubId] = useState<string | null>(null);
     const [newSub, setNewSub] = useState({
         name: '',
         email: '',
         phone: '',
         specialty: 'both' as 'interior' | 'exterior' | 'both',
         defaultPayoutPct: 60,
+        insuranceCompany: '',
+        insurancePolicyNumber: '',
+        insuranceExpirationDate: '',
+        licenseNumber: '',
+        licenseExpirationDate: '',
     });
 
     // Team Member Handlers
@@ -151,11 +180,20 @@ export default function EquipePage() {
             phone: newSub.phone,
             specialty: newSub.specialty,
             defaultPayoutPct: newSub.defaultPayoutPct,
+            insuranceCompany: newSub.insuranceCompany || undefined,
+            insurancePolicyNumber: newSub.insurancePolicyNumber || undefined,
+            insuranceExpirationDate: newSub.insuranceExpirationDate || undefined,
+            licenseNumber: newSub.licenseNumber || undefined,
+            licenseExpirationDate: newSub.licenseExpirationDate || undefined,
             isActive: true,
         };
 
         setSubcontractors(prev => [...prev, sub]);
-        setNewSub({ name: '', email: '', phone: '', specialty: 'both', defaultPayoutPct: 60 });
+        setNewSub({
+            name: '', email: '', phone: '', specialty: 'both', defaultPayoutPct: 60,
+            insuranceCompany: '', insurancePolicyNumber: '', insuranceExpirationDate: '',
+            licenseNumber: '', licenseExpirationDate: '',
+        });
         setIsAddSubOpen(false);
         toast.success('Subcontratado adicionado com sucesso!');
     };
@@ -176,6 +214,8 @@ export default function EquipePage() {
             .toUpperCase()
             .slice(0, 2);
     };
+
+    const viewingSub = subcontractors.find(s => s.id === viewSubId);
 
     return (
         <div className="space-y-6">
@@ -341,11 +381,12 @@ export default function EquipePage() {
                                 Adicionar Subcontratado
                             </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Novo Subcontratado</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 mt-4">
+                                {/* Basic Info */}
                                 <div className="grid gap-2">
                                     <Label htmlFor="subName">Nome/Empresa *</Label>
                                     <Input
@@ -355,24 +396,26 @@ export default function EquipePage() {
                                         placeholder="Nome da empresa ou pessoa"
                                     />
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="subEmail">Email *</Label>
-                                    <Input
-                                        id="subEmail"
-                                        type="email"
-                                        value={newSub.email}
-                                        onChange={(e) => setNewSub(prev => ({ ...prev, email: e.target.value }))}
-                                        placeholder="email@example.com"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="subPhone">Telefone</Label>
-                                    <Input
-                                        id="subPhone"
-                                        value={newSub.phone}
-                                        onChange={(e) => setNewSub(prev => ({ ...prev, phone: e.target.value }))}
-                                        placeholder="(555) 123-4567"
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="subEmail">Email *</Label>
+                                        <Input
+                                            id="subEmail"
+                                            type="email"
+                                            value={newSub.email}
+                                            onChange={(e) => setNewSub(prev => ({ ...prev, email: e.target.value }))}
+                                            placeholder="email@example.com"
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="subPhone">Telefone</Label>
+                                        <Input
+                                            id="subPhone"
+                                            value={newSub.phone}
+                                            onChange={(e) => setNewSub(prev => ({ ...prev, phone: e.target.value }))}
+                                            placeholder="(555) 123-4567"
+                                        />
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="grid gap-2">
@@ -401,6 +444,76 @@ export default function EquipePage() {
                                         />
                                     </div>
                                 </div>
+
+                                <Separator />
+
+                                {/* Insurance Section */}
+                                <div className="space-y-3">
+                                    <h4 className="font-medium flex items-center gap-2">
+                                        <Shield className="h-4 w-4" />
+                                        Seguro (Insurance)
+                                    </h4>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="insuranceCompany">Companhia de Seguro</Label>
+                                        <Input
+                                            id="insuranceCompany"
+                                            value={newSub.insuranceCompany}
+                                            onChange={(e) => setNewSub(prev => ({ ...prev, insuranceCompany: e.target.value }))}
+                                            placeholder="Ex: State Farm, Liberty Mutual"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="insurancePolicy">Número da Apólice (Policy #)</Label>
+                                            <Input
+                                                id="insurancePolicy"
+                                                value={newSub.insurancePolicyNumber}
+                                                onChange={(e) => setNewSub(prev => ({ ...prev, insurancePolicyNumber: e.target.value }))}
+                                                placeholder="POL-123456"
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="insuranceExp">Data de Vencimento</Label>
+                                            <Input
+                                                id="insuranceExp"
+                                                type="date"
+                                                value={newSub.insuranceExpirationDate}
+                                                onChange={(e) => setNewSub(prev => ({ ...prev, insuranceExpirationDate: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <Separator />
+
+                                {/* License Section */}
+                                <div className="space-y-3">
+                                    <h4 className="font-medium flex items-center gap-2">
+                                        <FileText className="h-4 w-4" />
+                                        Licença (HIC - Home Improvement Contractor)
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="licenseNumber">Número HIC</Label>
+                                            <Input
+                                                id="licenseNumber"
+                                                value={newSub.licenseNumber}
+                                                onChange={(e) => setNewSub(prev => ({ ...prev, licenseNumber: e.target.value }))}
+                                                placeholder="HIC-0123456"
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="licenseExp">Data de Vencimento</Label>
+                                            <Input
+                                                id="licenseExp"
+                                                type="date"
+                                                value={newSub.licenseExpirationDate}
+                                                onChange={(e) => setNewSub(prev => ({ ...prev, licenseExpirationDate: e.target.value }))}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="flex justify-end gap-2 pt-4">
                                     <Button variant="outline" onClick={() => setIsAddSubOpen(false)}>
                                         Cancelar
@@ -415,51 +528,88 @@ export default function EquipePage() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {subcontractors.map((sub) => (
-                        <Card key={sub.id}>
-                            <CardContent className="p-4">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarFallback className="bg-slate-600 text-white text-sm">
-                                                {getInitials(sub.name)}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                            <p className="font-medium">{sub.name}</p>
-                                            <Badge variant="outline" className="text-xs">
-                                                {specialtyLabels[sub.specialty]}
-                                            </Badge>
+                    {subcontractors.map((sub) => {
+                        const insuranceStatus = getExpirationStatus(sub.insuranceExpirationDate);
+                        const licenseStatus = getExpirationStatus(sub.licenseExpirationDate);
+                        const hasWarning = insuranceStatus === 'expired' || insuranceStatus === 'expiring' ||
+                            licenseStatus === 'expired' || licenseStatus === 'expiring';
+
+                        return (
+                            <Card key={sub.id} className={hasWarning ? 'border-orange-300' : ''}>
+                                <CardContent className="p-4">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-10 w-10">
+                                                <AvatarFallback className="bg-slate-600 text-white text-sm">
+                                                    {getInitials(sub.name)}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <p className="font-medium">{sub.name}</p>
+                                                <Badge variant="outline" className="text-xs">
+                                                    {specialtyLabels[sub.specialty]}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-slate-400 hover:text-blue-500"
+                                                onClick={() => setViewSubId(sub.id)}
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-slate-400 hover:text-red-500"
+                                                onClick={() => setDeleteSubId(sub.id)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="text-slate-400 hover:text-red-500"
-                                        onClick={() => setDeleteSubId(sub.id)}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                <div className="mt-3 space-y-1 text-sm text-slate-500">
-                                    <div className="flex items-center gap-2">
-                                        <Mail className="h-4 w-4" />
-                                        {sub.email}
-                                    </div>
-                                    {sub.phone && (
+                                    <div className="mt-3 space-y-1 text-sm text-slate-500">
                                         <div className="flex items-center gap-2">
-                                            <Phone className="h-4 w-4" />
-                                            {sub.phone}
+                                            <Percent className="h-4 w-4" />
+                                            Payout: {sub.defaultPayoutPct}%
                                         </div>
-                                    )}
-                                    <div className="flex items-center gap-2">
-                                        <Percent className="h-4 w-4" />
-                                        Payout: {sub.defaultPayoutPct}%
+                                        {/* Insurance Status */}
+                                        <div className="flex items-center gap-2">
+                                            <Shield className="h-4 w-4" />
+                                            {sub.insurancePolicyNumber ? (
+                                                <span className={
+                                                    insuranceStatus === 'expired' ? 'text-red-600 font-medium' :
+                                                        insuranceStatus === 'expiring' ? 'text-orange-600 font-medium' : ''
+                                                }>
+                                                    {insuranceStatus === 'expired' && <AlertTriangle className="h-3 w-3 inline mr-1" />}
+                                                    Seguro: {sub.insuranceExpirationDate}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-400">Sem seguro</span>
+                                            )}
+                                        </div>
+                                        {/* License Status */}
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="h-4 w-4" />
+                                            {sub.licenseNumber ? (
+                                                <span className={
+                                                    licenseStatus === 'expired' ? 'text-red-600 font-medium' :
+                                                        licenseStatus === 'expiring' ? 'text-orange-600 font-medium' : ''
+                                                }>
+                                                    {licenseStatus === 'expired' && <AlertTriangle className="h-3 w-3 inline mr-1" />}
+                                                    HIC: {sub.licenseNumber}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-400">Sem licença</span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
 
                 {subcontractors.length === 0 && (
@@ -475,6 +625,96 @@ export default function EquipePage() {
                     </Card>
                 )}
             </div>
+
+            {/* View Subcontractor Details Modal */}
+            <Dialog open={!!viewSubId} onOpenChange={() => setViewSubId(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Detalhes do Subcontratado</DialogTitle>
+                    </DialogHeader>
+                    {viewingSub && (
+                        <div className="space-y-4 mt-2">
+                            <div className="flex items-center gap-3">
+                                <Avatar className="h-12 w-12">
+                                    <AvatarFallback className="bg-slate-600 text-white">
+                                        {getInitials(viewingSub.name)}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <p className="font-medium text-lg">{viewingSub.name}</p>
+                                    <Badge variant="outline">{specialtyLabels[viewingSub.specialty]}</Badge>
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Email:</span>
+                                    <span>{viewingSub.email}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Telefone:</span>
+                                    <span>{viewingSub.phone || 'Não informado'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Payout:</span>
+                                    <span>{viewingSub.defaultPayoutPct}%</span>
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            {/* Insurance Details */}
+                            <div className="space-y-2">
+                                <h4 className="font-medium flex items-center gap-2">
+                                    <Shield className="h-4 w-4" />
+                                    Seguro
+                                </h4>
+                                <div className="text-sm space-y-1 pl-6">
+                                    <p><span className="text-slate-500">Companhia:</span> {viewingSub.insuranceCompany || 'N/A'}</p>
+                                    <p><span className="text-slate-500">Apólice:</span> {viewingSub.insurancePolicyNumber || 'N/A'}</p>
+                                    <p>
+                                        <span className="text-slate-500">Vence em:</span>{' '}
+                                        <span className={
+                                            getExpirationStatus(viewingSub.insuranceExpirationDate) === 'expired' ? 'text-red-600 font-medium' :
+                                                getExpirationStatus(viewingSub.insuranceExpirationDate) === 'expiring' ? 'text-orange-600 font-medium' : ''
+                                        }>
+                                            {viewingSub.insuranceExpirationDate || 'N/A'}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* License Details */}
+                            <div className="space-y-2">
+                                <h4 className="font-medium flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Licença HIC
+                                </h4>
+                                <div className="text-sm space-y-1 pl-6">
+                                    <p><span className="text-slate-500">Número:</span> {viewingSub.licenseNumber || 'N/A'}</p>
+                                    <p>
+                                        <span className="text-slate-500">Vence em:</span>{' '}
+                                        <span className={
+                                            getExpirationStatus(viewingSub.licenseExpirationDate) === 'expired' ? 'text-red-600 font-medium' :
+                                                getExpirationStatus(viewingSub.licenseExpirationDate) === 'expiring' ? 'text-orange-600 font-medium' : ''
+                                        }>
+                                            {viewingSub.licenseExpirationDate || 'N/A'}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="pt-4">
+                                <Button variant="outline" className="w-full" onClick={() => setViewSubId(null)}>
+                                    Fechar
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* Delete Member Confirmation */}
             <AlertDialog open={!!deleteMemberId} onOpenChange={() => setDeleteMemberId(null)}>
