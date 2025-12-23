@@ -4,7 +4,6 @@
  *
  * Limitations:
  * - Max 1 request per second
- * - Less accurate for Brazilian addresses
  * - Requires User-Agent header
  */
 
@@ -31,7 +30,7 @@ export async function geocodeAddress(
     // Build query string
     const parts = [address, city];
     if (state) parts.push(state);
-    parts.push('Brasil');
+    parts.push('USA');
 
     const query = parts.join(', ');
     const url = `${NOMINATIM_URL}?q=${encodeURIComponent(query)}&format=json&limit=1`;

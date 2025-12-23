@@ -21,7 +21,7 @@ import {
 import { Job, JobStatus, ProjectType, TeamMember, Subcontractor } from '@/types';
 import { Save, X, User, DollarSign, Building } from 'lucide-react';
 import { AddressAutocomplete, AddressResult } from '@/components/address-autocomplete';
-import { BRAZILIAN_STATES } from '@/lib/constants';
+import { US_STATES } from '@/lib/constants';
 
 interface JobCreateModalProps {
     isOpen: boolean;
@@ -233,10 +233,10 @@ export function JobCreateModal({
                                 onValueChange={(value) => setFormData(prev => ({ ...prev, state: value }))}
                             >
                                 <SelectTrigger id="state">
-                                    <SelectValue placeholder="UF" />
+                                    <SelectValue placeholder="State" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {BRAZILIAN_STATES.map((state) => (
+                                    {US_STATES.map((state) => (
                                         <SelectItem key={state.value} value={state.value}>
                                             {state.value} - {state.label}
                                         </SelectItem>
@@ -246,13 +246,13 @@ export function JobCreateModal({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="zipCode">CEP</Label>
+                            <Label htmlFor="zipCode">ZIP Code</Label>
                             <Input
                                 id="zipCode"
                                 value={formData.zipCode}
                                 onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
-                                placeholder="00000-000"
-                                maxLength={9}
+                                placeholder="12345"
+                                maxLength={10}
                             />
                         </div>
 

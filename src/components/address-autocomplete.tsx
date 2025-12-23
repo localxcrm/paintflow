@@ -64,7 +64,7 @@ export function AddressAutocomplete({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const searchQuery = query + ', Brasil';
+        const searchQuery = query + ', USA';
         const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&addressdetails=1&limit=5`;
 
         const res = await fetch(url, {
@@ -139,7 +139,7 @@ export function AddressAutocomplete({
             onFocus={() => {
               if (results.length > 0) setOpen(true);
             }}
-            placeholder={placeholder || 'Digite o endereço...'}
+            placeholder={placeholder || 'Enter address...'}
             className="pl-9"
           />
           {loading && (
@@ -150,7 +150,7 @@ export function AddressAutocomplete({
       <PopoverContent className="w-[400px] p-0" align="start">
         <Command>
           <CommandList>
-            <CommandEmpty>Nenhum endereço encontrado</CommandEmpty>
+            <CommandEmpty>No address found</CommandEmpty>
             <CommandGroup>
               {results.map((addr, i) => (
                 <CommandItem
