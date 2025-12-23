@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,6 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import {
     Select,
@@ -34,9 +33,8 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
     Users, Plus, Trash2, Mail, Phone, Percent, Wrench,
-    Shield, FileText, Calendar, AlertTriangle, Eye
+    Shield, FileText, Pencil, Loader2
 } from 'lucide-react';
-import { mockTeamMembers, mockSubcontractors } from '@/lib/mock-data';
 import { toast } from 'sonner';
 
 interface TeamMember {
@@ -44,8 +42,9 @@ interface TeamMember {
     name: string;
     email: string;
     phone?: string;
-    role: 'sales' | 'pm' | 'both';
-    defaultCommissionPct: number;
+    role: string;
+    defaultCommissionPct?: number;
+    color?: string;
     isActive: boolean;
 }
 
@@ -54,156 +53,251 @@ interface Subcontractor {
     name: string;
     email: string;
     phone?: string;
-    specialty: 'interior' | 'exterior' | 'both';
-    defaultPayoutPct: number;
-    // Insurance
-    insuranceCompany?: string;
-    insurancePolicyNumber?: string;
-    insuranceExpirationDate?: string;
-    // License
-    licenseNumber?: string; // HIC number
-    licenseExpirationDate?: string;
+    specialty: string;
+    defaultPayoutPct?: number;
+    color?: string;
     isActive: boolean;
 }
 
-const roleLabels = {
+const roleLabels: Record<string, string> = {
     sales: 'Vendedor',
     pm: 'Gerente de Projeto',
     both: 'Vendedor + PM',
 };
 
-const specialtyLabels = {
+const specialtyLabels: Record<string, string> = {
     interior: 'Interior',
     exterior: 'Exterior',
     both: 'Interior + Exterior',
 };
 
-// Check if date is expired or expiring soon (within 30 days)
-const getExpirationStatus = (dateStr?: string) => {
-    if (!dateStr) return null;
-    const date = new Date(dateStr);
-    const now = new Date();
-    const daysUntil = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (daysUntil < 0) return 'expired';
-    if (daysUntil <= 30) return 'expiring';
-    return 'valid';
-};
+const colorOptions = [
+    { value: 'bg-blue-500', label: 'Azul' },
+    { value: 'bg-green-500', label: 'Verde' },
+    { value: 'bg-purple-500', label: 'Roxo' },
+    { value: 'bg-orange-500', label: 'Laranja' },
+    { value: 'bg-pink-500', label: 'Rosa' },
+    { value: 'bg-yellow-500', label: 'Amarelo' },
+    { value: 'bg-red-500', label: 'Vermelho' },
+    { value: 'bg-teal-500', label: 'Turquesa' },
+];
 
 export default function EquipePage() {
-    // Team Members State
-    const [members, setMembers] = useState<TeamMember[]>(
-        mockTeamMembers.map(m => ({
-            id: m.id,
-            name: m.name,
-            email: m.email || `${m.name.toLowerCase().replace(' ', '.')}@email.com`,
-            phone: m.phone,
-            role: m.role,
-            defaultCommissionPct: m.defaultCommissionPct,
-            isActive: m.isActive,
-        }))
-    );
-    const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+    const [members, setMembers] = useState<TeamMember[]>([]);
+    const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Member modals
+    const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+    const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
     const [deleteMemberId, setDeleteMemberId] = useState<string | null>(null);
-    const [newMember, setNewMember] = useState({
+    const [memberForm, setMemberForm] = useState({
         name: '',
         email: '',
         phone: '',
-        role: 'both' as 'sales' | 'pm' | 'both',
+        role: 'both',
         defaultCommissionPct: 5,
+        color: 'bg-blue-500',
     });
 
-    // Subcontractors State
-    const [subcontractors, setSubcontractors] = useState<Subcontractor[]>(
-        mockSubcontractors.map(s => ({
-            id: s.id,
-            name: s.name,
-            email: s.email || `${s.name.toLowerCase().replace(' ', '.')}@email.com`,
-            phone: s.phone,
-            specialty: s.specialty,
-            defaultPayoutPct: s.defaultPayoutPct,
-            isActive: s.isActive,
-        }))
-    );
-    const [isAddSubOpen, setIsAddSubOpen] = useState(false);
+    // Subcontractor modals
+    const [isSubModalOpen, setIsSubModalOpen] = useState(false);
+    const [editingSub, setEditingSub] = useState<Subcontractor | null>(null);
     const [deleteSubId, setDeleteSubId] = useState<string | null>(null);
-    const [viewSubId, setViewSubId] = useState<string | null>(null);
-    const [newSub, setNewSub] = useState({
+    const [subForm, setSubForm] = useState({
         name: '',
         email: '',
         phone: '',
-        specialty: 'both' as 'interior' | 'exterior' | 'both',
+        specialty: 'both',
         defaultPayoutPct: 60,
-        insuranceCompany: '',
-        insurancePolicyNumber: '',
-        insuranceExpirationDate: '',
-        licenseNumber: '',
-        licenseExpirationDate: '',
+        color: 'bg-green-500',
     });
 
-    // Team Member Handlers
-    const handleAddMember = () => {
-        if (!newMember.name.trim() || !newMember.email.trim()) return;
+    useEffect(() => {
+        fetchData();
+    }, []);
 
-        const member: TeamMember = {
-            id: Date.now().toString(),
-            name: newMember.name,
-            email: newMember.email,
-            phone: newMember.phone,
-            role: newMember.role,
-            defaultCommissionPct: newMember.defaultCommissionPct,
-            isActive: true,
-        };
+    const fetchData = async () => {
+        try {
+            setIsLoading(true);
+            const [teamRes, subRes] = await Promise.all([
+                fetch('/api/team'),
+                fetch('/api/subcontractors')
+            ]);
 
-        setMembers(prev => [...prev, member]);
-        setNewMember({ name: '', email: '', phone: '', role: 'both', defaultCommissionPct: 5 });
-        setIsAddMemberOpen(false);
-        toast.success('Membro adicionado com sucesso!');
+            if (teamRes.ok) {
+                const data = await teamRes.json();
+                setMembers(data.teamMembers || []);
+            }
+
+            if (subRes.ok) {
+                const data = await subRes.json();
+                setSubcontractors(data.subcontractors || []);
+            }
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            toast.error('Erro ao carregar dados');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleDeleteMember = () => {
-        if (deleteMemberId) {
-            setMembers(prev => prev.filter(m => m.id !== deleteMemberId));
-            setDeleteMemberId(null);
-            toast.success('Membro removido!');
+    // Team Member Handlers
+    const openMemberModal = (member?: TeamMember) => {
+        if (member) {
+            setEditingMember(member);
+            setMemberForm({
+                name: member.name,
+                email: member.email || '',
+                phone: member.phone || '',
+                role: member.role || 'both',
+                defaultCommissionPct: member.defaultCommissionPct || 5,
+                color: member.color || 'bg-blue-500',
+            });
+        } else {
+            setEditingMember(null);
+            setMemberForm({
+                name: '',
+                email: '',
+                phone: '',
+                role: 'both',
+                defaultCommissionPct: 5,
+                color: 'bg-blue-500',
+            });
         }
+        setIsMemberModalOpen(true);
+    };
+
+    const handleSaveMember = async () => {
+        if (!memberForm.name.trim()) return;
+
+        try {
+            if (editingMember) {
+                // Update
+                const res = await fetch('/api/team', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: editingMember.id, ...memberForm }),
+                });
+                if (res.ok) {
+                    const updated = await res.json();
+                    setMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
+                    toast.success('Membro atualizado!');
+                }
+            } else {
+                // Create
+                const res = await fetch('/api/team', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(memberForm),
+                });
+                if (res.ok) {
+                    const created = await res.json();
+                    setMembers(prev => [...prev, created]);
+                    toast.success('Membro adicionado!');
+                }
+            }
+            setIsMemberModalOpen(false);
+        } catch (error) {
+            console.error('Error saving member:', error);
+            toast.error('Erro ao salvar membro');
+        }
+    };
+
+    const handleDeleteMember = async () => {
+        if (!deleteMemberId) return;
+        try {
+            const res = await fetch(`/api/team?id=${deleteMemberId}`, {
+                method: 'DELETE',
+            });
+            if (res.ok) {
+                setMembers(prev => prev.filter(m => m.id !== deleteMemberId));
+                toast.success('Membro removido!');
+            }
+        } catch (error) {
+            console.error('Error deleting member:', error);
+            toast.error('Erro ao remover membro');
+        }
+        setDeleteMemberId(null);
     };
 
     // Subcontractor Handlers
-    const handleAddSub = () => {
-        if (!newSub.name.trim() || !newSub.email.trim()) return;
-
-        const sub: Subcontractor = {
-            id: Date.now().toString(),
-            name: newSub.name,
-            email: newSub.email,
-            phone: newSub.phone,
-            specialty: newSub.specialty,
-            defaultPayoutPct: newSub.defaultPayoutPct,
-            insuranceCompany: newSub.insuranceCompany || undefined,
-            insurancePolicyNumber: newSub.insurancePolicyNumber || undefined,
-            insuranceExpirationDate: newSub.insuranceExpirationDate || undefined,
-            licenseNumber: newSub.licenseNumber || undefined,
-            licenseExpirationDate: newSub.licenseExpirationDate || undefined,
-            isActive: true,
-        };
-
-        setSubcontractors(prev => [...prev, sub]);
-        setNewSub({
-            name: '', email: '', phone: '', specialty: 'both', defaultPayoutPct: 60,
-            insuranceCompany: '', insurancePolicyNumber: '', insuranceExpirationDate: '',
-            licenseNumber: '', licenseExpirationDate: '',
-        });
-        setIsAddSubOpen(false);
-        toast.success('Subcontratado adicionado com sucesso!');
+    const openSubModal = (sub?: Subcontractor) => {
+        if (sub) {
+            setEditingSub(sub);
+            setSubForm({
+                name: sub.name,
+                email: sub.email || '',
+                phone: sub.phone || '',
+                specialty: sub.specialty || 'both',
+                defaultPayoutPct: sub.defaultPayoutPct || 60,
+                color: sub.color || 'bg-green-500',
+            });
+        } else {
+            setEditingSub(null);
+            setSubForm({
+                name: '',
+                email: '',
+                phone: '',
+                specialty: 'both',
+                defaultPayoutPct: 60,
+                color: 'bg-green-500',
+            });
+        }
+        setIsSubModalOpen(true);
     };
 
-    const handleDeleteSub = () => {
-        if (deleteSubId) {
-            setSubcontractors(prev => prev.filter(s => s.id !== deleteSubId));
-            setDeleteSubId(null);
-            toast.success('Subcontratado removido!');
+    const handleSaveSub = async () => {
+        if (!subForm.name.trim()) return;
+
+        try {
+            if (editingSub) {
+                // Update
+                const res = await fetch('/api/subcontractors', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: editingSub.id, ...subForm }),
+                });
+                if (res.ok) {
+                    const updated = await res.json();
+                    setSubcontractors(prev => prev.map(s => s.id === updated.id ? updated : s));
+                    toast.success('Subcontratado atualizado!');
+                }
+            } else {
+                // Create
+                const res = await fetch('/api/subcontractors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subForm),
+                });
+                if (res.ok) {
+                    const created = await res.json();
+                    setSubcontractors(prev => [...prev, created]);
+                    toast.success('Subcontratado adicionado!');
+                }
+            }
+            setIsSubModalOpen(false);
+        } catch (error) {
+            console.error('Error saving subcontractor:', error);
+            toast.error('Erro ao salvar subcontratado');
         }
+    };
+
+    const handleDeleteSub = async () => {
+        if (!deleteSubId) return;
+        try {
+            const res = await fetch(`/api/subcontractors?id=${deleteSubId}`, {
+                method: 'DELETE',
+            });
+            if (res.ok) {
+                setSubcontractors(prev => prev.filter(s => s.id !== deleteSubId));
+                toast.success('Subcontratado removido!');
+            }
+        } catch (error) {
+            console.error('Error deleting subcontractor:', error);
+            toast.error('Erro ao remover subcontratado');
+        }
+        setDeleteSubId(null);
     };
 
     const getInitials = (name: string) => {
@@ -215,7 +309,16 @@ export default function EquipePage() {
             .slice(0, 2);
     };
 
-    const viewingSub = subcontractors.find(s => s.id === viewSubId);
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="flex items-center gap-2 text-slate-500">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Carregando equipe...</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -225,84 +328,10 @@ export default function EquipePage() {
                     <h1 className="text-2xl font-bold text-slate-900">Equipe</h1>
                     <p className="text-slate-500">Vendedores e Gerentes de Projeto</p>
                 </div>
-                <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            Adicionar Membro
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Novo Membro da Equipe</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 mt-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="memberName">Nome *</Label>
-                                <Input
-                                    id="memberName"
-                                    value={newMember.name}
-                                    onChange={(e) => setNewMember(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Nome completo"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="memberEmail">Email *</Label>
-                                <Input
-                                    id="memberEmail"
-                                    type="email"
-                                    value={newMember.email}
-                                    onChange={(e) => setNewMember(prev => ({ ...prev, email: e.target.value }))}
-                                    placeholder="email@example.com"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="memberPhone">Telefone</Label>
-                                <Input
-                                    id="memberPhone"
-                                    value={newMember.phone}
-                                    onChange={(e) => setNewMember(prev => ({ ...prev, phone: e.target.value }))}
-                                    placeholder="(555) 123-4567"
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label>Função</Label>
-                                    <Select
-                                        value={newMember.role}
-                                        onValueChange={(value) => setNewMember(prev => ({ ...prev, role: value as 'sales' | 'pm' | 'both' }))}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="sales">Vendedor</SelectItem>
-                                            <SelectItem value="pm">Gerente de Projeto</SelectItem>
-                                            <SelectItem value="both">Vendedor + PM</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="commission">Comissão (%)</Label>
-                                    <Input
-                                        id="commission"
-                                        type="number"
-                                        value={newMember.defaultCommissionPct}
-                                        onChange={(e) => setNewMember(prev => ({ ...prev, defaultCommissionPct: Number(e.target.value) }))}
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-4">
-                                <Button variant="outline" onClick={() => setIsAddMemberOpen(false)}>
-                                    Cancelar
-                                </Button>
-                                <Button onClick={handleAddMember} disabled={!newMember.name || !newMember.email}>
-                                    Adicionar
-                                </Button>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <Button className="gap-2" onClick={() => openMemberModal()}>
+                    <Plus className="h-4 w-4" />
+                    Adicionar Membro
+                </Button>
             </div>
 
             {/* Team Members Grid */}
@@ -313,31 +342,43 @@ export default function EquipePage() {
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-12 w-12">
-                                        <AvatarFallback className="bg-blue-600 text-white">
+                                        <AvatarFallback className={`text-white ${member.color || 'bg-blue-600'}`}>
                                             {getInitials(member.name)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
                                         <p className="font-medium">{member.name}</p>
                                         <Badge variant="secondary" className="text-xs">
-                                            {roleLabels[member.role]}
+                                            {roleLabels[member.role] || member.role}
                                         </Badge>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-slate-400 hover:text-red-500"
-                                    onClick={() => setDeleteMemberId(member.id)}
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-slate-400 hover:text-blue-500"
+                                        onClick={() => openMemberModal(member)}
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-slate-400 hover:text-red-500"
+                                        onClick={() => setDeleteMemberId(member.id)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </div>
                             <div className="mt-4 space-y-2 text-sm text-slate-500">
-                                <div className="flex items-center gap-2">
-                                    <Mail className="h-4 w-4" />
-                                    {member.email}
-                                </div>
+                                {member.email && (
+                                    <div className="flex items-center gap-2">
+                                        <Mail className="h-4 w-4" />
+                                        {member.email}
+                                    </div>
+                                )}
                                 {member.phone && (
                                     <div className="flex items-center gap-2">
                                         <Phone className="h-4 w-4" />
@@ -346,7 +387,7 @@ export default function EquipePage() {
                                 )}
                                 <div className="flex items-center gap-2">
                                     <Percent className="h-4 w-4" />
-                                    Comissão: {member.defaultCommissionPct}%
+                                    Comissao: {member.defaultCommissionPct || 0}%
                                 </div>
                             </div>
                         </CardContent>
@@ -359,7 +400,7 @@ export default function EquipePage() {
                     <CardContent className="p-8 text-center">
                         <Users className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                         <p className="text-slate-500">Nenhum membro na equipe.</p>
-                        <Button className="mt-4 gap-2" onClick={() => setIsAddMemberOpen(true)}>
+                        <Button className="mt-4 gap-2" onClick={() => openMemberModal()}>
                             <Plus className="h-4 w-4" />
                             Adicionar Primeiro Membro
                         </Button>
@@ -368,351 +409,285 @@ export default function EquipePage() {
             )}
 
             {/* Subcontractors Section */}
-            <div className="mt-8">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-lg font-semibold text-slate-900">Subcontratados</h2>
-                        <p className="text-sm text-slate-500">Equipes de pintura terceirizadas</p>
-                    </div>
-                    <Dialog open={isAddSubOpen} onOpenChange={setIsAddSubOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" className="gap-2">
-                                <Plus className="h-4 w-4" />
-                                Adicionar Subcontratado
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Novo Subcontratado</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 mt-4">
-                                {/* Basic Info */}
-                                <div className="grid gap-2">
-                                    <Label htmlFor="subName">Nome/Empresa *</Label>
-                                    <Input
-                                        id="subName"
-                                        value={newSub.name}
-                                        onChange={(e) => setNewSub(prev => ({ ...prev, name: e.target.value }))}
-                                        placeholder="Nome da empresa ou pessoa"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="subEmail">Email *</Label>
-                                        <Input
-                                            id="subEmail"
-                                            type="email"
-                                            value={newSub.email}
-                                            onChange={(e) => setNewSub(prev => ({ ...prev, email: e.target.value }))}
-                                            placeholder="email@example.com"
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="subPhone">Telefone</Label>
-                                        <Input
-                                            id="subPhone"
-                                            value={newSub.phone}
-                                            onChange={(e) => setNewSub(prev => ({ ...prev, phone: e.target.value }))}
-                                            placeholder="(555) 123-4567"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label>Especialidade</Label>
-                                        <Select
-                                            value={newSub.specialty}
-                                            onValueChange={(value) => setNewSub(prev => ({ ...prev, specialty: value as 'interior' | 'exterior' | 'both' }))}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="interior">Interior</SelectItem>
-                                                <SelectItem value="exterior">Exterior</SelectItem>
-                                                <SelectItem value="both">Interior + Exterior</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="payout">Payout (%)</Label>
-                                        <Input
-                                            id="payout"
-                                            type="number"
-                                            value={newSub.defaultPayoutPct}
-                                            onChange={(e) => setNewSub(prev => ({ ...prev, defaultPayoutPct: Number(e.target.value) }))}
-                                        />
-                                    </div>
-                                </div>
+            <Separator className="my-8" />
 
-                                <Separator />
-
-                                {/* Insurance Section */}
-                                <div className="space-y-3">
-                                    <h4 className="font-medium flex items-center gap-2">
-                                        <Shield className="h-4 w-4" />
-                                        Seguro (Insurance)
-                                    </h4>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="insuranceCompany">Companhia de Seguro</Label>
-                                        <Input
-                                            id="insuranceCompany"
-                                            value={newSub.insuranceCompany}
-                                            onChange={(e) => setNewSub(prev => ({ ...prev, insuranceCompany: e.target.value }))}
-                                            placeholder="Ex: State Farm, Liberty Mutual"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="insurancePolicy">Número da Apólice (Policy #)</Label>
-                                            <Input
-                                                id="insurancePolicy"
-                                                value={newSub.insurancePolicyNumber}
-                                                onChange={(e) => setNewSub(prev => ({ ...prev, insurancePolicyNumber: e.target.value }))}
-                                                placeholder="POL-123456"
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="insuranceExp">Data de Vencimento</Label>
-                                            <Input
-                                                id="insuranceExp"
-                                                type="date"
-                                                value={newSub.insuranceExpirationDate}
-                                                onChange={(e) => setNewSub(prev => ({ ...prev, insuranceExpirationDate: e.target.value }))}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <Separator />
-
-                                {/* License Section */}
-                                <div className="space-y-3">
-                                    <h4 className="font-medium flex items-center gap-2">
-                                        <FileText className="h-4 w-4" />
-                                        Licença (HIC - Home Improvement Contractor)
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="licenseNumber">Número HIC</Label>
-                                            <Input
-                                                id="licenseNumber"
-                                                value={newSub.licenseNumber}
-                                                onChange={(e) => setNewSub(prev => ({ ...prev, licenseNumber: e.target.value }))}
-                                                placeholder="HIC-0123456"
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="licenseExp">Data de Vencimento</Label>
-                                            <Input
-                                                id="licenseExp"
-                                                type="date"
-                                                value={newSub.licenseExpirationDate}
-                                                onChange={(e) => setNewSub(prev => ({ ...prev, licenseExpirationDate: e.target.value }))}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-end gap-2 pt-4">
-                                    <Button variant="outline" onClick={() => setIsAddSubOpen(false)}>
-                                        Cancelar
-                                    </Button>
-                                    <Button onClick={handleAddSub} disabled={!newSub.name || !newSub.email}>
-                                        Adicionar
-                                    </Button>
-                                </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Subcontratados</h2>
+                    <p className="text-sm text-slate-500">Equipes de pintura terceirizadas</p>
                 </div>
-
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {subcontractors.map((sub) => {
-                        const insuranceStatus = getExpirationStatus(sub.insuranceExpirationDate);
-                        const licenseStatus = getExpirationStatus(sub.licenseExpirationDate);
-                        const hasWarning = insuranceStatus === 'expired' || insuranceStatus === 'expiring' ||
-                            licenseStatus === 'expired' || licenseStatus === 'expiring';
-
-                        return (
-                            <Card key={sub.id} className={hasWarning ? 'border-orange-300' : ''}>
-                                <CardContent className="p-4">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-10 w-10">
-                                                <AvatarFallback className="bg-slate-600 text-white text-sm">
-                                                    {getInitials(sub.name)}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <p className="font-medium">{sub.name}</p>
-                                                <Badge variant="outline" className="text-xs">
-                                                    {specialtyLabels[sub.specialty]}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-slate-400 hover:text-blue-500"
-                                                onClick={() => setViewSubId(sub.id)}
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-slate-400 hover:text-red-500"
-                                                onClick={() => setDeleteSubId(sub.id)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 space-y-1 text-sm text-slate-500">
-                                        <div className="flex items-center gap-2">
-                                            <Percent className="h-4 w-4" />
-                                            Payout: {sub.defaultPayoutPct}%
-                                        </div>
-                                        {/* Insurance Status */}
-                                        <div className="flex items-center gap-2">
-                                            <Shield className="h-4 w-4" />
-                                            {sub.insurancePolicyNumber ? (
-                                                <span className={
-                                                    insuranceStatus === 'expired' ? 'text-red-600 font-medium' :
-                                                        insuranceStatus === 'expiring' ? 'text-orange-600 font-medium' : ''
-                                                }>
-                                                    {insuranceStatus === 'expired' && <AlertTriangle className="h-3 w-3 inline mr-1" />}
-                                                    Seguro: {sub.insuranceExpirationDate}
-                                                </span>
-                                            ) : (
-                                                <span className="text-slate-400">Sem seguro</span>
-                                            )}
-                                        </div>
-                                        {/* License Status */}
-                                        <div className="flex items-center gap-2">
-                                            <FileText className="h-4 w-4" />
-                                            {sub.licenseNumber ? (
-                                                <span className={
-                                                    licenseStatus === 'expired' ? 'text-red-600 font-medium' :
-                                                        licenseStatus === 'expiring' ? 'text-orange-600 font-medium' : ''
-                                                }>
-                                                    {licenseStatus === 'expired' && <AlertTriangle className="h-3 w-3 inline mr-1" />}
-                                                    HIC: {sub.licenseNumber}
-                                                </span>
-                                            ) : (
-                                                <span className="text-slate-400">Sem licença</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-                </div>
-
-                {subcontractors.length === 0 && (
-                    <Card>
-                        <CardContent className="p-8 text-center">
-                            <Wrench className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                            <p className="text-slate-500">Nenhum subcontratado cadastrado.</p>
-                            <Button className="mt-4 gap-2" variant="outline" onClick={() => setIsAddSubOpen(true)}>
-                                <Plus className="h-4 w-4" />
-                                Adicionar Primeiro Subcontratado
-                            </Button>
-                        </CardContent>
-                    </Card>
-                )}
+                <Button variant="outline" className="gap-2" onClick={() => openSubModal()}>
+                    <Plus className="h-4 w-4" />
+                    Adicionar Subcontratado
+                </Button>
             </div>
 
-            {/* View Subcontractor Details Modal */}
-            <Dialog open={!!viewSubId} onOpenChange={() => setViewSubId(null)}>
-                <DialogContent className="max-w-md">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {subcontractors.map((sub) => (
+                    <Card key={sub.id}>
+                        <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="h-10 w-10">
+                                        <AvatarFallback className={`text-white text-sm ${sub.color || 'bg-green-600'}`}>
+                                            {getInitials(sub.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <p className="font-medium">{sub.name}</p>
+                                        <Badge variant="outline" className="text-xs">
+                                            {specialtyLabels[sub.specialty] || sub.specialty}
+                                        </Badge>
+                                    </div>
+                                </div>
+                                <div className="flex gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-slate-400 hover:text-blue-500"
+                                        onClick={() => openSubModal(sub)}
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-slate-400 hover:text-red-500"
+                                        onClick={() => setDeleteSubId(sub.id)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="mt-3 space-y-1 text-sm text-slate-500">
+                                {sub.email && (
+                                    <div className="flex items-center gap-2">
+                                        <Mail className="h-4 w-4" />
+                                        {sub.email}
+                                    </div>
+                                )}
+                                {sub.phone && (
+                                    <div className="flex items-center gap-2">
+                                        <Phone className="h-4 w-4" />
+                                        {sub.phone}
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <Percent className="h-4 w-4" />
+                                    Payout: {sub.defaultPayoutPct || 60}%
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            {subcontractors.length === 0 && (
+                <Card>
+                    <CardContent className="p-8 text-center">
+                        <Wrench className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-500">Nenhum subcontratado cadastrado.</p>
+                        <Button className="mt-4 gap-2" variant="outline" onClick={() => openSubModal()}>
+                            <Plus className="h-4 w-4" />
+                            Adicionar Primeiro Subcontratado
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Member Modal */}
+            <Dialog open={isMemberModalOpen} onOpenChange={setIsMemberModalOpen}>
+                <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Detalhes do Subcontratado</DialogTitle>
+                        <DialogTitle>
+                            {editingMember ? 'Editar Membro' : 'Novo Membro da Equipe'}
+                        </DialogTitle>
                     </DialogHeader>
-                    {viewingSub && (
-                        <div className="space-y-4 mt-2">
-                            <div className="flex items-center gap-3">
-                                <Avatar className="h-12 w-12">
-                                    <AvatarFallback className="bg-slate-600 text-white">
-                                        {getInitials(viewingSub.name)}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <p className="font-medium text-lg">{viewingSub.name}</p>
-                                    <Badge variant="outline">{specialtyLabels[viewingSub.specialty]}</Badge>
-                                </div>
+                    <div className="space-y-4 mt-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="memberName">Nome *</Label>
+                            <Input
+                                id="memberName"
+                                value={memberForm.name}
+                                onChange={(e) => setMemberForm(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="Nome completo"
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="memberEmail">Email</Label>
+                            <Input
+                                id="memberEmail"
+                                type="email"
+                                value={memberForm.email}
+                                onChange={(e) => setMemberForm(prev => ({ ...prev, email: e.target.value }))}
+                                placeholder="email@example.com"
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="memberPhone">Telefone</Label>
+                            <Input
+                                id="memberPhone"
+                                value={memberForm.phone}
+                                onChange={(e) => setMemberForm(prev => ({ ...prev, phone: e.target.value }))}
+                                placeholder="(11) 99999-9999"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label>Funcao</Label>
+                                <Select
+                                    value={memberForm.role}
+                                    onValueChange={(value) => setMemberForm(prev => ({ ...prev, role: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="sales">Vendedor</SelectItem>
+                                        <SelectItem value="pm">Gerente de Projeto</SelectItem>
+                                        <SelectItem value="both">Vendedor + PM</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-
-                            <Separator />
-
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Email:</span>
-                                    <span>{viewingSub.email}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Telefone:</span>
-                                    <span>{viewingSub.phone || 'Não informado'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Payout:</span>
-                                    <span>{viewingSub.defaultPayoutPct}%</span>
-                                </div>
-                            </div>
-
-                            <Separator />
-
-                            {/* Insurance Details */}
-                            <div className="space-y-2">
-                                <h4 className="font-medium flex items-center gap-2">
-                                    <Shield className="h-4 w-4" />
-                                    Seguro
-                                </h4>
-                                <div className="text-sm space-y-1 pl-6">
-                                    <p><span className="text-slate-500">Companhia:</span> {viewingSub.insuranceCompany || 'N/A'}</p>
-                                    <p><span className="text-slate-500">Apólice:</span> {viewingSub.insurancePolicyNumber || 'N/A'}</p>
-                                    <p>
-                                        <span className="text-slate-500">Vence em:</span>{' '}
-                                        <span className={
-                                            getExpirationStatus(viewingSub.insuranceExpirationDate) === 'expired' ? 'text-red-600 font-medium' :
-                                                getExpirationStatus(viewingSub.insuranceExpirationDate) === 'expiring' ? 'text-orange-600 font-medium' : ''
-                                        }>
-                                            {viewingSub.insuranceExpirationDate || 'N/A'}
-                                        </span>
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* License Details */}
-                            <div className="space-y-2">
-                                <h4 className="font-medium flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    Licença HIC
-                                </h4>
-                                <div className="text-sm space-y-1 pl-6">
-                                    <p><span className="text-slate-500">Número:</span> {viewingSub.licenseNumber || 'N/A'}</p>
-                                    <p>
-                                        <span className="text-slate-500">Vence em:</span>{' '}
-                                        <span className={
-                                            getExpirationStatus(viewingSub.licenseExpirationDate) === 'expired' ? 'text-red-600 font-medium' :
-                                                getExpirationStatus(viewingSub.licenseExpirationDate) === 'expiring' ? 'text-orange-600 font-medium' : ''
-                                        }>
-                                            {viewingSub.licenseExpirationDate || 'N/A'}
-                                        </span>
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="pt-4">
-                                <Button variant="outline" className="w-full" onClick={() => setViewSubId(null)}>
-                                    Fechar
-                                </Button>
+                            <div className="grid gap-2">
+                                <Label htmlFor="commission">Comissao (%)</Label>
+                                <Input
+                                    id="commission"
+                                    type="number"
+                                    value={memberForm.defaultCommissionPct}
+                                    onChange={(e) => setMemberForm(prev => ({ ...prev, defaultCommissionPct: Number(e.target.value) }))}
+                                />
                             </div>
                         </div>
-                    )}
+                        <div className="grid gap-2">
+                            <Label>Cor</Label>
+                            <Select
+                                value={memberForm.color}
+                                onValueChange={(value) => setMemberForm(prev => ({ ...prev, color: value }))}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {colorOptions.map(c => (
+                                        <SelectItem key={c.value} value={c.value}>
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-4 h-4 rounded ${c.value}`} />
+                                                {c.label}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="outline" onClick={() => setIsMemberModalOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSaveMember} disabled={!memberForm.name}>
+                                {editingMember ? 'Salvar' : 'Adicionar'}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Subcontractor Modal */}
+            <Dialog open={isSubModalOpen} onOpenChange={setIsSubModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            {editingSub ? 'Editar Subcontratado' : 'Novo Subcontratado'}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="subName">Nome/Empresa *</Label>
+                            <Input
+                                id="subName"
+                                value={subForm.name}
+                                onChange={(e) => setSubForm(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="Nome da empresa ou pessoa"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="subEmail">Email</Label>
+                                <Input
+                                    id="subEmail"
+                                    type="email"
+                                    value={subForm.email}
+                                    onChange={(e) => setSubForm(prev => ({ ...prev, email: e.target.value }))}
+                                    placeholder="email@example.com"
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="subPhone">Telefone</Label>
+                                <Input
+                                    id="subPhone"
+                                    value={subForm.phone}
+                                    onChange={(e) => setSubForm(prev => ({ ...prev, phone: e.target.value }))}
+                                    placeholder="(11) 99999-9999"
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label>Especialidade</Label>
+                                <Select
+                                    value={subForm.specialty}
+                                    onValueChange={(value) => setSubForm(prev => ({ ...prev, specialty: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="interior">Interior</SelectItem>
+                                        <SelectItem value="exterior">Exterior</SelectItem>
+                                        <SelectItem value="both">Interior + Exterior</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="payout">Payout (%)</Label>
+                                <Input
+                                    id="payout"
+                                    type="number"
+                                    value={subForm.defaultPayoutPct}
+                                    onChange={(e) => setSubForm(prev => ({ ...prev, defaultPayoutPct: Number(e.target.value) }))}
+                                />
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Cor (para calendario/mapa)</Label>
+                            <Select
+                                value={subForm.color}
+                                onValueChange={(value) => setSubForm(prev => ({ ...prev, color: value }))}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {colorOptions.map(c => (
+                                        <SelectItem key={c.value} value={c.value}>
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-4 h-4 rounded ${c.value}`} />
+                                                {c.label}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="outline" onClick={() => setIsSubModalOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSaveSub} disabled={!subForm.name}>
+                                {editingSub ? 'Salvar' : 'Adicionar'}
+                            </Button>
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
 
@@ -722,7 +697,7 @@ export default function EquipePage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Remover Membro?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. O membro será removido da equipe.
+                            Esta acao nao pode ser desfeita. O membro sera removido da equipe.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -740,7 +715,7 @@ export default function EquipePage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Remover Subcontratado?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. O subcontratado será removido.
+                            Esta acao nao pode ser desfeita. O subcontratado sera removido.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
