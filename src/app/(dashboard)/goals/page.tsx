@@ -31,19 +31,27 @@ const PRESETS = [
 
 interface FormulaParams {
   avgTicket: number;
-  closingRate: number;
+  leadConversionRate: number; // Lead → Estimate %
+  closingRate: number; // Estimate → Sale %
   marketingPercent: number;
   productionWeeks: number;
 }
 
 // Calculate goals based on annual revenue target and formula parameters
 function calculateGoals(annualTarget: number, params: FormulaParams) {
-  const { avgTicket, closingRate, marketingPercent, productionWeeks } = params;
+  const { avgTicket, leadConversionRate, closingRate, marketingPercent, productionWeeks } = params;
 
   const jobsPerYear = Math.round(annualTarget / avgTicket);
   const jobsPerWeek = jobsPerYear / productionWeeks;
-  const leadsPerYear = Math.round(jobsPerYear / (closingRate / 100));
+
+  // Calculate estimates needed based on closing rate (Estimate → Sale)
+  const estimatesPerYear = Math.round(jobsPerYear / (closingRate / 100));
+
+  // Calculate leads needed based on lead conversion rate (Lead → Estimate)
+  const leadsPerYear = Math.round(estimatesPerYear / (leadConversionRate / 100));
   const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
+  const estimatesPerWeek = Math.round(estimatesPerYear / productionWeeks);
+
   const revenuePerWeek = annualTarget / productionWeeks;
   const marketingAnnual = annualTarget * (marketingPercent / 100);
 
@@ -51,24 +59,28 @@ function calculateGoals(annualTarget: number, params: FormulaParams) {
     annual: {
       revenue: annualTarget,
       jobs: jobsPerYear,
+      estimates: estimatesPerYear,
       leads: leadsPerYear,
       marketing: marketingAnnual,
     },
     monthly: {
       revenue: Math.round(annualTarget / 12),
       jobs: Math.round(jobsPerYear / 12),
+      estimates: Math.round(estimatesPerYear / 12),
       leads: Math.round(leadsPerYear / 12),
       marketing: Math.round(marketingAnnual / 12),
     },
     weekly: {
       revenue: Math.round(revenuePerWeek),
       jobs: Math.round(jobsPerWeek * 10) / 10,
+      estimates: estimatesPerWeek,
       leads: leadsPerWeek,
       marketing: Math.round(marketingAnnual / 52),
     },
     quarterly: {
       revenue: Math.round(annualTarget / 4),
       jobs: Math.round(jobsPerYear / 4),
+      estimates: Math.round(estimatesPerYear / 4),
       leads: Math.round(leadsPerYear / 4),
       marketing: Math.round(marketingAnnual / 4),
     },
@@ -98,7 +110,8 @@ const defaultVTO: VTOData = {
   annualTarget: 1000000,
   formulaParams: {
     avgTicket: 9500,
-    closingRate: 30,
+    leadConversionRate: 85, // Lead → Estimate (default 85%)
+    closingRate: 30, // Estimate → Sale (default 30%)
     marketingPercent: 8,
     productionWeeks: 35,
   },
@@ -216,11 +229,10 @@ export default function GoalsPage() {
               <Button
                 key={preset.value}
                 variant={vto.annualTarget === preset.value ? 'default' : 'outline'}
-                className={`h-14 text-lg font-bold ${
-                  vto.annualTarget === preset.value
-                    ? 'bg-blue-600 hover:bg-blue-700'
-                    : 'border-2'
-                }`}
+                className={`h-14 text-lg font-bold ${vto.annualTarget === preset.value
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'border-2'
+                  }`}
                 onClick={() => handlePresetClick(preset.value)}
               >
                 {preset.label}
@@ -279,7 +291,18 @@ export default function GoalsPage() {
               <p className="text-xs text-slate-500 mt-1">Valor medio por job</p>
             </div>
             <div>
-              <Label>Taxa de Fechamento (%)</Label>
+              <Label>Lead → Orçamento (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={vto.formulaParams.leadConversionRate}
+                onChange={(e) => updateFormulaParam('leadConversionRate', parseFloat(e.target.value) || 0)}
+              />
+              <p className="text-xs text-slate-500 mt-1">Taxa de conversão Lead → Orçamento</p>
+            </div>
+            <div>
+              <Label>Orçamento → Venda (%)</Label>
               <Input
                 type="number"
                 min="0"
@@ -287,7 +310,7 @@ export default function GoalsPage() {
                 value={vto.formulaParams.closingRate}
                 onChange={(e) => updateFormulaParam('closingRate', parseFloat(e.target.value) || 0)}
               />
-              <p className="text-xs text-slate-500 mt-1">Leads → Vendas</p>
+              <p className="text-xs text-slate-500 mt-1">Taxa de fechamento</p>
             </div>
             <div>
               <Label>Marketing (%)</Label>
@@ -425,9 +448,8 @@ export default function GoalsPage() {
                   )}
                 </button>
                 <span
-                  className={`flex-1 text-sm ${
-                    rock.status === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'
-                  }`}
+                  className={`flex-1 text-sm ${rock.status === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'
+                    }`}
                 >
                   {rock.title}
                 </span>

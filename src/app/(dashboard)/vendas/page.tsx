@@ -35,7 +35,8 @@ interface WeeklyEntry {
 
 interface FormulaParams {
   avgTicket: number;
-  closingRate: number;
+  leadConversionRate: number; // Lead → Estimate %
+  closingRate: number; // Estimate → Sale %
   marketingPercent: number;
   productionWeeks: number;
 }
@@ -49,6 +50,7 @@ const defaultVTO: VTOData = {
   annualTarget: 1000000,
   formulaParams: {
     avgTicket: 9500,
+    leadConversionRate: 85,
     closingRate: 30,
     marketingPercent: 8,
     productionWeeks: 35,
@@ -57,23 +59,32 @@ const defaultVTO: VTOData = {
 
 // Calculate goals based on annual revenue target and formula parameters
 function calculateGoals(annualTarget: number, params: FormulaParams) {
-  const { avgTicket, closingRate, productionWeeks } = params;
+  const { avgTicket, leadConversionRate, closingRate, productionWeeks } = params;
 
   const jobsPerYear = Math.round(annualTarget / avgTicket);
   const jobsPerWeek = jobsPerYear / productionWeeks;
-  const leadsPerYear = Math.round(jobsPerYear / (closingRate / 100));
+
+  // Calculate estimates needed based on closing rate (Estimate → Sale)
+  const estimatesPerYear = Math.round(jobsPerYear / (closingRate / 100));
+
+  // Calculate leads needed based on lead conversion rate (Lead → Estimate)
+  const leadsPerYear = Math.round(estimatesPerYear / (leadConversionRate / 100));
   const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
+  const estimatesPerWeek = Math.round(estimatesPerYear / productionWeeks);
+
   const revenuePerWeek = annualTarget / productionWeeks;
 
   return {
     monthly: {
       revenue: Math.round(annualTarget / 12),
       jobs: Math.round(jobsPerYear / 12),
+      estimates: Math.round(estimatesPerYear / 12),
       leads: Math.round(leadsPerYear / 12),
     },
     weekly: {
       revenue: Math.round(revenuePerWeek),
       jobs: Math.round(jobsPerWeek * 10) / 10,
+      estimates: estimatesPerWeek,
       leads: leadsPerWeek,
     },
   };
@@ -217,7 +228,7 @@ export default function VendasPage() {
   // Monthly goals from VTO settings
   const monthlyGoals = {
     leads: goals.monthly.leads,
-    estimates: goals.monthly.leads, // Same as leads (every lead should get an estimate)
+    estimates: goals.monthly.estimates,
     sales: goals.monthly.jobs,
     revenue: goals.monthly.revenue,
   };
@@ -225,7 +236,7 @@ export default function VendasPage() {
   // Weekly goals from VTO settings
   const weeklyGoals = {
     leads: goals.weekly.leads,
-    estimates: goals.weekly.leads,
+    estimates: goals.weekly.estimates,
     sales: goals.weekly.jobs,
     revenue: goals.weekly.revenue,
   };
