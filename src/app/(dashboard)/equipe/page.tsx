@@ -96,7 +96,7 @@ export default function EquipePage() {
         email: '',
         phone: '',
         role: 'both',
-        color: '#3B82F6',
+        defaultCommissionPct: 5,
     });
 
     // Subcontractor modals
@@ -108,6 +108,7 @@ export default function EquipePage() {
         email: '',
         phone: '',
         specialty: 'both',
+        defaultPayoutPct: 60,
         color: '#10B981',
     });
 
@@ -149,7 +150,7 @@ export default function EquipePage() {
                 email: member.email || '',
                 phone: member.phone || '',
                 role: member.role || 'both',
-                color: member.color || '#3B82F6',
+                defaultCommissionPct: member.defaultCommissionPct || 5,
             });
         } else {
             setEditingMember(null);
@@ -158,7 +159,7 @@ export default function EquipePage() {
                 email: '',
                 phone: '',
                 role: 'both',
-                color: '#3B82F6',
+                defaultCommissionPct: 5,
             });
         }
         setIsMemberModalOpen(true);
@@ -233,6 +234,7 @@ export default function EquipePage() {
                 email: sub.email || '',
                 phone: sub.phone || '',
                 specialty: sub.specialty || 'both',
+                defaultPayoutPct: sub.defaultPayoutPct || 60,
                 color: sub.color || '#10B981',
             });
         } else {
@@ -242,6 +244,7 @@ export default function EquipePage() {
                 email: '',
                 phone: '',
                 specialty: 'both',
+                defaultPayoutPct: 60,
                 color: '#10B981',
             });
         }
@@ -350,10 +353,7 @@ export default function EquipePage() {
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-12 w-12">
-                                        <AvatarFallback
-                                            className="text-white"
-                                            style={{ backgroundColor: member.color || '#3B82F6' }}
-                                        >
+                                        <AvatarFallback className="text-white bg-blue-600">
                                             {getInitials(member.name)}
                                         </AvatarFallback>
                                     </Avatar>
@@ -564,28 +564,15 @@ export default function EquipePage() {
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label>Cor</Label>
-                                <Select
-                                    value={memberForm.color}
-                                    onValueChange={(value) => setMemberForm(prev => ({ ...prev, color: value }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {colorOptions.map(c => (
-                                            <SelectItem key={c.value} value={c.value}>
-                                                <div className="flex items-center gap-2">
-                                                    <div
-                                                        className="w-4 h-4 rounded"
-                                                        style={{ backgroundColor: c.value }}
-                                                    />
-                                                    {c.label}
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Label htmlFor="commission">Comissao (%)</Label>
+                                <Input
+                                    id="commission"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={memberForm.defaultCommissionPct}
+                                    onChange={(e) => setMemberForm(prev => ({ ...prev, defaultCommissionPct: Number(e.target.value) }))}
+                                />
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 pt-4">
@@ -657,29 +644,40 @@ export default function EquipePage() {
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label>Cor (para calendario/mapa)</Label>
-                                <Select
-                                    value={subForm.color}
-                                    onValueChange={(value) => setSubForm(prev => ({ ...prev, color: value }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {colorOptions.map(c => (
-                                            <SelectItem key={c.value} value={c.value}>
-                                                <div className="flex items-center gap-2">
-                                                    <div
-                                                        className="w-4 h-4 rounded"
-                                                        style={{ backgroundColor: c.value }}
-                                                    />
-                                                    {c.label}
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Label htmlFor="payout">Payout (%)</Label>
+                                <Input
+                                    id="payout"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={subForm.defaultPayoutPct}
+                                    onChange={(e) => setSubForm(prev => ({ ...prev, defaultPayoutPct: Number(e.target.value) }))}
+                                />
                             </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Cor (para calendario/mapa)</Label>
+                            <Select
+                                value={subForm.color}
+                                onValueChange={(value) => setSubForm(prev => ({ ...prev, color: value }))}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {colorOptions.map(c => (
+                                        <SelectItem key={c.value} value={c.value}>
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className="w-4 h-4 rounded"
+                                                    style={{ backgroundColor: c.value }}
+                                                />
+                                                {c.label}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="flex justify-end gap-2 pt-4">
                             <Button variant="outline" onClick={() => setIsSubModalOpen(false)}>

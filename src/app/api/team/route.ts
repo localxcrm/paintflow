@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         email: body.email,
         phone: body.phone || null,
         role: body.role || 'sales',
-        color: body.color || '#3B82F6',
+        defaultCommissionPct: body.defaultCommissionPct || 5,
         isActive: body.isActive !== false,
       })
       .select()
@@ -108,7 +108,7 @@ export async function PUT(request: NextRequest) {
         email: body.email,
         phone: body.phone,
         role: body.role,
-        color: body.color,
+        defaultCommissionPct: body.defaultCommissionPct,
         isActive: body.isActive,
         updatedAt: new Date().toISOString(),
       })
