@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   JobKPICards,
   JobFilters,
@@ -9,7 +10,10 @@ import {
   JobTable,
   JobDetailModal,
   JobCreateModal,
-  JobDeleteDialog
+  JobDeleteDialog,
+  JobKanban,
+  JobCalendar,
+  JobMapView,
 } from '@/components/jobs';
 import { PaymentDialog, PaymentDialogType, PaymentDialogData } from '@/components/jobs/payment-dialog';
 import {
@@ -23,7 +27,7 @@ import {
   getJobsDistribution,
 } from '@/lib/utils/job-calculations';
 import { Job, JobStatus, PaymentStatus, PaymentHistoryItem, TeamMember, Subcontractor } from '@/types';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, List, Calendar, MapPin, Columns } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PaymentState {
@@ -405,9 +409,15 @@ export default function JobsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Gerenciador de Trabalhos</h1>
-        <p className="text-slate-500">Acompanhe trabalhos, pagamentos e comissões</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Job Manager</h1>
+          <p className="text-slate-500">Track jobs, payments, and commissions</p>
+        </div>
+        <Button className="gap-2 whitespace-nowrap" onClick={handleOpenCreateModal}>
+          <Plus className="h-4 w-4" />
+          New Job
+        </Button>
       </div>
 
       {/* KPI Cards */}
@@ -416,9 +426,30 @@ export default function JobsPage() {
       {/* Charts */}
       <JobCharts valueByStatus={valueByStatus} distribution={distribution} />
 
-      {/* Filters + New Job Button */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-        <div className="flex-1">
+      {/* Tabs for different views */}
+      <Tabs defaultValue="list" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 lg:w-[400px]">
+          <TabsTrigger value="list" className="gap-2">
+            <List className="h-4 w-4" />
+            <span className="hidden sm:inline">List</span>
+          </TabsTrigger>
+          <TabsTrigger value="kanban" className="gap-2">
+            <Columns className="h-4 w-4" />
+            <span className="hidden sm:inline">Kanban</span>
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            <span className="hidden sm:inline">Calendar</span>
+          </TabsTrigger>
+          <TabsTrigger value="map" className="gap-2">
+            <MapPin className="h-4 w-4" />
+            <span className="hidden sm:inline">Map</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* List View */}
+        <TabsContent value="list" className="space-y-4">
+          {/* Filters */}
           <JobFilters
             statusFilter={statusFilter}
             paymentFilter={paymentFilter}
@@ -434,31 +465,46 @@ export default function JobsPage() {
             onSubcontractorChange={setSubcontractorFilter}
             onClearFilters={clearFilters}
           />
-        </div>
-        <Button className="gap-2 whitespace-nowrap" onClick={handleOpenCreateModal}>
-          <Plus className="h-4 w-4" />
-          Novo Trabalho
-        </Button>
-      </div>
 
-      {/* Data Table */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Todos os Trabalhos ({filteredJobs.length})
-          </h2>
-        </div>
-        <JobTable
-          jobs={filteredJobs}
-          onToggleDepositPaid={handleToggleDepositPaid}
-          onToggleJobPaid={handleToggleJobPaid}
-          onToggleSalesCommissionPaid={handleToggleSalesCommissionPaid}
-          onTogglePMCommissionPaid={handleTogglePMCommissionPaid}
-          onToggleSubPaid={handleToggleSubPaid}
-          onJobClick={handleJobClick}
-          onDeleteJob={handleDeleteClick}
-        />
-      </div>
+          {/* Data Table */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                All Jobs ({filteredJobs.length})
+              </h2>
+            </div>
+            <JobTable
+              jobs={filteredJobs}
+              onToggleDepositPaid={handleToggleDepositPaid}
+              onToggleJobPaid={handleToggleJobPaid}
+              onToggleSalesCommissionPaid={handleToggleSalesCommissionPaid}
+              onTogglePMCommissionPaid={handleTogglePMCommissionPaid}
+              onToggleSubPaid={handleToggleSubPaid}
+              onJobClick={handleJobClick}
+              onDeleteJob={handleDeleteClick}
+            />
+          </div>
+        </TabsContent>
+
+        {/* Kanban View */}
+        <TabsContent value="kanban">
+          <JobKanban jobs={filteredJobs} onJobClick={handleJobClick} />
+        </TabsContent>
+
+        {/* Calendar View */}
+        <TabsContent value="calendar">
+          <JobCalendar
+            jobs={jobs}
+            subcontractors={subcontractors}
+            onJobClick={handleJobClick}
+          />
+        </TabsContent>
+
+        {/* Map View */}
+        <TabsContent value="map">
+          <JobMapView jobs={jobs} subcontractors={subcontractors} />
+        </TabsContent>
+      </Tabs>
 
       {/* Job Detail Modal */}
       <JobDetailModal

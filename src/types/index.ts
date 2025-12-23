@@ -92,6 +92,7 @@ export interface Subcontractor {
   specialty: 'interior' | 'exterior' | 'both';
   defaultPayoutPct: number;
   isActive: boolean;
+  color?: string;
 }
 
 // Job Types
@@ -108,6 +109,8 @@ export interface Job {
   city: string;
   state?: string;
   zipCode?: string;
+  latitude?: number;
+  longitude?: number;
   projectType: ProjectType;
   status: JobStatus;
   jobDate: string;

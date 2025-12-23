@@ -5,3 +5,6 @@ export { JobTable } from './job-table';
 export { JobDetailModal } from './job-detail-modal';
 export { JobCreateModal } from './job-create-modal';
 export { JobDeleteDialog } from './job-delete-dialog';
+export { JobKanban } from './job-kanban';
+export { JobCalendar } from './job-calendar';
+export { JobMapView } from './job-map-view';

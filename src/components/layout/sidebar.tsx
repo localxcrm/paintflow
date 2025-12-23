@@ -11,19 +11,15 @@ import {
   TrendingUp,
   BookOpen,
   PaintBucket,
-  Calendar,
-  MapPin,
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
-  { href: '/goals', label: 'Metas', icon: Target },
-  { href: '/jobs', label: 'Trabalhos', icon: Briefcase },
-  { href: '/calendario', label: 'Calendário', icon: Calendar },
-  { href: '/mapa', label: 'Mapa', icon: MapPin },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/goals', label: 'Goals', icon: Target },
+  { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
-  { href: '/vendas', label: 'Vendas', icon: TrendingUp },
-  { href: '/conhecimento', label: 'Conhecimento', icon: BookOpen },
+  { href: '/vendas', label: 'Sales', icon: TrendingUp },
+  { href: '/conhecimento', label: 'Knowledge', icon: BookOpen },
 ];
 
 export function Sidebar() {
@@ -38,7 +34,7 @@ export function Sidebar() {
         </div>
         <div>
           <h1 className="text-lg font-bold">PaintFlow</h1>
-          <p className="text-xs text-slate-400">Fórmula $1 Milhão</p>
+          <p className="text-xs text-slate-400">$1 Million Formula</p>
         </div>
       </div>
 

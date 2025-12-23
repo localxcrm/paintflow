@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Target,
+  Briefcase,
   Megaphone,
   TrendingUp,
   BookOpen,
@@ -16,11 +17,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SheetClose } from '@/components/ui/sheet';
 
 const navItems = [
-  { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
-  { href: '/goals', label: 'Metas', icon: Target },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/goals', label: 'Goals', icon: Target },
+  { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
-  { href: '/vendas', label: 'Vendas', icon: TrendingUp },
-  { href: '/conhecimento', label: 'Conhecimento', icon: BookOpen },
+  { href: '/vendas', label: 'Sales', icon: TrendingUp },
+  { href: '/conhecimento', label: 'Knowledge', icon: BookOpen },
 ];
 
 export function MobileNav() {
@@ -35,7 +37,7 @@ export function MobileNav() {
         </div>
         <div>
           <h1 className="text-lg font-bold">PaintFlow</h1>
-          <p className="text-xs text-slate-400">Fórmula $1 Milhão</p>
+          <p className="text-xs text-slate-400">$1 Million Formula</p>
         </div>
       </div>
 
@@ -78,7 +80,7 @@ export function MobileNav() {
             )}
           >
             <Settings className="w-5 h-5" />
-            Configurações
+            Settings
           </Link>
         </SheetClose>
       </div>
