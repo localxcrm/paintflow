@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { geocodeAddress } from '@/lib/geocoding';
 
 // Helper function to calculate job financials
 async function calculateJobFinancials(jobValue: number) {
@@ -144,12 +145,35 @@ export async function PATCH(
       balanceDue = body.depositPaid ? currentJob.jobValue - currentJob.depositRequired : currentJob.jobValue;
     }
 
+    // Geocode address if address or city changed
+    let latitude = currentJob.latitude;
+    let longitude = currentJob.longitude;
+    if (body.address !== undefined || body.city !== undefined) {
+      const address = body.address ?? currentJob.address;
+      const city = body.city ?? currentJob.city;
+      const state = body.state ?? currentJob.state;
+
+      if (address && city) {
+        const coords = await geocodeAddress(address, city, state);
+        if (coords) {
+          latitude = coords.lat;
+          longitude = coords.lng;
+        }
+      }
+    }
+
     // Build update data
     const updateData: any = { updatedAt: new Date().toISOString() };
 
     if (body.clientName !== undefined) updateData.clientName = body.clientName;
     if (body.address !== undefined) updateData.address = body.address;
     if (body.city !== undefined) updateData.city = body.city;
+    if (body.state !== undefined) updateData.state = body.state;
+    // Update coordinates if address changed
+    if (body.address !== undefined || body.city !== undefined) {
+      updateData.latitude = latitude;
+      updateData.longitude = longitude;
+    }
     if (body.projectType !== undefined) updateData.projectType = body.projectType;
     if (body.status !== undefined) updateData.status = body.status;
     if (body.jobDate !== undefined) updateData.jobDate = new Date(body.jobDate).toISOString();

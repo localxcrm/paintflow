@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
+import { geocodeAddress } from '@/lib/geocoding';
 
 // Helper function to calculate job financials
 async function calculateJobFinancials(jobValue: number, organizationId: string) {
@@ -185,6 +186,17 @@ export async function POST(request: NextRequest) {
       pmCommissionAmount = jobValue * (pmCommissionPct / 100);
     }
 
+    // Geocode address to get latitude/longitude
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+    if (body.address && body.city) {
+      const coords = await geocodeAddress(body.address, body.city, body.state);
+      if (coords) {
+        latitude = coords.lat;
+        longitude = coords.lng;
+      }
+    }
+
     const { data: job, error: jobError } = await supabase
       .from('Job')
       .insert({
@@ -193,6 +205,9 @@ export async function POST(request: NextRequest) {
         clientName: body.clientName,
         address: body.address,
         city: body.city || '',
+        state: body.state || null,
+        latitude,
+        longitude,
         projectType: body.projectType || 'interior',
         status: body.status || 'lead',
         jobDate: body.jobDate ? new Date(body.jobDate).toISOString() : new Date().toISOString(),

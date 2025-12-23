@@ -106,6 +106,8 @@ export interface Job {
   clientName: string;
   address: string;
   city: string;
+  state?: string;
+  zipCode?: string;
   projectType: ProjectType;
   status: JobStatus;
   jobDate: string;

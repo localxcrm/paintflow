@@ -1,11 +1,21 @@
 -- ============================================
--- PaintPro SaaS - Complete Database Reset
--- Multi-Tenancy Schema with RLS
--- Version: 4.0
+-- PaintPro - Reset Completo do Banco de Dados
+-- Schema Painting Contractor + Multi-Tenancy
+-- Version: 5.0
+-- Data: 2024-12-22
+-- ============================================
+--
+-- INSTRUCOES:
+-- 1. Acesse Supabase Dashboard > SQL Editor
+-- 2. Cole todo este conteudo
+-- 3. Clique em "Run"
+-- 4. Verifique se todas as tabelas foram criadas
+--
+-- ATENCAO: Este script APAGA TODOS OS DADOS existentes!
 -- ============================================
 
 -- ============================================
--- PART 1: DROP ALL EXISTING TABLES
+-- PARTE 1: DROP ALL EXISTING TABLES
 -- ============================================
 
 -- Drop in reverse dependency order
@@ -25,8 +35,8 @@ DROP TABLE IF EXISTS "MarketingSpend" CASCADE;
 DROP TABLE IF EXISTS "WeeklySales" CASCADE;
 DROP TABLE IF EXISTS "EstimateSignature" CASCADE;
 DROP TABLE IF EXISTS "EstimateLineItem" CASCADE;
-DROP TABLE IF EXISTS "Estimate" CASCADE;
 DROP TABLE IF EXISTS "Job" CASCADE;
+DROP TABLE IF EXISTS "Estimate" CASCADE;
 DROP TABLE IF EXISTS "Lead" CASCADE;
 DROP TABLE IF EXISTS "Subcontractor" CASCADE;
 DROP TABLE IF EXISTS "TeamMember" CASCADE;
@@ -46,11 +56,11 @@ DROP TABLE IF EXISTS "Organization" CASCADE;
 DROP FUNCTION IF EXISTS get_current_org_id() CASCADE;
 
 -- ============================================
--- PART 2: CREATE NEW TABLES WITH MULTI-TENANCY
+-- PARTE 2: CREATE TABLES
 -- ============================================
 
 -- -----------------------------
--- Organization (NEW - Core SaaS)
+-- Organization (Multi-tenant Core)
 -- -----------------------------
 CREATE TABLE "Organization" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -76,13 +86,14 @@ CREATE TABLE "Organization" (
 );
 
 -- -----------------------------
--- User (Base - No organizationId)
+-- User (Auth - No organizationId)
 -- -----------------------------
 CREATE TABLE "User" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "email" TEXT UNIQUE NOT NULL,
   "name" TEXT NOT NULL,
   "passwordHash" TEXT NOT NULL,
+  "role" TEXT DEFAULT 'user' CHECK ("role" IN ('admin', 'user', 'viewer')),
   "avatar" TEXT,
   "phone" TEXT,
   "isActive" BOOLEAN DEFAULT true,
@@ -93,7 +104,7 @@ CREATE TABLE "User" (
 );
 
 -- -----------------------------
--- UserOrganization (NEW - Junction Table)
+-- UserOrganization (Junction Table)
 -- -----------------------------
 CREATE TABLE "UserOrganization" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -106,7 +117,7 @@ CREATE TABLE "UserOrganization" (
 );
 
 -- -----------------------------
--- Session (Updated - with organizationId)
+-- Session (With organizationId)
 -- -----------------------------
 CREATE TABLE "Session" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -120,7 +131,7 @@ CREATE TABLE "Session" (
 );
 
 -- -----------------------------
--- Invitation (NEW)
+-- Invitation
 -- -----------------------------
 CREATE TABLE "Invitation" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -155,11 +166,12 @@ CREATE TABLE "VTO" (
 );
 
 -- -----------------------------
--- BusinessSettings
+-- BusinessSettings (COM CAMPOS FINANCEIROS)
 -- -----------------------------
 CREATE TABLE "BusinessSettings" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
+  -- Company Info
   "companyName" TEXT,
   "logo" TEXT,
   "email" TEXT,
@@ -170,7 +182,17 @@ CREATE TABLE "BusinessSettings" (
   "zipCode" TEXT,
   "website" TEXT,
   "taxId" TEXT,
-  "marketingChannels" JSONB DEFAULT '[{"id": "meta", "label": "Meta Ads", "color": "#1877F2"}, {"id": "google", "label": "Google Ads", "color": "#EA4335"}, {"id": "indicacao", "label": "Indicação", "color": "#10B981"}, {"id": "organico", "label": "Orgânico", "color": "#8B5CF6"}]',
+  -- Financial Settings (CRITICO)
+  "subPayoutPct" NUMERIC DEFAULT 60,
+  "subMaterialsPct" NUMERIC DEFAULT 15,
+  "subLaborPct" NUMERIC DEFAULT 45,
+  "minGrossProfitPerJob" NUMERIC DEFAULT 900,
+  "targetGrossMarginPct" NUMERIC DEFAULT 40,
+  "defaultDepositPct" NUMERIC DEFAULT 30,
+  "arTargetDays" INTEGER DEFAULT 7,
+  "priceRoundingIncrement" NUMERIC DEFAULT 50,
+  -- Marketing Channels
+  "marketingChannels" JSONB DEFAULT '[{"id": "meta", "label": "Meta Ads", "color": "#1877F2"}, {"id": "google", "label": "Google Ads", "color": "#EA4335"}, {"id": "indicacao", "label": "Indicacao", "color": "#10B981"}, {"id": "organico", "label": "Organico", "color": "#8B5CF6"}]',
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW(),
   UNIQUE("organizationId")
@@ -182,11 +204,22 @@ CREATE TABLE "BusinessSettings" (
 CREATE TABLE "CompanyEstimateSettings" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
-  "companyName" TEXT,
-  "logo" TEXT,
-  "email" TEXT,
-  "phone" TEXT,
-  "address" TEXT,
+  -- Insurance
+  "insuranceCertificateUrl" TEXT,
+  "insuranceCompany" TEXT,
+  "insurancePolicyNumber" TEXT,
+  "insuranceCoverageAmount" NUMERIC,
+  "insuranceExpirationDate" TIMESTAMP,
+  -- License
+  "licenseImageUrl" TEXT,
+  "licenseNumber" TEXT,
+  "licenseState" TEXT,
+  "licenseExpirationDate" TIMESTAMP,
+  -- Terms
+  "termsAndConditions" TEXT DEFAULT '',
+  "paymentTerms" TEXT,
+  "warrantyTerms" TEXT,
+  -- Estimate Settings
   "estimatePrefix" TEXT DEFAULT 'EST',
   "nextEstimateNumber" INTEGER DEFAULT 1001,
   "taxRate" NUMERIC DEFAULT 0,
@@ -198,7 +231,7 @@ CREATE TABLE "CompanyEstimateSettings" (
 );
 
 -- -----------------------------
--- TeamMember
+-- TeamMember (COM defaultCommissionPct)
 -- -----------------------------
 CREATE TABLE "TeamMember" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -206,40 +239,42 @@ CREATE TABLE "TeamMember" (
   "name" TEXT NOT NULL,
   "email" TEXT,
   "phone" TEXT,
-  "role" TEXT,
+  "role" TEXT DEFAULT 'both' CHECK ("role" IN ('sales', 'pm', 'both')),
+  "defaultCommissionPct" NUMERIC DEFAULT 5,
   "color" TEXT DEFAULT '#3B82F6',
   "avatar" TEXT,
   "isActive" BOOLEAN DEFAULT true,
-  "hourlyRate" NUMERIC,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
 );
 
 -- -----------------------------
--- Subcontractor
+-- Subcontractor (COM defaultPayoutPct)
 -- -----------------------------
 CREATE TABLE "Subcontractor" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
   "name" TEXT NOT NULL,
+  "companyName" TEXT,
   "email" TEXT,
   "phone" TEXT,
-  "specialty" TEXT,
+  "specialty" TEXT DEFAULT 'both' CHECK ("specialty" IN ('interior', 'exterior', 'both')),
+  "defaultPayoutPct" NUMERIC DEFAULT 60,
   "color" TEXT DEFAULT '#10B981',
   "notes" TEXT,
   "isActive" BOOLEAN DEFAULT true,
-  "rating" INTEGER DEFAULT 5,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
 );
 
 -- -----------------------------
--- Lead
+-- Lead (COM firstName, lastName)
 -- -----------------------------
 CREATE TABLE "Lead" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
-  "name" TEXT NOT NULL,
+  "firstName" TEXT NOT NULL,
+  "lastName" TEXT NOT NULL,
   "email" TEXT,
   "phone" TEXT,
   "address" TEXT,
@@ -247,16 +282,20 @@ CREATE TABLE "Lead" (
   "state" TEXT,
   "zipCode" TEXT,
   "source" TEXT,
-  "status" TEXT DEFAULT 'new' CHECK ("status" IN ('new', 'contacted', 'qualified', 'proposal', 'won', 'lost')),
+  "status" TEXT DEFAULT 'new' CHECK ("status" IN ('new', 'contacted', 'estimate_scheduled', 'estimated', 'proposal_sent', 'follow_up', 'won', 'lost')),
+  "projectType" TEXT DEFAULT 'interior' CHECK ("projectType" IN ('interior', 'exterior', 'both')),
+  "leadDate" TIMESTAMP DEFAULT NOW(),
+  "nextFollowupDate" TIMESTAMP,
+  "estimatedJobValue" NUMERIC,
+  "wonLostReason" TEXT,
   "notes" TEXT,
-  "estimatedValue" NUMERIC,
-  "assignedTo" TEXT REFERENCES "TeamMember"("id") ON DELETE SET NULL,
+  "assignedToId" TEXT REFERENCES "TeamMember"("id") ON DELETE SET NULL,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
 );
 
 -- -----------------------------
--- Estimate
+-- Estimate (COM campos de lucro)
 -- -----------------------------
 CREATE TABLE "Estimate" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -266,15 +305,29 @@ CREATE TABLE "Estimate" (
   "clientName" TEXT NOT NULL,
   "clientEmail" TEXT,
   "clientPhone" TEXT,
-  "clientAddress" TEXT,
-  "status" TEXT DEFAULT 'draft' CHECK ("status" IN ('draft', 'sent', 'viewed', 'accepted', 'rejected', 'expired')),
+  "address" TEXT,
+  "city" TEXT,
+  "state" TEXT,
+  "zipCode" TEXT,
+  "status" TEXT DEFAULT 'draft' CHECK ("status" IN ('draft', 'sent', 'viewed', 'accepted', 'declined', 'expired')),
+  "estimateDate" TIMESTAMP DEFAULT NOW(),
+  "validUntil" TIMESTAMP,
+  -- Pricing
   "subtotal" NUMERIC DEFAULT 0,
-  "taxAmount" NUMERIC DEFAULT 0,
-  "discount" NUMERIC DEFAULT 0,
-  "total" NUMERIC DEFAULT 0,
+  "discountAmount" NUMERIC DEFAULT 0,
+  "totalPrice" NUMERIC DEFAULT 0,
+  -- Cost Calculations (CRITICO)
+  "subMaterialsCost" NUMERIC DEFAULT 0,
+  "subLaborCost" NUMERIC DEFAULT 0,
+  "subTotalCost" NUMERIC DEFAULT 0,
+  -- Profit Calculations (CRITICO)
+  "grossProfit" NUMERIC DEFAULT 0,
+  "grossMarginPct" NUMERIC DEFAULT 0,
+  "meetsMinGp" BOOLEAN DEFAULT false,
+  "meetsTargetGm" BOOLEAN DEFAULT false,
+  -- Notes
   "notes" TEXT,
   "terms" TEXT,
-  "validUntil" DATE,
   "sentAt" TIMESTAMP,
   "viewedAt" TIMESTAMP,
   "acceptedAt" TIMESTAMP,
@@ -289,10 +342,11 @@ CREATE TABLE "EstimateLineItem" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "estimateId" TEXT NOT NULL REFERENCES "Estimate"("id") ON DELETE CASCADE,
   "description" TEXT NOT NULL,
+  "location" TEXT,
+  "scope" TEXT CHECK ("scope" IN ('walls_only', 'walls_trim', 'walls_trim_ceiling', 'full_refresh')),
   "quantity" NUMERIC DEFAULT 1,
-  "unit" TEXT DEFAULT 'un',
   "unitPrice" NUMERIC NOT NULL,
-  "total" NUMERIC NOT NULL,
+  "lineTotal" NUMERIC NOT NULL,
   "sortOrder" INTEGER DEFAULT 0,
   "createdAt" TIMESTAMP DEFAULT NOW()
 );
@@ -303,45 +357,79 @@ CREATE TABLE "EstimateLineItem" (
 CREATE TABLE "EstimateSignature" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "estimateId" TEXT NOT NULL REFERENCES "Estimate"("id") ON DELETE CASCADE,
-  "signatureData" TEXT NOT NULL,
-  "signerName" TEXT,
-  "signerEmail" TEXT,
-  "ipAddress" TEXT,
-  "signedAt" TIMESTAMP DEFAULT NOW()
+  "clientName" TEXT NOT NULL,
+  "signatureDataUrl" TEXT NOT NULL,
+  "signedAt" TIMESTAMP DEFAULT NOW(),
+  "ipAddress" TEXT
 );
 
 -- -----------------------------
--- Job
+-- Job (PAINTING CONTRACTOR - 30+ campos)
 -- -----------------------------
 CREATE TABLE "Job" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
-  "estimateId" TEXT REFERENCES "Estimate"("id") ON DELETE SET NULL,
-  "title" TEXT NOT NULL,
-  "description" TEXT,
+  "jobNumber" TEXT NOT NULL,
+  -- Client Info
   "clientName" TEXT NOT NULL,
-  "clientEmail" TEXT,
-  "clientPhone" TEXT,
   "address" TEXT,
   "city" TEXT,
   "state" TEXT,
   "zipCode" TEXT,
   "latitude" NUMERIC,
   "longitude" NUMERIC,
-  "status" TEXT DEFAULT 'scheduled' CHECK ("status" IN ('scheduled', 'in_progress', 'completed', 'cancelled', 'on_hold')),
-  "priority" TEXT DEFAULT 'medium' CHECK ("priority" IN ('low', 'medium', 'high', 'urgent')),
-  "startDate" DATE,
-  "endDate" DATE,
-  "estimatedHours" NUMERIC,
-  "actualHours" NUMERIC,
-  "revenue" NUMERIC DEFAULT 0,
-  "cost" NUMERIC DEFAULT 0,
-  "assignedTo" TEXT REFERENCES "TeamMember"("id") ON DELETE SET NULL,
-  "subcontractorId" TEXT REFERENCES "Subcontractor"("id") ON DELETE SET NULL,
+  -- Project Details
+  "projectType" TEXT DEFAULT 'interior' CHECK ("projectType" IN ('interior', 'exterior', 'both')),
+  "status" TEXT DEFAULT 'lead' CHECK ("status" IN ('lead', 'got_the_job', 'scheduled', 'completed')),
+  -- Dates
+  "jobDate" DATE DEFAULT CURRENT_DATE,
+  "scheduledStartDate" DATE,
+  "scheduledEndDate" DATE,
+  "actualStartDate" DATE,
+  "actualEndDate" DATE,
+  -- Financial (CRITICO)
+  "jobValue" NUMERIC DEFAULT 0,
+  "subMaterials" NUMERIC DEFAULT 0,
+  "subLabor" NUMERIC DEFAULT 0,
+  "subTotal" NUMERIC DEFAULT 0,
+  "grossProfit" NUMERIC DEFAULT 0,
+  "grossMarginPct" NUMERIC DEFAULT 0,
+  -- Deposit & Payment
+  "depositRequired" NUMERIC DEFAULT 0,
+  "depositPaid" BOOLEAN DEFAULT false,
+  "balanceDue" NUMERIC DEFAULT 0,
+  "jobPaid" BOOLEAN DEFAULT false,
+  "invoiceDate" DATE,
+  "paymentReceivedDate" DATE,
+  "daysToCollect" INTEGER,
+  -- Sales Commission
+  "salesCommissionPct" NUMERIC DEFAULT 0,
+  "salesCommissionAmount" NUMERIC DEFAULT 0,
+  "salesCommissionPaid" BOOLEAN DEFAULT false,
+  -- PM Commission
+  "pmCommissionPct" NUMERIC DEFAULT 0,
+  "pmCommissionAmount" NUMERIC DEFAULT 0,
+  "pmCommissionPaid" BOOLEAN DEFAULT false,
+  -- Subcontractor
+  "subcontractorPrice" NUMERIC DEFAULT 0,
+  "subcontractorPaid" BOOLEAN DEFAULT false,
+  -- Profit Flags
+  "meetsMinGp" BOOLEAN DEFAULT false,
+  "meetsTargetGm" BOOLEAN DEFAULT false,
+  "profitFlag" TEXT DEFAULT 'OK' CHECK ("profitFlag" IN ('OK', 'RAISE_PRICE', 'FIX_SCOPE')),
+  -- Notes
   "notes" TEXT,
-  "photos" JSONB DEFAULT '[]',
+  -- Foreign Keys
+  "leadId" TEXT REFERENCES "Lead"("id") ON DELETE SET NULL,
+  "estimateId" TEXT REFERENCES "Estimate"("id") ON DELETE SET NULL,
+  "salesRepId" TEXT REFERENCES "TeamMember"("id") ON DELETE SET NULL,
+  "projectManagerId" TEXT REFERENCES "TeamMember"("id") ON DELETE SET NULL,
+  "subcontractorId" TEXT REFERENCES "Subcontractor"("id") ON DELETE SET NULL,
+  -- Timestamps
   "createdAt" TIMESTAMP DEFAULT NOW(),
-  "updatedAt" TIMESTAMP DEFAULT NOW()
+  "updatedAt" TIMESTAMP DEFAULT NOW(),
+  -- Constraints
+  UNIQUE("organizationId", "jobNumber")
 );
 
 -- -----------------------------
@@ -387,7 +475,7 @@ CREATE TABLE "KnowledgeArticle" (
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
   "title" TEXT NOT NULL,
   "category" TEXT NOT NULL,
-  "content" TEXT,
+  "content" TEXT DEFAULT '',
   "checklist" JSONB DEFAULT '[]',
   "images" JSONB DEFAULT '[]',
   "videoUrl" TEXT,
@@ -406,7 +494,7 @@ CREATE TABLE "Rock" (
   "title" TEXT NOT NULL,
   "description" TEXT,
   "owner" TEXT NOT NULL,
-  "rockType" TEXT DEFAULT 'company' CHECK ("rockType" IN ('company', 'departmental', 'individual')),
+  "rockType" TEXT DEFAULT 'company' CHECK ("rockType" IN ('company', 'individual')),
   "quarter" INTEGER NOT NULL CHECK ("quarter" BETWEEN 1 AND 4),
   "year" INTEGER NOT NULL,
   "status" TEXT DEFAULT 'on_track' CHECK ("status" IN ('on_track', 'off_track', 'complete', 'dropped')),
@@ -418,7 +506,7 @@ CREATE TABLE "Rock" (
 );
 
 -- -----------------------------
--- Todo (EOS To-Do List)
+-- Todo
 -- -----------------------------
 CREATE TABLE "Todo" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -426,7 +514,7 @@ CREATE TABLE "Todo" (
   "title" TEXT NOT NULL,
   "owner" TEXT NOT NULL,
   "dueDate" DATE,
-  "isCompleted" BOOLEAN DEFAULT false,
+  "status" TEXT DEFAULT 'pending' CHECK ("status" IN ('pending', 'done')),
   "completedAt" TIMESTAMP,
   "rockId" TEXT REFERENCES "Rock"("id") ON DELETE SET NULL,
   "createdAt" TIMESTAMP DEFAULT NOW(),
@@ -434,16 +522,18 @@ CREATE TABLE "Todo" (
 );
 
 -- -----------------------------
--- Issue (EOS Issues List)
+-- Issue
 -- -----------------------------
 CREATE TABLE "Issue" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
   "title" TEXT NOT NULL,
   "description" TEXT,
-  "owner" TEXT,
-  "priority" TEXT DEFAULT 'medium' CHECK ("priority" IN ('low', 'medium', 'high')),
-  "status" TEXT DEFAULT 'open' CHECK ("status" IN ('open', 'in_progress', 'resolved', 'dropped')),
+  "issueType" TEXT DEFAULT 'short_term' CHECK ("issueType" IN ('short_term', 'long_term')),
+  "priority" INTEGER DEFAULT 2 CHECK ("priority" BETWEEN 1 AND 3),
+  "status" TEXT DEFAULT 'open' CHECK ("status" IN ('open', 'in_discussion', 'solved')),
+  "createdBy" TEXT,
+  "resolution" TEXT,
   "resolvedAt" TIMESTAMP,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
@@ -455,31 +545,36 @@ CREATE TABLE "Issue" (
 CREATE TABLE "Seat" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
-  "title" TEXT NOT NULL,
-  "description" TEXT,
+  "seatName" TEXT NOT NULL,
+  "roleDescription" TEXT,
   "responsibilities" JSONB DEFAULT '[]',
-  "parentId" TEXT REFERENCES "Seat"("id") ON DELETE SET NULL,
-  "teamMemberId" TEXT REFERENCES "TeamMember"("id") ON DELETE SET NULL,
+  "personName" TEXT,
+  "personId" TEXT,
+  "reportsToId" TEXT REFERENCES "Seat"("id") ON DELETE SET NULL,
+  "gwcGetsIt" BOOLEAN DEFAULT false,
+  "gwcWantsIt" BOOLEAN DEFAULT false,
+  "gwcCapacity" BOOLEAN DEFAULT false,
+  "isRightPersonRightSeat" BOOLEAN DEFAULT false,
   "sortOrder" INTEGER DEFAULT 0,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
 );
 
 -- -----------------------------
--- Meeting (L10 Meetings)
+-- Meeting
 -- -----------------------------
 CREATE TABLE "Meeting" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
-  "title" TEXT NOT NULL,
-  "meetingType" TEXT DEFAULT 'l10' CHECK ("meetingType" IN ('l10', 'quarterly', 'annual', 'other')),
-  "scheduledAt" TIMESTAMP NOT NULL,
+  "title" TEXT,
+  "meetingType" TEXT DEFAULT 'l10' CHECK ("meetingType" IN ('l10', 'quarterly', 'annual')),
+  "meetingDate" TIMESTAMP NOT NULL,
   "duration" INTEGER DEFAULT 90,
   "attendees" JSONB DEFAULT '[]',
-  "agenda" JSONB DEFAULT '[]',
+  "ratingAvg" NUMERIC,
+  "segueNotes" TEXT,
+  "headlines" TEXT,
   "notes" TEXT,
-  "todoIds" JSONB DEFAULT '[]',
-  "issueIds" JSONB DEFAULT '[]',
   "status" TEXT DEFAULT 'scheduled' CHECK ("status" IN ('scheduled', 'in_progress', 'completed', 'cancelled')),
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
@@ -494,10 +589,10 @@ CREATE TABLE "ScorecardMetric" (
   "name" TEXT NOT NULL,
   "description" TEXT,
   "owner" TEXT NOT NULL,
-  "unit" TEXT DEFAULT 'number',
-  "goal" NUMERIC NOT NULL,
-  "direction" TEXT DEFAULT 'above' CHECK ("direction" IN ('above', 'below', 'exact')),
-  "frequency" TEXT DEFAULT 'weekly' CHECK ("frequency" IN ('daily', 'weekly', 'monthly', 'quarterly')),
+  "goalValue" NUMERIC NOT NULL,
+  "goalType" TEXT DEFAULT 'number' CHECK ("goalType" IN ('number', 'currency', 'percent')),
+  "goalDirection" TEXT DEFAULT 'above' CHECK ("goalDirection" IN ('above', 'below')),
+  "category" TEXT DEFAULT 'leading' CHECK ("category" IN ('leading', 'lagging')),
   "isActive" BOOLEAN DEFAULT true,
   "sortOrder" INTEGER DEFAULT 0,
   "createdAt" TIMESTAMP DEFAULT NOW(),
@@ -510,11 +605,12 @@ CREATE TABLE "ScorecardMetric" (
 CREATE TABLE "ScorecardEntry" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "metricId" TEXT NOT NULL REFERENCES "ScorecardMetric"("id") ON DELETE CASCADE,
-  "value" NUMERIC NOT NULL,
-  "date" DATE NOT NULL,
+  "weekEndingDate" TIMESTAMP NOT NULL,
+  "actualValue" NUMERIC NOT NULL,
+  "onTrack" BOOLEAN DEFAULT false,
   "notes" TEXT,
   "createdAt" TIMESTAMP DEFAULT NOW(),
-  UNIQUE("metricId", "date")
+  UNIQUE("metricId", "weekEndingDate")
 );
 
 -- -----------------------------
@@ -523,13 +619,15 @@ CREATE TABLE "ScorecardEntry" (
 CREATE TABLE "PeopleAnalyzer" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
-  "teamMemberId" TEXT NOT NULL REFERENCES "TeamMember"("id") ON DELETE CASCADE,
-  "seatId" TEXT REFERENCES "Seat"("id") ON DELETE SET NULL,
-  "coreValuesScore" JSONB DEFAULT '{}',
-  "gwtScore" JSONB DEFAULT '{"getsIt": null, "wantsIt": null, "capacityToDoIt": null}',
-  "overallRating" TEXT CHECK ("overallRating" IN ('right_person_right_seat', 'right_person_wrong_seat', 'wrong_person_right_seat', 'wrong_person_wrong_seat', 'pending')),
+  "personName" TEXT NOT NULL,
+  "personId" TEXT NOT NULL,
+  "reviewDate" TIMESTAMP DEFAULT NOW(),
+  "coreValueRatings" JSONB DEFAULT '{}',
+  "gwcGetsIt" BOOLEAN DEFAULT false,
+  "gwcWantsIt" BOOLEAN DEFAULT false,
+  "gwcCapacity" BOOLEAN DEFAULT false,
+  "overallStatus" TEXT DEFAULT 'needs_work' CHECK ("overallStatus" IN ('right_person_right_seat', 'needs_work', 'wrong_fit')),
   "notes" TEXT,
-  "evaluatedAt" TIMESTAMP DEFAULT NOW(),
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
 );
@@ -542,8 +640,11 @@ CREATE TABLE "RoomPrice" (
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
   "roomType" TEXT NOT NULL,
   "size" TEXT NOT NULL,
-  "basePrice" NUMERIC NOT NULL,
-  "laborHours" NUMERIC,
+  "typicalSqft" INTEGER DEFAULT 0,
+  "wallsOnly" NUMERIC DEFAULT 0,
+  "wallsTrim" NUMERIC DEFAULT 0,
+  "wallsTrimCeiling" NUMERIC DEFAULT 0,
+  "fullRefresh" NUMERIC DEFAULT 0,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
 );
@@ -554,10 +655,9 @@ CREATE TABLE "RoomPrice" (
 CREATE TABLE "ExteriorPrice" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
-  "exteriorType" TEXT NOT NULL,
-  "size" TEXT NOT NULL,
-  "basePrice" NUMERIC NOT NULL,
-  "laborHours" NUMERIC,
+  "surfaceType" TEXT NOT NULL,
+  "pricePerSqft" NUMERIC NOT NULL,
+  "prepMultiplier" NUMERIC DEFAULT 1.0,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
 );
@@ -569,9 +669,9 @@ CREATE TABLE "Addon" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
   "name" TEXT NOT NULL,
-  "category" TEXT NOT NULL,
-  "price" NUMERIC NOT NULL,
+  "category" TEXT DEFAULT 'both' CHECK ("category" IN ('interior', 'exterior', 'both')),
   "unit" TEXT DEFAULT 'each',
+  "basePrice" NUMERIC NOT NULL,
   "description" TEXT,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW()
@@ -584,9 +684,10 @@ CREATE TABLE "PortfolioImage" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
   "jobId" TEXT REFERENCES "Job"("id") ON DELETE SET NULL,
-  "url" TEXT NOT NULL,
-  "caption" TEXT,
-  "category" TEXT,
+  "beforeUrl" TEXT,
+  "afterUrl" TEXT,
+  "projectType" TEXT CHECK ("projectType" IN ('interior', 'exterior', 'both')),
+  "description" TEXT,
   "isFeatured" BOOLEAN DEFAULT false,
   "sortOrder" INTEGER DEFAULT 0,
   "createdAt" TIMESTAMP DEFAULT NOW()
@@ -599,6 +700,7 @@ CREATE TABLE "AIConversation" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "organizationId" TEXT NOT NULL REFERENCES "Organization"("id") ON DELETE CASCADE,
   "userId" TEXT REFERENCES "User"("id") ON DELETE SET NULL,
+  "sessionId" TEXT,
   "title" TEXT,
   "context" TEXT,
   "createdAt" TIMESTAMP DEFAULT NOW(),
@@ -611,73 +713,84 @@ CREATE TABLE "AIConversation" (
 CREATE TABLE "AIMessage" (
   "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   "conversationId" TEXT NOT NULL REFERENCES "AIConversation"("id") ON DELETE CASCADE,
-  "role" TEXT NOT NULL CHECK ("role" IN ('user', 'assistant', 'system')),
+  "role" TEXT NOT NULL CHECK ("role" IN ('user', 'assistant')),
   "content" TEXT NOT NULL,
+  "suggestedLineItems" JSONB,
+  "suggestedRiskModifiers" JSONB DEFAULT '[]',
   "createdAt" TIMESTAMP DEFAULT NOW()
 );
 
 -- ============================================
--- PART 3: CREATE INDEXES FOR PERFORMANCE
+-- PARTE 3: CREATE INDEXES
 -- ============================================
 
--- Organization indexes
+-- Organization
 CREATE INDEX "idx_organization_slug" ON "Organization"("slug");
 CREATE INDEX "idx_organization_plan" ON "Organization"("plan");
 
--- User indexes
+-- User
 CREATE INDEX "idx_user_email" ON "User"("email");
 
--- UserOrganization indexes
+-- UserOrganization
 CREATE INDEX "idx_userorg_user" ON "UserOrganization"("userId");
 CREATE INDEX "idx_userorg_org" ON "UserOrganization"("organizationId");
 
--- Session indexes
+-- Session
 CREATE INDEX "idx_session_token" ON "Session"("token");
 CREATE INDEX "idx_session_user" ON "Session"("userId");
 CREATE INDEX "idx_session_org" ON "Session"("organizationId");
 
--- Invitation indexes
-CREATE INDEX "idx_invitation_token" ON "Invitation"("token");
-CREATE INDEX "idx_invitation_email" ON "Invitation"("email");
-CREATE INDEX "idx_invitation_org" ON "Invitation"("organizationId");
+-- TeamMember
+CREATE INDEX "idx_teammember_org" ON "TeamMember"("organizationId");
+CREATE INDEX "idx_teammember_active" ON "TeamMember"("isActive");
 
--- Multi-tenant table indexes (organizationId)
-CREATE INDEX "idx_job_org" ON "Job"("organizationId");
-CREATE INDEX "idx_job_status" ON "Job"("status");
-CREATE INDEX "idx_job_dates" ON "Job"("startDate", "endDate");
+-- Subcontractor
+CREATE INDEX "idx_subcontractor_org" ON "Subcontractor"("organizationId");
+CREATE INDEX "idx_subcontractor_active" ON "Subcontractor"("isActive");
 
+-- Lead
 CREATE INDEX "idx_lead_org" ON "Lead"("organizationId");
 CREATE INDEX "idx_lead_status" ON "Lead"("status");
 
+-- Estimate
 CREATE INDEX "idx_estimate_org" ON "Estimate"("organizationId");
 CREATE INDEX "idx_estimate_status" ON "Estimate"("status");
 
+-- Job
+CREATE INDEX "idx_job_org" ON "Job"("organizationId");
+CREATE INDEX "idx_job_status" ON "Job"("status");
+CREATE INDEX "idx_job_dates" ON "Job"("scheduledStartDate", "scheduledEndDate");
+CREATE INDEX "idx_job_salesrep" ON "Job"("salesRepId");
+CREATE INDEX "idx_job_pm" ON "Job"("projectManagerId");
+CREATE INDEX "idx_job_sub" ON "Job"("subcontractorId");
+
+-- WeeklySales
 CREATE INDEX "idx_weeklysales_org" ON "WeeklySales"("organizationId");
 CREATE INDEX "idx_weeklysales_week" ON "WeeklySales"("weekStart");
 
+-- MarketingSpend
 CREATE INDEX "idx_marketingspend_org" ON "MarketingSpend"("organizationId");
 CREATE INDEX "idx_marketingspend_period" ON "MarketingSpend"("year", "month");
 
+-- Rock
 CREATE INDEX "idx_rock_org" ON "Rock"("organizationId");
 CREATE INDEX "idx_rock_quarter" ON "Rock"("quarter", "year");
 
+-- KnowledgeArticle
 CREATE INDEX "idx_knowledge_org" ON "KnowledgeArticle"("organizationId");
 CREATE INDEX "idx_knowledge_category" ON "KnowledgeArticle"("category");
 
-CREATE INDEX "idx_teammember_org" ON "TeamMember"("organizationId");
-CREATE INDEX "idx_subcontractor_org" ON "Subcontractor"("organizationId");
-
 -- ============================================
--- PART 4: ROW-LEVEL SECURITY (RLS)
+-- PARTE 4: ROW-LEVEL SECURITY (RLS)
 -- ============================================
 
--- Helper function to get current organization ID from session context
+-- Helper function
 CREATE OR REPLACE FUNCTION get_current_org_id()
 RETURNS TEXT AS $$
   SELECT NULLIF(current_setting('app.current_organization_id', true), '')::TEXT;
 $$ LANGUAGE SQL STABLE;
 
--- Enable RLS on all multi-tenant tables
+-- Enable RLS on multi-tenant tables
 ALTER TABLE "VTO" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "BusinessSettings" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "CompanyEstimateSettings" ENABLE ROW LEVEL SECURITY;
@@ -702,154 +815,139 @@ ALTER TABLE "Addon" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "PortfolioImage" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AIConversation" ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies for each table
--- VTO
+-- Create RLS policies
 CREATE POLICY "vto_org_access" ON "VTO" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- BusinessSettings
 CREATE POLICY "settings_org_access" ON "BusinessSettings" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- CompanyEstimateSettings
 CREATE POLICY "estimate_settings_org_access" ON "CompanyEstimateSettings" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- TeamMember
 CREATE POLICY "team_org_access" ON "TeamMember" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Subcontractor
 CREATE POLICY "subcontractor_org_access" ON "Subcontractor" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Lead
 CREATE POLICY "lead_org_access" ON "Lead" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Estimate
 CREATE POLICY "estimate_org_access" ON "Estimate" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Job
 CREATE POLICY "job_org_access" ON "Job" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- WeeklySales
 CREATE POLICY "weeklysales_org_access" ON "WeeklySales" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- MarketingSpend
 CREATE POLICY "marketingspend_org_access" ON "MarketingSpend" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- KnowledgeArticle
 CREATE POLICY "knowledge_org_access" ON "KnowledgeArticle" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Rock
 CREATE POLICY "rock_org_access" ON "Rock" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Todo
 CREATE POLICY "todo_org_access" ON "Todo" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Issue
 CREATE POLICY "issue_org_access" ON "Issue" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Seat
 CREATE POLICY "seat_org_access" ON "Seat" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Meeting
 CREATE POLICY "meeting_org_access" ON "Meeting" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- ScorecardMetric
 CREATE POLICY "scorecard_org_access" ON "ScorecardMetric" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- PeopleAnalyzer
 CREATE POLICY "people_org_access" ON "PeopleAnalyzer" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- RoomPrice
 CREATE POLICY "roomprice_org_access" ON "RoomPrice" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- ExteriorPrice
 CREATE POLICY "exteriorprice_org_access" ON "ExteriorPrice" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- Addon
 CREATE POLICY "addon_org_access" ON "Addon" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- PortfolioImage
 CREATE POLICY "portfolio_org_access" ON "PortfolioImage" FOR ALL USING ("organizationId" = get_current_org_id());
-
--- AIConversation
 CREATE POLICY "ai_conv_org_access" ON "AIConversation" FOR ALL USING ("organizationId" = get_current_org_id());
 
 -- ============================================
--- PART 5: BYPASS RLS FOR SERVICE ROLE
--- ============================================
--- Note: Service role automatically bypasses RLS in Supabase
--- This is needed for server-side operations
-
--- ============================================
--- PART 6: INSERT SAMPLE DATA FOR TESTING
+-- PARTE 5: SAMPLE DATA
 -- ============================================
 
--- Create sample organization
-INSERT INTO "Organization" ("id", "name", "slug", "email", "plan")
-VALUES ('org_demo_001', 'Demo Painting Co', 'demo-painting', 'demo@paintpro.com', 'pro');
+-- Create demo organization
+INSERT INTO "Organization" ("id", "name", "slug", "email", "phone", "plan")
+VALUES ('org_demo_001', 'Demo Painting Co', 'demo-painting', 'demo@paintpro.com', '(11) 99999-9999', 'pro');
 
--- Create sample user
-INSERT INTO "User" ("id", "email", "name", "passwordHash")
-VALUES ('user_demo_001', 'admin@paintpro.com', 'Admin Demo', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.K7HvK8kK6k6K6k');
+-- Create demo user (password: demo123)
+INSERT INTO "User" ("id", "email", "name", "passwordHash", "role")
+VALUES ('user_demo_001', 'admin@paintpro.com', 'Admin Demo', 'pp_demo123', 'admin');
 
 -- Link user to organization as owner
 INSERT INTO "UserOrganization" ("userId", "organizationId", "role", "isDefault")
 VALUES ('user_demo_001', 'org_demo_001', 'owner', true);
 
--- Create sample VTO
-INSERT INTO "VTO" ("organizationId", "annualTarget", "formulaParams", "coreValues")
-VALUES (
-  'org_demo_001',
-  1000000,
-  '{"avgTicket": 3500, "closeRate": 0.35, "showRate": 0.70, "leadToEstimate": 0.85}',
-  '["Qualidade", "Integridade", "Respeito", "Excelência"]'
-);
+-- Create VTO
+INSERT INTO "VTO" ("organizationId", "annualTarget", "coreValues")
+VALUES ('org_demo_001', 1000000, '["Qualidade", "Integridade", "Respeito"]');
 
--- Create sample business settings
-INSERT INTO "BusinessSettings" ("organizationId", "companyName", "email", "phone", "marketingChannels")
+-- Create BusinessSettings with financial defaults
+INSERT INTO "BusinessSettings" (
+  "organizationId",
+  "companyName",
+  "email",
+  "phone",
+  "subPayoutPct",
+  "subMaterialsPct",
+  "subLaborPct",
+  "minGrossProfitPerJob",
+  "targetGrossMarginPct",
+  "defaultDepositPct",
+  "arTargetDays"
+)
 VALUES (
   'org_demo_001',
   'Demo Painting Co',
   'contact@demo-painting.com',
   '(11) 99999-9999',
-  '[{"id": "meta", "label": "Meta Ads", "color": "#1877F2"}, {"id": "google", "label": "Google Ads", "color": "#EA4335"}, {"id": "indicacao", "label": "Indicação", "color": "#10B981"}, {"id": "organico", "label": "Orgânico", "color": "#8B5CF6"}]'
+  60,
+  15,
+  45,
+  900,
+  40,
+  30,
+  7
 );
 
--- Create sample subcontractors
-INSERT INTO "Subcontractor" ("organizationId", "name", "specialty", "color", "phone")
+-- Create sample team members
+INSERT INTO "TeamMember" ("organizationId", "name", "email", "role", "defaultCommissionPct", "color")
 VALUES
-  ('org_demo_001', 'João Pintor', 'Pintura Interna', '#3B82F6', '(11) 98888-1111'),
-  ('org_demo_001', 'Carlos Exterior', 'Pintura Externa', '#10B981', '(11) 98888-2222'),
-  ('org_demo_001', 'Maria Decoradora', 'Textura e Efeitos', '#8B5CF6', '(11) 98888-3333');
+  ('org_demo_001', 'Carlos Vendedor', 'carlos@demo.com', 'sales', 5, '#3B82F6'),
+  ('org_demo_001', 'Maria PM', 'maria@demo.com', 'pm', 5, '#8B5CF6'),
+  ('org_demo_001', 'Joao Both', 'joao@demo.com', 'both', 5, '#F97316');
+
+-- Create sample subcontractors
+INSERT INTO "Subcontractor" ("organizationId", "name", "specialty", "defaultPayoutPct", "color", "phone")
+VALUES
+  ('org_demo_001', 'Pedro Pintor', 'interior', 60, '#10B981', '(11) 98888-1111'),
+  ('org_demo_001', 'Andre Exterior', 'exterior', 55, '#3B82F6', '(11) 98888-2222'),
+  ('org_demo_001', 'Marcos Geral', 'both', 60, '#8B5CF6', '(11) 98888-3333');
 
 -- Create sample jobs
-INSERT INTO "Job" ("organizationId", "title", "clientName", "address", "city", "state", "status", "startDate", "endDate", "revenue")
+INSERT INTO "Job" (
+  "organizationId",
+  "jobNumber",
+  "clientName",
+  "address",
+  "city",
+  "status",
+  "jobValue",
+  "grossProfit",
+  "grossMarginPct"
+)
 VALUES
-  ('org_demo_001', 'Pintura Residencial - Casa Completa', 'Fernando Silva', 'Rua das Flores, 123', 'São Paulo', 'SP', 'completed', '2024-12-01', '2024-12-05', 8500),
-  ('org_demo_001', 'Pintura Comercial - Escritório', 'Empresa ABC', 'Av. Paulista, 1000', 'São Paulo', 'SP', 'in_progress', '2024-12-15', '2024-12-20', 12000),
-  ('org_demo_001', 'Pintura Externa - Fachada', 'Condomínio Vista', 'Rua dos Pinheiros, 500', 'São Paulo', 'SP', 'scheduled', '2024-12-22', '2024-12-28', 25000);
+  ('org_demo_001', 'JOB-1001', 'Fernando Silva', 'Rua das Flores, 123', 'Sao Paulo', 'completed', 8500, 3400, 40),
+  ('org_demo_001', 'JOB-1002', 'Empresa ABC', 'Av. Paulista, 1000', 'Sao Paulo', 'scheduled', 12000, 4800, 40),
+  ('org_demo_001', 'JOB-1003', 'Condominio Vista', 'Rua dos Pinheiros, 500', 'Sao Paulo', 'lead', 25000, 10000, 40);
 
 -- ============================================
--- VERIFICATION QUERIES
+-- PARTE 6: VERIFICATION
 -- ============================================
 
--- Verify tables created
+-- List all tables
 SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = 'public'
 ORDER BY table_name;
-
--- Verify RLS enabled
-SELECT tablename, rowsecurity
-FROM pg_tables
-WHERE schemaname = 'public'
-AND rowsecurity = true;
 
 -- Count sample data
 SELECT 'Organizations' as entity, COUNT(*) as count FROM "Organization"
 UNION ALL
 SELECT 'Users', COUNT(*) FROM "User"
 UNION ALL
-SELECT 'UserOrganizations', COUNT(*) FROM "UserOrganization"
+SELECT 'TeamMembers', COUNT(*) FROM "TeamMember"
 UNION ALL
-SELECT 'Jobs', COUNT(*) FROM "Job"
+SELECT 'Subcontractors', COUNT(*) FROM "Subcontractor"
 UNION ALL
-SELECT 'Subcontractors', COUNT(*) FROM "Subcontractor";
+SELECT 'Jobs', COUNT(*) FROM "Job";
+
+-- ============================================
+-- FIM DO SCRIPT
+-- ============================================
+--
+-- Proximos passos:
+-- 1. Acesse a aplicacao
+-- 2. Faca login com: admin@paintpro.com / demo123
+-- 3. Teste criar TeamMember
+-- 4. Teste criar Subcontractor
+-- 5. Teste criar Job
+-- ============================================

@@ -19,7 +19,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Job, JobStatus, ProjectType, TeamMember, Subcontractor } from '@/types';
-import { Save, X, User, MapPin, DollarSign, Building } from 'lucide-react';
+import { Save, X, User, DollarSign, Building } from 'lucide-react';
+import { AddressAutocomplete, AddressResult } from '@/components/address-autocomplete';
+import { BRAZILIAN_STATES } from '@/lib/constants';
 
 interface JobCreateModalProps {
     isOpen: boolean;
@@ -40,6 +42,8 @@ export function JobCreateModal({
         clientName: '',
         address: '',
         city: '',
+        state: '',
+        zipCode: '',
         projectType: 'interior' as ProjectType,
         status: 'lead' as JobStatus,
         jobValue: 0,
@@ -50,6 +54,16 @@ export function JobCreateModal({
         subcontractorId: '',
         notes: '',
     });
+
+    const handleAddressSelect = (addr: AddressResult) => {
+        setFormData((prev) => ({
+            ...prev,
+            address: addr.street || addr.display.split(',')[0],
+            city: addr.city,
+            state: addr.state,
+            zipCode: addr.zipCode || '',
+        }));
+    };
 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -83,6 +97,8 @@ export function JobCreateModal({
             clientName: formData.clientName,
             address: formData.address,
             city: formData.city,
+            state: formData.state,
+            zipCode: formData.zipCode,
             projectType: formData.projectType,
             status: formData.status,
             jobDate: new Date().toISOString().split('T')[0],
@@ -131,6 +147,8 @@ export function JobCreateModal({
             clientName: '',
             address: '',
             city: '',
+            state: '',
+            zipCode: '',
             projectType: 'interior',
             status: 'lead',
             jobValue: 0,
@@ -180,19 +198,21 @@ export function JobCreateModal({
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="address" className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4" />
+                        <div className="col-span-2 space-y-2">
+                            <Label htmlFor="address">
                                 Endereço
                             </Label>
-                            <Input
-                                id="address"
+                            <AddressAutocomplete
                                 value={formData.address}
-                                onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                                placeholder="Rua, número"
+                                onAddressSelect={handleAddressSelect}
+                                onChange={(value) => setFormData(prev => ({ ...prev, address: value }))}
+                                placeholder="Digite o endereço..."
                             />
                         </div>
+                    </div>
 
+                    {/* Address Details */}
+                    <div className="grid grid-cols-4 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="city" className="flex items-center gap-2">
                                 <Building className="h-4 w-4" />
@@ -205,10 +225,37 @@ export function JobCreateModal({
                                 placeholder="Cidade"
                             />
                         </div>
-                    </div>
 
-                    {/* Project Details */}
-                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="state">Estado</Label>
+                            <Select
+                                value={formData.state}
+                                onValueChange={(value) => setFormData(prev => ({ ...prev, state: value }))}
+                            >
+                                <SelectTrigger id="state">
+                                    <SelectValue placeholder="UF" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {BRAZILIAN_STATES.map((state) => (
+                                        <SelectItem key={state.value} value={state.value}>
+                                            {state.value} - {state.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="zipCode">CEP</Label>
+                            <Input
+                                id="zipCode"
+                                value={formData.zipCode}
+                                onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                                placeholder="00000-000"
+                                maxLength={9}
+                            />
+                        </div>
+
                         <div className="space-y-2">
                             <Label>Tipo de Projeto</Label>
                             <Select
@@ -225,7 +272,10 @@ export function JobCreateModal({
                                 </SelectContent>
                             </Select>
                         </div>
+                    </div>
 
+                    {/* Schedule Details */}
+                    <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label>Status</Label>
                             <Select
