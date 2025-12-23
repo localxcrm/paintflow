@@ -52,7 +52,11 @@ export async function POST(request: NextRequest) {
       .single<User>();
 
     if (createError || !user) {
-      throw new Error('Failed to create user');
+      console.error('Supabase create user error:', createError);
+      return NextResponse.json(
+        { error: createError?.message || 'Failed to create user', details: createError },
+        { status: 500 }
+      );
     }
 
     // Create organization for user (auto-create on registration)
