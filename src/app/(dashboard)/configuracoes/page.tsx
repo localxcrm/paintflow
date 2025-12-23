@@ -14,8 +14,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Settings, DollarSign, Percent, Building, Save } from 'lucide-react';
+import { Settings, DollarSign, Percent, Building, Save, Megaphone, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface MarketingChannel {
+    id: string;
+    label: string;
+    color: string;
+}
 
 interface BusinessSettings {
     companyName: string;
@@ -26,6 +32,7 @@ interface BusinessSettings {
     pmCommissionPct: number;
     currency: string;
     dateFormat: string;
+    marketingChannels: MarketingChannel[];
 }
 
 export default function ConfiguracoesPage() {
@@ -38,6 +45,15 @@ export default function ConfiguracoesPage() {
         pmCommissionPct: 3,
         currency: 'USD',
         dateFormat: 'DD/MM/YYYY',
+        marketingChannels: [
+            { id: 'google', label: 'Google Ads', color: 'bg-blue-500' },
+            { id: 'facebook', label: 'Facebook/Meta', color: 'bg-indigo-500' },
+            { id: 'referral', label: 'Indicação', color: 'bg-green-500' },
+            { id: 'yard_sign', label: 'Placa de Obra', color: 'bg-yellow-500' },
+            { id: 'door_knock', label: 'Door Knock', color: 'bg-orange-500' },
+            { id: 'repeat', label: 'Cliente Repetido', color: 'bg-purple-500' },
+            { id: 'other', label: 'Outro', color: 'bg-slate-500' },
+        ],
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -194,6 +210,68 @@ export default function ConfiguracoesPage() {
                             />
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Marketing Channels */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Megaphone className="h-5 w-5" />
+                        Canais de Marketing
+                    </CardTitle>
+                    <CardDescription>
+                        Defina os canais de origem dos seus leads
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        {settings.marketingChannels?.map((channel, index) => (
+                            <div key={channel.id} className="flex items-center gap-2">
+                                <div className={`w-4 h-4 rounded-full ${channel.color}`} />
+                                <Input
+                                    value={channel.label}
+                                    onChange={(e) => {
+                                        const newChannels = [...(settings.marketingChannels || [])];
+                                        newChannels[index].label = e.target.value;
+                                        setSettings(prev => ({ ...prev, marketingChannels: newChannels }));
+                                    }}
+                                    className="flex-1"
+                                />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                        const newChannels = settings.marketingChannels?.filter((_, i) => i !== index);
+                                        setSettings(prev => ({ ...prev, marketingChannels: newChannels }));
+                                    }}
+                                    disabled={(settings.marketingChannels?.length || 0) <= 1}
+                                >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500', 'bg-yellow-500', 'bg-cyan-500', 'bg-indigo-500'];
+                            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                            const newChannel = {
+                                id: `custom_${Date.now()}`,
+                                label: 'Novo Canal',
+                                color: randomColor
+                            };
+                            setSettings(prev => ({
+                                ...prev,
+                                marketingChannels: [...(prev.marketingChannels || []), newChannel]
+                            }));
+                        }}
+                        className="w-full"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Adicionar Canal
+                    </Button>
                 </CardContent>
             </Card>
 

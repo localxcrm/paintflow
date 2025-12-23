@@ -23,6 +23,12 @@ import {
 import { Plus, Save, TrendingUp, Users, FileText, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface MarketingChannel {
+  id: string;
+  label: string;
+  color: string;
+}
+
 interface WeeklyEntry {
   id?: string;
   weekStart: string;
@@ -30,12 +36,12 @@ interface WeeklyEntry {
   estimates: number;
   sales: number;
   revenue: number;
-  channels?: Record<ChannelId, ChannelData>;
+  channels?: Record<string, ChannelData>;
   createdAt?: string;
 }
 
-// Sales channels
-const SALES_CHANNELS = [
+// Default channels if none configured
+const DEFAULT_CHANNELS: MarketingChannel[] = [
   { id: 'google', label: 'Google Ads', color: 'bg-blue-500' },
   { id: 'facebook', label: 'Facebook/Meta', color: 'bg-indigo-500' },
   { id: 'referral', label: 'Indicação', color: 'bg-green-500' },
@@ -43,9 +49,7 @@ const SALES_CHANNELS = [
   { id: 'door_knock', label: 'Door Knock', color: 'bg-orange-500' },
   { id: 'repeat', label: 'Cliente Repetido', color: 'bg-purple-500' },
   { id: 'other', label: 'Outro', color: 'bg-slate-500' },
-] as const;
-
-type ChannelId = typeof SALES_CHANNELS[number]['id'];
+];
 
 interface ChannelData {
   leads: number;
@@ -159,26 +163,22 @@ export default function VendasPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string>(''); // Currently selected week for editing
   const [vto, setVto] = useState<VTOData>(defaultVTO);
+  const [availableChannels, setAvailableChannels] = useState<MarketingChannel[]>(DEFAULT_CHANNELS);
 
   // Channel data state - now tracks edits for the current selected week
   // Initialize with zeroed structure
-  const [currentChannelData, setCurrentChannelData] = useState<Record<ChannelId, ChannelData>>(() => {
-    const initial: Partial<Record<ChannelId, ChannelData>> = {};
-    SALES_CHANNELS.forEach((ch) => {
-      initial[ch.id] = { leads: 0, estimates: 0, sales: 0, revenue: 0 };
-    });
-    return initial as Record<ChannelId, ChannelData>;
-  });
+  const [currentChannelData, setCurrentChannelData] = useState<Record<string, ChannelData>>({});
 
   const weeks = getWeeksInMonth(selectedYear, selectedMonth);
   const goals = calculateGoals(vto.annualTarget, vto.formulaParams);
 
-  // Load VTO settings from localStorage
+  // Load VTO and Channels settings from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('paintpro_vto');
-    if (saved) {
+    // VTO
+    const savedVto = localStorage.getItem('paintpro_vto');
+    if (savedVto) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(savedVto);
         setVto({
           ...defaultVTO,
           ...parsed,
@@ -189,6 +189,19 @@ export default function VendasPage() {
         });
       } catch (e) {
         console.error('Error loading VTO:', e);
+      }
+    }
+
+    // Settings (Channels)
+    const savedSettings = localStorage.getItem('paintflow_settings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.marketingChannels && parsed.marketingChannels.length > 0) {
+          setAvailableChannels(parsed.marketingChannels);
+        }
+      } catch (e) {
+        console.error('Error loading settings:', e);
       }
     }
   }, []);
@@ -209,29 +222,35 @@ export default function VendasPage() {
     }
   }, []);
 
-  // When selected week changes, load its data into currentChannelData
+  // Initialize or update currentChannelData when week changes or channels load
   useEffect(() => {
     if (!selectedWeek) return;
 
     const existingEntry = entries.find(e => e.weekStart === selectedWeek);
 
-    // Reset to zeros first
-    const newChannelData: Partial<Record<ChannelId, ChannelData>> = {};
-    SALES_CHANNELS.forEach((ch) => {
+    // Create structure based on CURRENT available channels
+    const newChannelData: Record<string, ChannelData> = {};
+    availableChannels.forEach((ch) => {
       newChannelData[ch.id] = { leads: 0, estimates: 0, sales: 0, revenue: 0 };
     });
 
     if (existingEntry && existingEntry.channels) {
-      // Load existing data
-      setChannelData(existingEntry.channels);
-    } else {
-      // New week or no channel data, use zeros
-      setChannelData(newChannelData as Record<ChannelId, ChannelData>);
+      // Merge existing data into current structure
+      // This preserves data for channels that still exist, and initializes new ones with 0
+      availableChannels.forEach(ch => {
+        if (existingEntry.channels && existingEntry.channels[ch.id]) {
+          newChannelData[ch.id] = existingEntry.channels[ch.id];
+        }
+      });
+      // Also keep data for channels that might have been deleted but exist in history?
+      // For now, let's stick to showing only active channels in the editor to avoid confusion.
     }
-  }, [selectedWeek, entries]);
+
+    setCurrentChannelData(newChannelData);
+  }, [selectedWeek, entries, availableChannels]);
 
   // Helper to update channel data state
-  const setChannelData = (data: Record<ChannelId, ChannelData>) => {
+  const setChannelData = (data: Record<string, ChannelData>) => {
     setCurrentChannelData(data);
   };
 
@@ -303,19 +322,19 @@ export default function VendasPage() {
   };
 
   // Channel totals for display
-  const channelTotals = SALES_CHANNELS.map((ch) => ({
+  const channelTotals = availableChannels.map((ch) => ({
     ...ch,
-    data: currentChannelData[ch.id],
-    conversionRate: currentChannelData[ch.id].estimates > 0
+    data: currentChannelData[ch.id] || { leads: 0, estimates: 0, sales: 0, revenue: 0 },
+    conversionRate: currentChannelData[ch.id]?.estimates > 0
       ? Math.round((currentChannelData[ch.id].sales / currentChannelData[ch.id].estimates) * 100)
       : 0,
   }));
 
-  const updateChannelData = (channelId: ChannelId, field: keyof ChannelData, value: number) => {
+  const updateChannelData = (channelId: string, field: keyof ChannelData, value: number) => {
     const updated = {
       ...currentChannelData,
       [channelId]: {
-        ...currentChannelData[channelId],
+        ...(currentChannelData[channelId] || { leads: 0, estimates: 0, sales: 0, revenue: 0 }),
         [field]: value,
       },
     };
@@ -589,21 +608,21 @@ export default function VendasPage() {
                   <TableRow className="font-bold bg-slate-50">
                     <TableCell>Total da Semana</TableCell>
                     <TableCell className="text-center">
-                      {channelTotals.reduce((sum, ch) => sum + ch.data.leads, 0)}
+                      {channelTotals.reduce((sum: number, ch) => sum + ch.data.leads, 0)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {channelTotals.reduce((sum, ch) => sum + ch.data.estimates, 0)}
+                      {channelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {channelTotals.reduce((sum, ch) => sum + ch.data.sales, 0)}
+                      {channelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0)}
                     </TableCell>
                     <TableCell className="text-center">
-                      ${channelTotals.reduce((sum, ch) => sum + ch.data.revenue, 0).toLocaleString()}
+                      ${channelTotals.reduce((sum: number, ch) => sum + ch.data.revenue, 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-center">
                       {(() => {
-                        const totalEst = channelTotals.reduce((sum, ch) => sum + ch.data.estimates, 0);
-                        const totalSales = channelTotals.reduce((sum, ch) => sum + ch.data.sales, 0);
+                        const totalEst = channelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0);
+                        const totalSales = channelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0);
                         return totalEst > 0 ? Math.round((totalSales / totalEst) * 100) : 0;
                       })()}%
                     </TableCell>
