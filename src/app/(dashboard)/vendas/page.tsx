@@ -30,6 +30,7 @@ interface WeeklyEntry {
   estimates: number;
   sales: number;
   revenue: number;
+  channels?: Record<ChannelId, ChannelData>;
   createdAt?: string;
 }
 
@@ -156,18 +157,12 @@ export default function VendasPage() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [entries, setEntries] = useState<WeeklyEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState<string>(''); // Currently selected week for editing
   const [vto, setVto] = useState<VTOData>(defaultVTO);
-  const [formData, setFormData] = useState<WeeklyEntry>({
-    weekStart: '',
-    leads: 0,
-    estimates: 0,
-    sales: 0,
-    revenue: 0,
-  });
 
-  // Channel data state
-  const [channelData, setChannelData] = useState<Record<ChannelId, ChannelData>>(() => {
+  // Channel data state - now tracks edits for the current selected week
+  // Initialize with zeroed structure
+  const [currentChannelData, setCurrentChannelData] = useState<Record<ChannelId, ChannelData>>(() => {
     const initial: Partial<Record<ChannelId, ChannelData>> = {};
     SALES_CHANNELS.forEach((ch) => {
       initial[ch.id] = { leads: 0, estimates: 0, sales: 0, revenue: 0 };
@@ -196,17 +191,49 @@ export default function VendasPage() {
         console.error('Error loading VTO:', e);
       }
     }
+  }, []);
 
-    // Load channel data
-    const savedChannels = localStorage.getItem('paintflow_channels');
-    if (savedChannels) {
+  // Load entries (simulating local storage persistence for historical data for now)
+  useEffect(() => {
+    // In a real app, this would fetch from DB based on month/year
+    const savedEntries = localStorage.getItem('paintflow_sales_entries');
+    if (savedEntries) {
       try {
-        setChannelData(JSON.parse(savedChannels));
+        const parsed = JSON.parse(savedEntries);
+        // Filter for current month/year view if needed, but for now we just load all
+        // to simplify the "save" logic finding existing entries
+        setEntries(parsed);
       } catch (e) {
-        console.error('Error loading channel data:', e);
+        console.error('Error loading entries:', e);
       }
     }
   }, []);
+
+  // When selected week changes, load its data into currentChannelData
+  useEffect(() => {
+    if (!selectedWeek) return;
+
+    const existingEntry = entries.find(e => e.weekStart === selectedWeek);
+
+    // Reset to zeros first
+    const newChannelData: Partial<Record<ChannelId, ChannelData>> = {};
+    SALES_CHANNELS.forEach((ch) => {
+      newChannelData[ch.id] = { leads: 0, estimates: 0, sales: 0, revenue: 0 };
+    });
+
+    if (existingEntry && existingEntry.channels) {
+      // Load existing data
+      setChannelData(existingEntry.channels);
+    } else {
+      // New week or no channel data, use zeros
+      setChannelData(newChannelData as Record<ChannelId, ChannelData>);
+    }
+  }, [selectedWeek, entries]);
+
+  // Helper to update channel data state
+  const setChannelData = (data: Record<ChannelId, ChannelData>) => {
+    setCurrentChannelData(data);
+  };
 
   useEffect(() => {
     fetchEntries();
@@ -225,22 +252,74 @@ export default function VendasPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Save current week data
+  const handleSaveWeek = async () => {
+    if (!selectedWeek) {
+      toast.error('Selecione uma semana');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // TODO: Save to API
-      const newEntry = { ...formData, id: Date.now().toString() };
-      setEntries([...entries, newEntry]);
-      setFormData({ weekStart: '', leads: 0, estimates: 0, sales: 0, revenue: 0 });
-      setShowForm(false);
-      toast.success('Dados salvos com sucesso!');
+      // Calculate totals from channels
+      const totals = Object.values(currentChannelData).reduce(
+        (acc, curr) => ({
+          leads: acc.leads + curr.leads,
+          estimates: acc.estimates + curr.estimates,
+          sales: acc.sales + curr.sales,
+          revenue: acc.revenue + curr.revenue,
+        }),
+        { leads: 0, estimates: 0, sales: 0, revenue: 0 }
+      );
+
+      // Create or update entry
+      const newEntry: WeeklyEntry = {
+        id: entries.find(e => e.weekStart === selectedWeek)?.id || Date.now().toString(),
+        weekStart: selectedWeek,
+        ...totals,
+        channels: currentChannelData,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Update entries list
+      const updatedEntries = [
+        ...entries.filter(e => e.weekStart !== selectedWeek),
+        newEntry
+      ];
+
+      setEntries(updatedEntries);
+
+      // Persist to local storage
+      localStorage.setItem('paintflow_sales_entries', JSON.stringify(updatedEntries));
+
+      toast.success('Dados da semana salvos!');
     } catch (error) {
+      console.error('Error saving:', error);
       toast.error('Erro ao salvar dados');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Channel totals for display
+  const channelTotals = SALES_CHANNELS.map((ch) => ({
+    ...ch,
+    data: currentChannelData[ch.id],
+    conversionRate: currentChannelData[ch.id].estimates > 0
+      ? Math.round((currentChannelData[ch.id].sales / currentChannelData[ch.id].estimates) * 100)
+      : 0,
+  }));
+
+  const updateChannelData = (channelId: ChannelId, field: keyof ChannelData, value: number) => {
+    const updated = {
+      ...currentChannelData,
+      [channelId]: {
+        ...currentChannelData[channelId],
+        [field]: value,
+      },
+    };
+    setCurrentChannelData(updated);
   };
 
   // Calculate totals
@@ -280,26 +359,7 @@ export default function VendasPage() {
     revenue: goals.weekly.revenue,
   };
 
-  // Channel totals
-  const channelTotals = SALES_CHANNELS.map((ch) => ({
-    ...ch,
-    data: channelData[ch.id],
-    conversionRate: channelData[ch.id].estimates > 0
-      ? Math.round((channelData[ch.id].sales / channelData[ch.id].estimates) * 100)
-      : 0,
-  }));
-
-  const updateChannelData = (channelId: ChannelId, field: keyof ChannelData, value: number) => {
-    const updated = {
-      ...channelData,
-      [channelId]: {
-        ...channelData[channelId],
-        [field]: value,
-      },
-    };
-    setChannelData(updated);
-    localStorage.setItem('paintflow_channels', JSON.stringify(updated));
-  };
+  // Channel totals (removed duplicates)
 
   return (
     <div className="space-y-6">
@@ -432,94 +492,141 @@ export default function VendasPage() {
         </Card>
       </div>
 
-      {/* Add Entry Form */}
-      {showForm ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Adicionar Semana</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <Label>Semana</Label>
-                  <Select
-                    value={formData.weekStart}
-                    onValueChange={(v) => setFormData({ ...formData, weekStart: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {weeks.map((week, i) => (
-                        <SelectItem key={i} value={week.start.toISOString()}>
-                          {week.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Leads</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.leads}
-                    onChange={(e) => setFormData({ ...formData, leads: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div>
-                  <Label>Orçamentos</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.estimates}
-                    onChange={(e) => setFormData({ ...formData, estimates: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div>
-                  <Label>Vendas</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.sales}
-                    onChange={(e) => setFormData({ ...formData, sales: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div>
-                  <Label>Faturamento ($)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.revenue}
-                    onChange={(e) => setFormData({ ...formData, revenue: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isLoading}>
-                  <Save className="w-4 h-4 mr-2" />
-                  Salvar
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      ) : (
-        <Button onClick={() => setShowForm(true)} className="w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          Adicionar Semana
-        </Button>
-      )}
+      {/* Unified Input Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle className="text-lg">Registro Semanal</CardTitle>
+            <div className="flex items-center gap-2">
+              <Label>Semana:</Label>
+              <Select
+                value={selectedWeek}
+                onValueChange={(v) => setSelectedWeek(v)}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Selecione a semana..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {weeks.map((week, i) => (
+                    <SelectItem key={i} value={week.start.toISOString()}>
+                      {week.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!selectedWeek ? (
+            <div className="text-center py-8 text-slate-500">
+              Selecione uma semana acima para registrar os dados por canal.
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[160px]">Canal</TableHead>
+                    <TableHead className="text-center">Leads</TableHead>
+                    <TableHead className="text-center">Orçamentos</TableHead>
+                    <TableHead className="text-center">Vendas</TableHead>
+                    <TableHead className="text-center">Faturamento</TableHead>
+                    <TableHead className="text-center">Taxa Fech.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {channelTotals.map((ch) => (
+                    <TableRow key={ch.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full ${ch.color}`} />
+                          {ch.label}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="w-16 text-center h-8"
+                          value={ch.data.leads || ''}
+                          onChange={(e) => updateChannelData(ch.id, 'leads', parseInt(e.target.value) || 0)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="w-16 text-center h-8"
+                          value={ch.data.estimates || ''}
+                          onChange={(e) => updateChannelData(ch.id, 'estimates', parseInt(e.target.value) || 0)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="w-16 text-center h-8"
+                          value={ch.data.sales || ''}
+                          onChange={(e) => updateChannelData(ch.id, 'sales', parseInt(e.target.value) || 0)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="w-24 text-center h-8"
+                          value={ch.data.revenue || ''}
+                          onChange={(e) => updateChannelData(ch.id, 'revenue', parseInt(e.target.value) || 0)}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center font-medium">
+                        {ch.conversionRate}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Totals Row */}
+                  <TableRow className="font-bold bg-slate-50">
+                    <TableCell>Total da Semana</TableCell>
+                    <TableCell className="text-center">
+                      {channelTotals.reduce((sum, ch) => sum + ch.data.leads, 0)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {channelTotals.reduce((sum, ch) => sum + ch.data.estimates, 0)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {channelTotals.reduce((sum, ch) => sum + ch.data.sales, 0)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      ${channelTotals.reduce((sum, ch) => sum + ch.data.revenue, 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {(() => {
+                        const totalEst = channelTotals.reduce((sum, ch) => sum + ch.data.estimates, 0);
+                        const totalSales = channelTotals.reduce((sum, ch) => sum + ch.data.sales, 0);
+                        return totalEst > 0 ? Math.round((totalSales / totalEst) * 100) : 0;
+                      })()}%
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
 
-      {/* Weekly Data Table */}
+              <div className="flex justify-end">
+                <Button onClick={handleSaveWeek} disabled={isLoading} className="w-full sm:w-auto">
+                  <Save className="w-4 h-4 mr-2" />
+                  Salvar Semana
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Historical Data Table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
-            {months[selectedMonth]} {selectedYear}
+            Histórico: {months[selectedMonth]} {selectedYear}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -539,8 +646,6 @@ export default function VendasPage() {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                     Nenhum dado registrado para este mês.
-                    <br />
-                    <span className="text-sm">Clique em &quot;Adicionar Semana&quot; para começar.</span>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -566,22 +671,6 @@ export default function VendasPage() {
                     </TableRow>
                   );
                 })
-              )}
-              {entries.length > 0 && (
-                <TableRow className="font-bold bg-slate-50">
-                  <TableCell>Total</TableCell>
-                  <TableCell className="text-right">{totals.leads}</TableCell>
-                  <TableCell className="text-right">{totals.estimates}</TableCell>
-                  <TableCell className="text-right">{totals.sales}</TableCell>
-                  <TableCell className="text-right">
-                    ${totals.revenue.toLocaleString('en-US')}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {totals.estimates > 0
-                      ? ((totals.sales / totals.estimates) * 100).toFixed(0)
-                      : '0'}%
-                  </TableCell>
-                </TableRow>
               )}
             </TableBody>
           </Table>
