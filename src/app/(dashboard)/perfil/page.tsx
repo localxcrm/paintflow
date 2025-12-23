@@ -7,14 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { User, Mail, Phone, Building, Save } from 'lucide-react';
+import { User, Mail, Phone, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserProfile {
     name: string;
     email: string;
     phone: string;
-    company: string;
 }
 
 export default function PerfilPage() {
@@ -22,7 +21,6 @@ export default function PerfilPage() {
         name: '',
         email: '',
         phone: '',
-        company: '',
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -31,12 +29,10 @@ export default function PerfilPage() {
         const stored = localStorage.getItem('paintpro_user');
         if (stored) {
             const user = JSON.parse(stored);
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setProfile({
                 name: user.name || '',
                 email: user.email || '',
                 phone: user.phone || '',
-                company: user.company || 'PaintFlow Demo',
             });
         }
     }, []);
@@ -139,19 +135,6 @@ export default function PerfilPage() {
                                 value={profile.phone}
                                 onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
                                 placeholder="(555) 123-4567"
-                            />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="company" className="flex items-center gap-2">
-                                <Building className="h-4 w-4" />
-                                Empresa
-                            </Label>
-                            <Input
-                                id="company"
-                                value={profile.company}
-                                onChange={(e) => setProfile(prev => ({ ...prev, company: e.target.value }))}
-                                placeholder="Nome da sua empresa"
                             />
                         </div>
                     </div>
