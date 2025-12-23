@@ -153,7 +153,7 @@ export default function EquipePage() {
                                     id="memberPhone"
                                     value={newMember.phone}
                                     onChange={(e) => setNewMember(prev => ({ ...prev, phone: e.target.value }))}
-                                    placeholder="(11) 99999-9999"
+                                    placeholder="(555) 123-4567"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">

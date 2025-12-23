@@ -137,7 +137,7 @@ export default function PerfilPage() {
                                 id="phone"
                                 value={profile.phone}
                                 onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
-                                placeholder="(11) 99999-9999"
+                                placeholder="(555) 123-4567"
                             />
                         </div>
 
