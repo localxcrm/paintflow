@@ -41,10 +41,26 @@ const colorMap: Record<string, string> = {
   'bg-yellow-500': '#eab308',
   'bg-indigo-500': '#6366f1',
   'bg-gray-500': '#6b7280',
+  '#3B82F6': '#3B82F6',
+  '#22C55E': '#22C55E',
+  '#10B981': '#10B981',
+  '#A855F7': '#A855F7',
+  '#F97316': '#F97316',
+  '#EC4899': '#EC4899',
+  '#14B8A6': '#14B8A6',
+  '#EF4444': '#EF4444',
+  '#EAB308': '#EAB308',
+  '#6366F1': '#6366F1',
+  '#6B7280': '#6B7280',
 };
 
-function getHexColor(tailwindClass: string): string {
-  return colorMap[tailwindClass] || '#6b7280';
+function getHexColor(color: string): string {
+  // If it's already a hex color, return it
+  if (color?.startsWith('#')) {
+    return color;
+  }
+  // Otherwise look up in color map
+  return colorMap[color] || '#6b7280';
 }
 
 function createMarkerIcon(color: string): L.DivIcon {
@@ -104,66 +120,70 @@ export default function JobMap({ jobs }: JobMapProps) {
         });
 
         const formatCurrency = (value: number) => {
-          return new Intl.NumberFormat('pt-BR', {
+          return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'BRL'
+            currency: 'USD'
           }).format(value);
         };
 
         const statusLabels: Record<string, string> = {
           'lead': 'Lead',
-          'got_the_job': 'Confirmado',
-          'scheduled': 'Agendado',
-          'completed': 'Concluído',
+          'got_the_job': 'Confirmed',
+          'scheduled': 'Scheduled',
+          'completed': 'Completed',
         };
 
+        const statusColors: Record<string, string> = {
+          'lead': '#6b7280',
+          'got_the_job': '#22c55e',
+          'scheduled': '#3b82f6',
+          'completed': '#10b981',
+        };
+
+        const subColor = job.Subcontractor?.color || '#6b7280';
+        const hexSubColor = getHexColor(subColor);
+
         const popupContent = `
-          <div style="min-width: 200px;">
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px;">
-              ${job.jobNumber}
+          <div style="min-width: 220px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div style="font-weight: bold; font-size: 14px;">
+                ${job.jobNumber}
+              </div>
+              <span style="
+                background-color: ${statusColors[job.status] || '#6b7280'};
+                color: white;
+                padding: 2px 8px;
+                border-radius: 10px;
+                font-size: 11px;
+                font-weight: 500;
+              ">${statusLabels[job.status] || job.status}</span>
             </div>
-            <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">
-              Cliente
+            <div style="color: #64748b; font-size: 11px; margin-bottom: 2px;">
+              Client
             </div>
             <div style="font-weight: 500; margin-bottom: 8px;">
               ${job.clientName}
             </div>
-            <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">
-              Endereço
+            <div style="color: #64748b; font-size: 11px; margin-bottom: 2px;">
+              Address
             </div>
             <div style="font-weight: 500; margin-bottom: 8px;">
               ${job.address}, ${job.city}${job.state ? ', ' + job.state : ''}
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <div style="color: #64748b; font-size: 12px;">Status</div>
-                <div style="font-weight: 500;">${statusLabels[job.status] || job.status}</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #e2e8f0;">
+              <div style="text-align: left;">
+                <div style="color: #64748b; font-size: 11px;">Value</div>
+                <div style="font-weight: bold; color: #10b981; font-size: 16px;">${formatCurrency(job.jobValue)}</div>
               </div>
-              <div style="text-align: right;">
-                <div style="color: #64748b; font-size: 12px;">Valor</div>
-                <div style="font-weight: bold; color: #10b981;">${formatCurrency(job.jobValue)}</div>
-              </div>
-            </div>
-            ${job.Subcontractor ? `
-              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
-                <div style="color: #64748b; font-size: 12px;">Equipe</div>
-                <div style="font-weight: 500;">${job.Subcontractor.name}</div>
-              </div>
-            ` : ''}
-            <div style="margin-top: 12px;">
-              <a href="/jobs/${job.id}" style="
-                display: block;
-                text-align: center;
-                background-color: #3b82f6;
-                color: white;
-                padding: 6px 12px;
-                border-radius: 6px;
-                text-decoration: none;
-                font-size: 13px;
-                font-weight: 500;
-              ">
-                Ver Detalhes
-              </a>
+              ${job.Subcontractor ? `
+                <div style="text-align: right;">
+                  <div style="color: #64748b; font-size: 11px;">Crew</div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background-color: ${hexSubColor};"></div>
+                    <span style="font-weight: 500;">${job.Subcontractor.name}</span>
+                  </div>
+                </div>
+              ` : ''}
             </div>
           </div>
         `;

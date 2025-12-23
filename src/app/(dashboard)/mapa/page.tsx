@@ -127,9 +127,9 @@ export default function MapaPage() {
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'USD'
     }).format(value);
   };
 
@@ -142,14 +142,14 @@ export default function MapaPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <MapPin className="w-6 h-6 text-blue-600" />
-            Mapa de Trabalhos
+            Job Map
           </h1>
-          <p className="text-slate-500">Visualize a localização dos trabalhos</p>
+          <p className="text-slate-500">View job locations</p>
         </div>
 
         <Button variant="outline" onClick={fetchData} disabled={isLoading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Atualizar
+          Refresh
         </Button>
       </div>
 
@@ -158,22 +158,22 @@ export default function MapaPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Filter className="w-4 h-4" />
-            Filtros
+            Filters
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <div className="w-40">
-              <label className="text-xs text-slate-500 mb-1 block">Período</label>
+              <label className="text-xs text-slate-500 mb-1 block">Period</label>
               <Select value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="this_week">Esta Semana</SelectItem>
-                  <SelectItem value="this_month">Este Mês</SelectItem>
-                  <SelectItem value="next_month">Próximo Mês</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="this_week">This Week</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                  <SelectItem value="next_month">Next Month</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -185,22 +185,22 @@ export default function MapaPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="scheduled">Agendado</SelectItem>
-                  <SelectItem value="got_the_job">Confirmado</SelectItem>
-                  <SelectItem value="completed">Concluído</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="got_the_job">Confirmed</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="w-48">
-              <label className="text-xs text-slate-500 mb-1 block">Equipe</label>
+              <label className="text-xs text-slate-500 mb-1 block">Crew</label>
               <Select value={selectedSubcontractor} onValueChange={setSelectedSubcontractor}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="all">All Crews</SelectItem>
                   {subcontractors.map(sub => (
                     <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
                   ))}
@@ -222,29 +222,29 @@ export default function MapaPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
-            <div className="text-sm text-slate-500">Jobs no Mapa</div>
+            <div className="text-sm text-slate-500">Jobs on Map</div>
             <div className="text-2xl font-bold">{jobsWithCoords.length}</div>
-            <div className="text-xs text-slate-400">de {filteredJobs.length} total</div>
+            <div className="text-xs text-slate-400">of {filteredJobs.length} total</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-sm text-slate-500">Agendados</div>
+            <div className="text-sm text-slate-500">Scheduled</div>
             <div className="text-2xl font-bold text-blue-600">{statusCounts.scheduled}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-sm text-slate-500">Confirmados</div>
+            <div className="text-sm text-slate-500">Confirmed</div>
             <div className="text-2xl font-bold text-green-600">{statusCounts.got_the_job}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-4">
-            <div className="text-sm text-slate-500">Valor Total</div>
+            <div className="text-sm text-slate-500">Total Value</div>
             <div className="text-xl font-bold text-emerald-600">{formatCurrency(totalValue)}</div>
           </CardContent>
         </Card>
@@ -253,18 +253,21 @@ export default function MapaPage() {
       {/* Legend */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Legenda - Equipes</CardTitle>
+          <CardTitle className="text-sm font-medium">Legend - Crews</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
             {subcontractors.map(sub => (
               <div key={sub.id} className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded-full ${sub.color || 'bg-gray-500'}`} />
+                <div
+                  className="w-4 h-4 rounded-full"
+                  style={{ backgroundColor: sub.color || '#6b7280' }}
+                />
                 <span className="text-sm">{sub.name}</span>
               </div>
             ))}
             {subcontractors.length === 0 && (
-              <span className="text-sm text-slate-500">Nenhum subcontratado cadastrado</span>
+              <span className="text-sm text-slate-500">No subcontractors registered</span>
             )}
           </div>
         </CardContent>
@@ -278,10 +281,10 @@ export default function MapaPage() {
               <MapPin className="w-5 h-5 text-yellow-600 mt-0.5" />
               <div>
                 <div className="font-medium text-yellow-800">
-                  {filteredJobs.length - jobsWithCoords.length} trabalhos sem coordenadas
+                  {filteredJobs.length - jobsWithCoords.length} jobs without coordinates
                 </div>
                 <div className="text-sm text-yellow-700">
-                  Adicione latitude e longitude aos trabalhos para visualizá-los no mapa.
+                  Add address with city and state to jobs to display them on the map.
                 </div>
               </div>
             </div>
