@@ -477,7 +477,15 @@ export default function VendasPage() {
       {/* Weekly Goals Reference */}
       <Card className="bg-slate-50">
         <CardContent className="p-4">
-          <h3 className="font-semibold text-slate-700 mb-2">Metas Semanais</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-slate-700">Metas Semanais</h3>
+            <a href="/goals" className="text-sm text-blue-600 hover:underline">
+              Editar em Metas →
+            </a>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            Baseado em: Meta de {formatCurrency(vto.annualTarget)} / {vto.formulaParams.productionWeeks} semanas
+          </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-slate-500">Leads:</span>
