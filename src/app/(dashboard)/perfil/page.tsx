@@ -31,6 +31,7 @@ export default function PerfilPage() {
         const stored = localStorage.getItem('paintpro_user');
         if (stored) {
             const user = JSON.parse(stored);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setProfile({
                 name: user.name || '',
                 email: user.email || '',

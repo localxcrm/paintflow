@@ -226,7 +226,7 @@ export default function SopEditor({ article, isNew = true }: SopEditorProps) {
   };
 
   // Save article
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim()) {
       toast.error('Preencha o titulo');
       return;
@@ -239,44 +239,46 @@ export default function SopEditor({ article, isNew = true }: SopEditorProps) {
     setIsSaving(true);
 
     try {
-      const saved = localStorage.getItem('paintpro_knowledge');
-      const articles: Article[] = saved ? JSON.parse(saved) : [];
-      const now = new Date().toISOString();
+      const articleData = {
+        title,
+        category,
+        content,
+        checklist,
+        images,
+        videoUrl,
+      };
 
       if (isNew) {
-        // Create new article
-        const newArticle: Article = {
-          id: Date.now().toString(),
-          title,
-          category,
-          content,
-          checklist,
-          images,
-          videoUrl,
-          createdAt: now,
-          updatedAt: now,
-        };
-        articles.push(newArticle);
+        // Create new article via API
+        const res = await fetch('/api/knowledge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(articleData),
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to create article');
+        }
+
         toast.success('SOP criado com sucesso!');
       } else if (article) {
-        // Update existing article
-        const index = articles.findIndex((a) => a.id === article.id);
-        if (index !== -1) {
-          articles[index] = {
-            ...articles[index],
-            title,
-            category,
-            content,
-            checklist,
-            images,
-            videoUrl,
-            updatedAt: now,
-          };
+        // Update existing article via API
+        const res = await fetch('/api/knowledge', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: article.id,
+            ...articleData,
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to update article');
         }
+
         toast.success('SOP atualizado com sucesso!');
       }
 
-      localStorage.setItem('paintpro_knowledge', JSON.stringify(articles));
       router.push('/conhecimento');
     } catch (error) {
       toast.error('Erro ao salvar SOP');

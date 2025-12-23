@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { Lead, BusinessSettings } from '@/types';
 
 // Initialize OpenAI client
 export const openai = new OpenAI({
@@ -97,13 +98,13 @@ Be conversational, helpful, and thorough. Always aim to gather complete informat
 // Helper function to create chat completion
 export async function createChatCompletion(
   messages: { role: string; content: string }[],
-  priceBookContext: any,
+  priceBookContext: Record<string, unknown>, // Using unknown instead of any
   additionalContext?: {
-    availableLeads?: any[];
-    businessSettings?: any;
+    availableLeads?: Lead[];
+    businessSettings?: BusinessSettings;
   }
 ) {
-  const systemMessages: any[] = [
+  const systemMessages: { role: string; content: string }[] = [
     {
       role: 'system',
       content: ESTIMATOR_SYSTEM_PROMPT
@@ -150,10 +151,11 @@ export async function createChatCompletion(
     model: 'gpt-4-turbo-preview',
     messages: [
       ...systemMessages,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...messages
-    ],
+    ] as any, // Cast to any because OpenAI types can be strict with array spread
     temperature: 0.7,
-    max_tokens: 2000, // Increased to handle more detailed responses
+    max_tokens: 2000,
   });
 
   return response.choices[0].message.content;

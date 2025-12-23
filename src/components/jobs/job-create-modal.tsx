@@ -77,6 +77,7 @@ export function JobCreateModal({
         const grossProfit = jobValue - subTotal;
 
         const newJob: Job = {
+            // eslint-disable-next-line react-hooks/purity
             id: Date.now().toString(),
             jobNumber: `JOB-${Date.now().toString().slice(-6)}`,
             clientName: formData.clientName,

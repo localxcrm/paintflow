@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { hashPassword, createSession } from '@/lib/auth';
+import { hashPassword, createSession, createOrganization } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import type { User } from '@/types/database';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, name } = body;
+    const { email, password, name, companyName } = body;
 
     // Validation
     if (!email || !password || !name) {
@@ -47,7 +47,6 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase(),
         passwordHash: hashPassword(password),
         name,
-        role: 'user',
       })
       .select()
       .single<User>();
@@ -56,13 +55,28 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to create user');
     }
 
-    // Create session
-    const session = await createSession(user.id);
+    // Create organization for user (auto-create on registration)
+    const orgName = companyName || `${name}'s Company`;
+    const org = await createOrganization(orgName, user.id, email);
 
-    // Set cookie
+    // Create session with organization
+    const session = await createSession(user.id, org.id);
+
+    // Set cookies
     const cookieStore = await cookies();
+
+    // Session cookie
     cookieStore.set('paintpro_session', session.token, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      expires: new Date(session.expiresAt),
+      path: '/',
+    });
+
+    // Organization cookie
+    cookieStore.set('paintpro_org_id', org.id, {
+      httpOnly: false, // Allow client-side access
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       expires: new Date(session.expiresAt),
@@ -74,7 +88,13 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+      },
+      organization: {
+        id: org.id,
+        name: orgName,
+        slug: org.slug,
+        plan: 'free',
+        role: 'owner',
       },
       message: 'Account created successfully',
     });

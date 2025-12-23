@@ -11,12 +11,16 @@ import {
   TrendingUp,
   BookOpen,
   PaintBucket,
+  Calendar,
+  MapPin,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
   { href: '/goals', label: 'Metas', icon: Target },
   { href: '/jobs', label: 'Trabalhos', icon: Briefcase },
+  { href: '/calendario', label: 'Calendário', icon: Calendar },
+  { href: '/mapa', label: 'Mapa', icon: MapPin },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/vendas', label: 'Vendas', icon: TrendingUp },
   { href: '/conhecimento', label: 'Conhecimento', icon: BookOpen },

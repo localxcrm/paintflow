@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Save, TrendingUp, Users, FileText, DollarSign } from 'lucide-react';
+import { Save, TrendingUp, Users, FileText, DollarSign, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MarketingChannel {
@@ -172,54 +172,38 @@ export default function VendasPage() {
   const weeks = getWeeksInMonth(selectedYear, selectedMonth);
   const goals = calculateGoals(vto.annualTarget, vto.formulaParams);
 
-  // Load VTO and Channels settings from localStorage
+  // Load VTO and Settings from Supabase
   useEffect(() => {
-    // VTO
-    const savedVto = localStorage.getItem('paintpro_vto');
-    if (savedVto) {
+    const loadSettings = async () => {
       try {
-        const parsed = JSON.parse(savedVto);
-        setVto({
-          ...defaultVTO,
-          ...parsed,
-          formulaParams: {
-            ...defaultVTO.formulaParams,
-            ...parsed.formulaParams,
-          },
-        });
-      } catch (e) {
-        console.error('Error loading VTO:', e);
-      }
-    }
+        // Load VTO
+        const vtoRes = await fetch('/api/vto');
+        if (vtoRes.ok) {
+          const vtoData = await vtoRes.json();
+          setVto({
+            ...defaultVTO,
+            ...vtoData,
+            formulaParams: {
+              ...defaultVTO.formulaParams,
+              ...vtoData.formulaParams,
+            },
+          });
+        }
 
-    // Settings (Channels)
-    const savedSettings = localStorage.getItem('paintflow_settings');
-    if (savedSettings) {
-      try {
-        const parsed = JSON.parse(savedSettings);
-        if (parsed.marketingChannels && parsed.marketingChannels.length > 0) {
-          setAvailableChannels(parsed.marketingChannels);
+        // Load Settings (Channels)
+        const settingsRes = await fetch('/api/settings');
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData.marketingChannels && settingsData.marketingChannels.length > 0) {
+            setAvailableChannels(settingsData.marketingChannels);
+          }
         }
       } catch (e) {
         console.error('Error loading settings:', e);
       }
-    }
-  }, []);
+    };
 
-  // Load entries (simulating local storage persistence for historical data for now)
-  useEffect(() => {
-    // In a real app, this would fetch from DB based on month/year
-    const savedEntries = localStorage.getItem('paintflow_sales_entries');
-    if (savedEntries) {
-      try {
-        const parsed = JSON.parse(savedEntries);
-        // Filter for current month/year view if needed, but for now we just load all
-        // to simplify the "save" logic finding existing entries
-        setEntries(parsed);
-      } catch (e) {
-        console.error('Error loading entries:', e);
-      }
-    }
+    loadSettings();
   }, []);
 
   // Initialize or update currentChannelData when week changes or channels load
@@ -259,11 +243,13 @@ export default function VendasPage() {
   }, [selectedMonth, selectedYear]);
 
   const fetchEntries = async () => {
-    // TODO: Fetch from API
     setIsLoading(true);
     try {
-      // Simulated data for now
-      setEntries([]);
+      const res = await fetch(`/api/weekly-sales?year=${selectedYear}&month=${selectedMonth}`);
+      if (res.ok) {
+        const data = await res.json();
+        setEntries(data.entries || []);
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -292,25 +278,28 @@ export default function VendasPage() {
         { leads: 0, estimates: 0, sales: 0, revenue: 0 }
       );
 
-      // Create or update entry
-      const newEntry: WeeklyEntry = {
-        id: entries.find(e => e.weekStart === selectedWeek)?.id || Date.now().toString(),
-        weekStart: selectedWeek,
-        ...totals,
-        channels: currentChannelData,
-        createdAt: new Date().toISOString(),
-      };
+      // Save to Supabase via API
+      const res = await fetch('/api/weekly-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekStart: selectedWeek.split('T')[0],
+          ...totals,
+          channels: currentChannelData,
+        }),
+      });
 
-      // Update entries list
-      const updatedEntries = [
-        ...entries.filter(e => e.weekStart !== selectedWeek),
-        newEntry
-      ];
+      if (!res.ok) {
+        throw new Error('Failed to save');
+      }
 
-      setEntries(updatedEntries);
+      const savedEntry = await res.json();
 
-      // Persist to local storage
-      localStorage.setItem('paintflow_sales_entries', JSON.stringify(updatedEntries));
+      // Update local entries list
+      setEntries(prev => [
+        ...prev.filter(e => e.weekStart !== selectedWeek && e.weekStart !== selectedWeek.split('T')[0]),
+        savedEntry
+      ]);
 
       toast.success('Dados da semana salvos!');
     } catch (error) {

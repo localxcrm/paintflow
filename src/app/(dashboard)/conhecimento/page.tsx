@@ -189,27 +189,52 @@ export default function ConhecimentoPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load from localStorage
+  // Load from Supabase
   useEffect(() => {
-    const saved = localStorage.getItem('paintpro_knowledge');
-    if (saved) {
+    const loadArticles = async () => {
       try {
-        setArticles(JSON.parse(saved));
-      } catch {
+        const res = await fetch('/api/knowledge');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.articles && data.articles.length > 0) {
+            setArticles(data.articles);
+          } else {
+            // Use sample articles if none exist
+            setArticles(sampleArticles);
+          }
+        } else {
+          setArticles(sampleArticles);
+        }
+      } catch (error) {
+        console.error('Error loading articles:', error);
         setArticles(sampleArticles);
-        localStorage.setItem('paintpro_knowledge', JSON.stringify(sampleArticles));
+      } finally {
+        setIsLoading(false);
       }
-    } else {
-      setArticles(sampleArticles);
-      localStorage.setItem('paintpro_knowledge', JSON.stringify(sampleArticles));
-    }
+    };
+
+    loadArticles();
   }, []);
 
-  // Save to localStorage
-  const saveArticles = (newArticles: Article[]) => {
-    localStorage.setItem('paintpro_knowledge', JSON.stringify(newArticles));
-    setArticles(newArticles);
+  // Save article to Supabase
+  const saveArticle = async (article: Article) => {
+    try {
+      const res = await fetch('/api/knowledge', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(article),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setArticles(prev => prev.map(a => a.id === updated.id ? updated : a));
+        return updated;
+      }
+    } catch (error) {
+      console.error('Error saving article:', error);
+    }
+    return null;
   };
 
   // Filter articles
@@ -222,31 +247,45 @@ export default function ConhecimentoPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este SOP?')) {
-      saveArticles(articles.filter((a) => a.id !== id));
-      setSelectedArticle(null);
-      toast.success('SOP excluido');
+      try {
+        const res = await fetch(`/api/knowledge?id=${id}`, {
+          method: 'DELETE',
+        });
+        if (res.ok) {
+          setArticles(prev => prev.filter(a => a.id !== id));
+          setSelectedArticle(null);
+          toast.success('SOP excluido');
+        } else {
+          toast.error('Erro ao excluir SOP');
+        }
+      } catch (error) {
+        console.error('Error deleting article:', error);
+        toast.error('Erro ao excluir SOP');
+      }
     }
   };
 
-  const toggleChecklistItem = (articleId: string, itemId: string) => {
-    const updated = articles.map((a) => {
-      if (a.id === articleId) {
-        return {
-          ...a,
-          checklist: a.checklist.map((item) =>
-            item.id === itemId ? { ...item, checked: !item.checked } : item
-          ),
-        };
-      }
-      return a;
-    });
-    saveArticles(updated);
+  const toggleChecklistItem = async (articleId: string, itemId: string) => {
+    const article = articles.find(a => a.id === articleId);
+    if (!article) return;
+
+    const updatedArticle = {
+      ...article,
+      checklist: article.checklist.map((item) =>
+        item.id === itemId ? { ...item, checked: !item.checked } : item
+      ),
+    };
+
+    // Update locally first for instant feedback
+    setArticles(prev => prev.map(a => a.id === articleId ? updatedArticle : a));
     if (selectedArticle?.id === articleId) {
-      const updatedArticle = updated.find((a) => a.id === articleId);
-      if (updatedArticle) setSelectedArticle(updatedArticle);
+      setSelectedArticle(updatedArticle);
     }
+
+    // Then save to API
+    await saveArticle(updatedArticle);
   };
 
   const getCategoryInfo = (categoryId: string) => {

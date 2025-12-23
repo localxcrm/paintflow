@@ -29,31 +29,35 @@ export default function EditarSopPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const id = params.id as string;
-    if (!id) {
-      router.push('/conhecimento');
-      return;
-    }
+    const loadArticle = async () => {
+      const id = params.id as string;
+      if (!id) {
+        router.push('/conhecimento');
+        return;
+      }
 
-    try {
-      const saved = localStorage.getItem('paintpro_knowledge');
-      if (saved) {
-        const articles: Article[] = JSON.parse(saved);
-        const found = articles.find((a) => a.id === id);
-        if (found) {
-          setArticle(found);
+      try {
+        const res = await fetch('/api/knowledge');
+        if (res.ok) {
+          const data = await res.json();
+          const found = data.articles?.find((a: Article) => a.id === id);
+          if (found) {
+            setArticle(found);
+          } else {
+            router.push('/conhecimento');
+          }
         } else {
           router.push('/conhecimento');
         }
-      } else {
+      } catch (error) {
+        console.error('Error loading article:', error);
         router.push('/conhecimento');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading article:', error);
-      router.push('/conhecimento');
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    loadArticle();
   }, [params.id, router]);
 
   if (isLoading) {

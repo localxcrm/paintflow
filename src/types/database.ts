@@ -86,6 +86,7 @@ export interface Subcontractor {
   specialty: SubcontractorType;
   defaultPayoutPct: number;
   isActive: boolean;
+  color: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -163,6 +164,10 @@ export interface Job {
   clientName: string;
   address: string;
   city: string;
+  state: string | null;
+  zipCode: string | null;
+  latitude: number | null;
+  longitude: number | null;
   projectType: ProjectType;
   status: JobStatus;
   jobDate: string;
@@ -396,7 +401,7 @@ export interface AIMessage {
   id: string;
   role: AIRole;
   content: string;
-  suggestedLineItems: any | null;
+  suggestedLineItems: unknown | null;
   suggestedRiskModifiers: string[];
   createdAt: string;
   conversationId: string;

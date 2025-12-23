@@ -71,7 +71,7 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 // Create session for user
-export async function createSession(userId: string): Promise<Session> {
+export async function createSession(userId: string, organizationId?: string): Promise<Session> {
   const supabase = createServerSupabaseClient();
   const token = generateSessionToken();
   const expiresAt = getSessionExpiry();
@@ -81,6 +81,7 @@ export async function createSession(userId: string): Promise<Session> {
     .insert({
       token,
       userId,
+      organizationId: organizationId || null,
       expiresAt: expiresAt.toISOString(),
     })
     .select()
@@ -91,6 +92,121 @@ export async function createSession(userId: string): Promise<Session> {
   }
 
   return session;
+}
+
+// Update session with organization
+export async function updateSessionOrganization(token: string, organizationId: string): Promise<boolean> {
+  try {
+    const supabase = createServerSupabaseClient();
+
+    const { error } = await supabase
+      .from('Session')
+      .update({ organizationId })
+      .eq('token', token);
+
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Generate URL-safe slug from name
+export function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+    .replace(/[^a-z0-9]+/g, '-')     // Replace non-alphanumeric with dash
+    .replace(/^-+|-+$/g, '')         // Trim dashes from ends
+    .substring(0, 50);               // Limit length
+}
+
+// Create organization for new user
+export async function createOrganization(
+  name: string,
+  userId: string,
+  email?: string
+): Promise<{ id: string; slug: string }> {
+  const supabase = createServerSupabaseClient();
+
+  // Generate unique slug
+  let slug = generateSlug(name);
+  let slugSuffix = 0;
+
+  // Check if slug exists and add suffix if needed
+  while (true) {
+    const checkSlug = slugSuffix > 0 ? `${slug}-${slugSuffix}` : slug;
+    const { data: existing } = await supabase
+      .from('Organization')
+      .select('id')
+      .eq('slug', checkSlug)
+      .single();
+
+    if (!existing) {
+      slug = checkSlug;
+      break;
+    }
+    slugSuffix++;
+  }
+
+  // Create organization
+  const { data: org, error: orgError } = await supabase
+    .from('Organization')
+    .insert({
+      name,
+      slug,
+      email,
+      plan: 'free',
+    })
+    .select('id, slug')
+    .single();
+
+  if (orgError || !org) {
+    throw new Error('Failed to create organization');
+  }
+
+  // Link user to organization as owner
+  const { error: linkError } = await supabase
+    .from('UserOrganization')
+    .insert({
+      userId,
+      organizationId: org.id,
+      role: 'owner',
+      isDefault: true,
+    });
+
+  if (linkError) {
+    // Rollback org creation
+    await supabase.from('Organization').delete().eq('id', org.id);
+    throw new Error('Failed to link user to organization');
+  }
+
+  // Create default VTO for organization
+  await supabase.from('VTO').insert({
+    organizationId: org.id,
+    annualTarget: 1000000,
+    formulaParams: {
+      avgTicket: 3500,
+      closeRate: 0.35,
+      showRate: 0.70,
+      leadToEstimate: 0.85,
+    },
+  });
+
+  // Create default business settings
+  await supabase.from('BusinessSettings').insert({
+    organizationId: org.id,
+    companyName: name,
+    email,
+    marketingChannels: [
+      { id: 'meta', label: 'Meta Ads', color: '#1877F2' },
+      { id: 'google', label: 'Google Ads', color: '#EA4335' },
+      { id: 'indicacao', label: 'Indicação', color: '#10B981' },
+      { id: 'organico', label: 'Orgânico', color: '#8B5CF6' },
+    ],
+  });
+
+  return { id: org.id, slug };
 }
 
 // Delete session

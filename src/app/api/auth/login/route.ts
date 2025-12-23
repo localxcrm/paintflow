@@ -55,10 +55,47 @@ export async function POST(request: NextRequest) {
       .update({ lastLoginAt: new Date().toISOString() })
       .eq('id', user.id);
 
-    // Create session
-    const session = await createSession(user.id);
+    // Get user's organizations
+    const { data: userOrgs } = await supabase
+      .from('UserOrganization')
+      .select(`
+        role,
+        isDefault,
+        Organization:organizationId (
+          id,
+          name,
+          slug,
+          plan,
+          isActive
+        )
+      `)
+      .eq('userId', user.id);
 
-    // Set cookie
+    // Map organizations
+    const organizations = (userOrgs || [])
+      .filter((uo: Record<string, unknown>) => {
+        const org = uo.Organization as { isActive: boolean } | null;
+        return org && org.isActive;
+      })
+      .map((uo: Record<string, unknown>) => {
+        const org = uo.Organization as { id: string; name: string; slug: string; plan: string };
+        return {
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+          plan: org.plan,
+          role: uo.role as string,
+          isDefault: uo.isDefault as boolean,
+        };
+      });
+
+    // Find default organization
+    const defaultOrg = organizations.find(o => o.isDefault) || organizations[0];
+
+    // Create session with organization if available
+    const session = await createSession(user.id, defaultOrg?.id);
+
+    // Set session cookie
     const cookieStore = await cookies();
     cookieStore.set('paintpro_session', session.token, {
       httpOnly: true,
@@ -68,13 +105,26 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
+    // Set organization cookie if available
+    if (defaultOrg) {
+      cookieStore.set('paintpro_org_id', defaultOrg.id, {
+        httpOnly: false, // Allow client-side access
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        expires: new Date(session.expiresAt),
+        path: '/',
+      });
+    }
+
     return NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
       },
+      organizations,
+      currentOrganization: defaultOrg || null,
+      needsOrgSelection: organizations.length > 1 || organizations.length === 0,
       message: 'Login successful',
     });
   } catch (error) {

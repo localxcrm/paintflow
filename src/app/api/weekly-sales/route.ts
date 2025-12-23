@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
 
-// GET /api/marketing-spend - Get marketing spend with optional filtering
+// GET /api/weekly-sales - Get weekly sales entries for organization
 export async function GET(request: NextRequest) {
   try {
     const organizationId = getOrganizationIdFromRequest(request);
@@ -11,54 +11,41 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
-    const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : new Date().getFullYear();
-    const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : null;
-    const source = searchParams.get('source');
+    const year = searchParams.get('year');
+    const month = searchParams.get('month');
 
     let query = supabase
-      .from('MarketingSpend')
+      .from('WeeklySales')
       .select('*')
       .eq('organizationId', organizationId)
-      .eq('year', year)
-      .order('year', { ascending: false })
-      .order('month', { ascending: false })
-      .order('source', { ascending: true });
+      .order('weekStart', { ascending: false });
 
-    if (month) {
-      query = query.eq('month', month);
+    // Filter by year if provided
+    if (year) {
+      const startDate = new Date(parseInt(year), month ? parseInt(month) : 0, 1);
+      const endDate = new Date(parseInt(year), month ? parseInt(month) + 1 : 12, 0);
+      query = query
+        .gte('weekStart', startDate.toISOString().split('T')[0])
+        .lte('weekStart', endDate.toISOString().split('T')[0]);
     }
 
-    if (source) {
-      query = query.eq('source', source);
+    const { data: entries, error } = await query;
+
+    if (error) {
+      throw error;
     }
 
-    const { data: spends, error } = await query;
-    if (error) throw error;
-
-    // Calculate totals by source
-    const totalBySource = (spends || []).reduce((acc, item) => {
-      acc[item.source] = (acc[item.source] || 0) + item.amount;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const grandTotal = (Object.values(totalBySource) as number[]).reduce((sum, val) => sum + val, 0);
-
-    return NextResponse.json({
-      spends: spends || [],
-      totalBySource,
-      grandTotal,
-      year,
-    });
+    return NextResponse.json({ entries: entries || [] });
   } catch (error) {
-    console.error('Error fetching marketing spend:', error);
+    console.error('Error fetching weekly sales:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch marketing spend' },
+      { error: 'Failed to fetch weekly sales' },
       { status: 500 }
     );
   }
 }
 
-// POST /api/marketing-spend - Create or update marketing spend
+// POST /api/weekly-sales - Create or update a weekly sales entry
 export async function POST(request: NextRequest) {
   try {
     const organizationId = getOrganizationIdFromRequest(request);
@@ -69,59 +56,72 @@ export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient();
     const body = await request.json();
 
-    // Check if record exists for this organization
-    const { data: existing } = await supabase
-      .from('MarketingSpend')
+    if (!body.weekStart) {
+      return NextResponse.json(
+        { error: 'weekStart is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if entry for this week already exists for this organization
+    const { data: existingEntry } = await supabase
+      .from('WeeklySales')
       .select('id')
       .eq('organizationId', organizationId)
-      .eq('month', body.month)
-      .eq('year', body.year)
-      .eq('source', body.source)
+      .eq('weekStart', body.weekStart)
       .single();
 
     let result;
-    if (existing) {
+
+    if (existingEntry) {
+      // Update existing entry
       const { data, error } = await supabase
-        .from('MarketingSpend')
+        .from('WeeklySales')
         .update({
-          amount: body.amount,
           leads: body.leads || 0,
-          notes: body.notes,
+          estimates: body.estimates || 0,
+          sales: body.sales || 0,
+          revenue: body.revenue || 0,
+          channels: body.channels || {},
+          updatedAt: new Date().toISOString(),
         })
-        .eq('id', existing.id)
+        .eq('id', existingEntry.id)
         .select()
         .single();
+
       if (error) throw error;
       result = data;
     } else {
+      // Create new entry
       const { data, error } = await supabase
-        .from('MarketingSpend')
+        .from('WeeklySales')
         .insert({
           organizationId,
-          source: body.source,
-          amount: body.amount,
+          weekStart: body.weekStart,
           leads: body.leads || 0,
-          month: body.month,
-          year: body.year,
-          notes: body.notes,
+          estimates: body.estimates || 0,
+          sales: body.sales || 0,
+          revenue: body.revenue || 0,
+          channels: body.channels || {},
         })
         .select()
         .single();
+
       if (error) throw error;
       result = data;
     }
 
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Error saving marketing spend:', error);
+    console.error('Error saving weekly sales:', error);
     return NextResponse.json(
-      { error: 'Failed to save marketing spend' },
+      { error: 'Failed to save weekly sales' },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/marketing-spend - Delete marketing spend
+// DELETE /api/weekly-sales - Delete a weekly sales entry
 export async function DELETE(request: NextRequest) {
   try {
     const organizationId = getOrganizationIdFromRequest(request);
@@ -140,19 +140,22 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Ensure entry belongs to this organization
     const { error } = await supabase
-      .from('MarketingSpend')
+      .from('WeeklySales')
       .delete()
       .eq('id', id)
       .eq('organizationId', organizationId);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting marketing spend:', error);
+    console.error('Error deleting weekly sales:', error);
     return NextResponse.json(
-      { error: 'Failed to delete marketing spend' },
+      { error: 'Failed to delete weekly sales' },
       { status: 500 }
     );
   }

@@ -76,6 +76,7 @@ export function JobDetailModal({
 
   useEffect(() => {
     if (job) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditedJob({ ...job });
     }
   }, [job]);
@@ -661,10 +662,10 @@ export function JobDetailModal({
                       >
                         <div className="flex items-center gap-3">
                           <div className={`w-2 h-2 rounded-full ${payment.type === 'deposit' ? 'bg-blue-500' :
-                              payment.type === 'final_payment' ? 'bg-green-500' :
-                                payment.type === 'sales_commission' ? 'bg-purple-500' :
-                                  payment.type === 'pm_commission' ? 'bg-orange-500' :
-                                    'bg-slate-500'
+                            payment.type === 'final_payment' ? 'bg-green-500' :
+                              payment.type === 'sales_commission' ? 'bg-purple-500' :
+                                payment.type === 'pm_commission' ? 'bg-orange-500' :
+                                  'bg-slate-500'
                             }`} />
                           <div>
                             <p className="font-medium">
