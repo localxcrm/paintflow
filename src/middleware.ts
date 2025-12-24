@@ -4,19 +4,28 @@ import type { NextRequest } from 'next/server';
 // Cookie names (must match supabase.ts)
 const SESSION_COOKIE = 'paintpro_session';
 const ORG_COOKIE = 'paintpro_org_id';
+const SUB_SESSION_COOKIE = 'paintpro_sub_session';
 
 // Routes that don't require authentication
 const publicRoutes = [
   '/',
+  '/login',
   '/register',
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/logout',
+  // Subcontractor public routes
+  '/sub/login',
+  '/sub/register',
+  '/api/sub/login',
+  '/api/sub/register',
 ];
 
 // Routes that start with these paths are public
 const publicPathPrefixes = [
   '/api/estimates/', // Allow public estimate viewing/signing
+  '/api/os/',        // Allow public OS viewing (via token)
+  '/os/',            // Public OS page
   '/_next',
   '/favicon',
 ];
@@ -27,6 +36,13 @@ const authOnlyRoutes = [
   '/criar-organizacao',
   '/api/organizations',
   '/api/user/organizations',
+  '/admin',
+];
+
+// Subcontractor routes - require sub session only
+const subRoutes = [
+  '/sub/',
+  '/api/sub/',
 ];
 
 export function middleware(request: NextRequest) {
@@ -41,7 +57,30 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for session cookie
+  // Check if it's a subcontractor route
+  const isSubRoute = subRoutes.some(prefix => pathname.startsWith(prefix));
+
+  if (isSubRoute) {
+    // Subcontractor routes need sub session
+    const subSessionToken = request.cookies.get(SUB_SESSION_COOKIE)?.value;
+
+    if (!subSessionToken) {
+      // No sub session
+      if (pathname.startsWith('/api/sub/')) {
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
+      // Redirect to sub login
+      return NextResponse.redirect(new URL('/sub/login', request.url));
+    }
+
+    // Sub session exists, allow the request
+    return NextResponse.next();
+  }
+
+  // Regular admin routes - check for session cookie
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
 
   // If no session and trying to access protected route

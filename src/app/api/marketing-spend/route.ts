@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
+import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 
 // GET /api/marketing-spend - Get marketing spend with optional filtering
 export async function GET(request: NextRequest) {
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       .eq('month', body.month)
       .eq('year', body.year)
       .eq('source', body.source)
-      .single();
+      .maybeSingle();
 
     let result;
     if (existing) {

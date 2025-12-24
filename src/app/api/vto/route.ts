@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
+import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
+import { DEFAULT_VTO_SETTINGS } from '@/lib/utils/goal-calculations';
 
 // GET /api/vto - Get VTO data for organization
 export async function GET(request: NextRequest) {
@@ -33,13 +34,10 @@ export async function GET(request: NextRequest) {
         oneYearPlan: { revenue: '', profit: '', goals: [] },
         quarterlyRocks: [],
         issuesList: [],
-        annualTarget: 1000000,
-        formulaParams: {
-          avgTicket: 3500,
-          closeRate: 0.35,
-          showRate: 0.70,
-          leadToEstimate: 0.85,
-        },
+        annualTarget: DEFAULT_VTO_SETTINGS.annualTarget,
+        formulaParams: { ...DEFAULT_VTO_SETTINGS.formulaParams },
+        oneYearVision: '',
+        oneYearGoals: [],
       });
     }
 
@@ -87,6 +85,8 @@ export async function POST(request: NextRequest) {
           issuesList: body.issuesList,
           annualTarget: body.annualTarget,
           formulaParams: body.formulaParams,
+          oneYearVision: body.oneYearVision,
+          oneYearGoals: body.oneYearGoals,
           updatedAt: new Date().toISOString(),
         })
         .eq('id', existingVto.id)
@@ -108,13 +108,10 @@ export async function POST(request: NextRequest) {
           oneYearPlan: body.oneYearPlan || { revenue: '', profit: '', goals: [] },
           quarterlyRocks: body.quarterlyRocks || [],
           issuesList: body.issuesList || [],
-          annualTarget: body.annualTarget || 1000000,
-          formulaParams: body.formulaParams || {
-            avgTicket: 3500,
-            closeRate: 0.35,
-            showRate: 0.70,
-            leadToEstimate: 0.85,
-          },
+          annualTarget: body.annualTarget || DEFAULT_VTO_SETTINGS.annualTarget,
+          formulaParams: body.formulaParams || { ...DEFAULT_VTO_SETTINGS.formulaParams },
+          oneYearVision: body.oneYearVision || '',
+          oneYearGoals: body.oneYearGoals || [],
         })
         .select()
         .single();

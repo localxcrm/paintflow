@@ -24,7 +24,8 @@ import {
   getStatusColor,
   getProfitFlagColor,
 } from '@/lib/utils/job-calculations';
-import { MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Trash2, FileText } from 'lucide-react';
+import Link from 'next/link';
 
 interface JobTableProps {
   jobs: Job[];
@@ -176,6 +177,12 @@ export function JobTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/jobs/${job.id}`} className="gap-2">
+                          <FileText className="h-4 w-4" />
+                          Página do Job
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem className="gap-2" onClick={() => onJobClick(job)}>
                         <Eye className="h-4 w-4" />
                         Ver Detalhes

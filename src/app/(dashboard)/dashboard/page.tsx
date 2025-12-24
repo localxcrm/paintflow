@@ -22,53 +22,13 @@ import {
 import Link from 'next/link';
 import { useRocks } from '@/hooks/useRocks';
 import { mockJobs } from '@/lib/mock-data';
-import { Job } from '@/types';
-
-// Calculate goals based on annual revenue target and formula params
-interface FormulaParams {
-  avgTicket: number;
-  closingRate: number;
-  marketingPercent: number;
-  productionWeeks: number;
-}
-
-function calculateGoals(annualTarget: number, params: FormulaParams) {
-  const { avgTicket, closingRate, marketingPercent, productionWeeks } = params;
-
-  const jobsPerYear = Math.round(annualTarget / avgTicket);
-  const jobsPerWeek = jobsPerYear / productionWeeks;
-  const leadsPerYear = Math.round(jobsPerYear / (closingRate / 100));
-  const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
-  const revenuePerWeek = annualTarget / productionWeeks;
-  const marketingAnnual = annualTarget * (marketingPercent / 100);
-
-  return {
-    annual: {
-      revenue: annualTarget,
-      jobs: jobsPerYear,
-      leads: leadsPerYear,
-      marketing: marketingAnnual,
-    },
-    monthly: {
-      revenue: Math.round(annualTarget / 12),
-      jobs: Math.round(jobsPerYear / 12),
-      leads: Math.round(leadsPerYear / 12),
-      marketing: Math.round(marketingAnnual / 12),
-    },
-    weekly: {
-      revenue: Math.round(revenuePerWeek),
-      jobs: Math.round(jobsPerWeek * 10) / 10,
-      leads: leadsPerWeek,
-      marketing: Math.round(marketingAnnual / 52),
-    },
-    quarterly: {
-      revenue: Math.round(annualTarget / 4),
-      jobs: Math.round(jobsPerYear / 4),
-      leads: Math.round(leadsPerYear / 4),
-      marketing: Math.round(marketingAnnual / 4),
-    },
-  };
-}
+import {
+  calculateGoals,
+  formatCurrency as formatCurrencyUtil,
+  VTOSettings,
+  DEFAULT_VTO_SETTINGS,
+  CalculatedGoals,
+} from '@/lib/utils/goal-calculations';
 
 interface DashboardData {
   leads: { total: number; goal: number };
@@ -78,24 +38,9 @@ interface DashboardData {
   reviews: { total: number; goal: number; avgRating: number };
 }
 
-interface VTOSettings {
-  annualTarget: number;
-  formulaParams: FormulaParams;
-}
-
-const defaultSettings: VTOSettings = {
-  annualTarget: 1000000,
-  formulaParams: {
-    avgTicket: 9500,
-    closingRate: 30,
-    marketingPercent: 8,
-    productionWeeks: 35,
-  },
-};
-
 export default function DashboardPage() {
   const [period, setPeriod] = useState('month');
-  const [settings, setSettings] = useState<VTOSettings>(defaultSettings);
+  const [settings, setSettings] = useState<VTOSettings>(DEFAULT_VTO_SETTINGS);
   const [ytdRevenue, setYtdRevenue] = useState(0);
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,36 +51,39 @@ export default function DashboardPage() {
 
   const goals = calculateGoals(settings.annualTarget, settings.formulaParams);
 
-  const getGoalsForPeriod = () => {
+  const getGoalsForPeriod = (g: CalculatedGoals) => {
     switch (period) {
       case 'week':
-        return goals.weekly;
+        return g.weekly;
       case 'quarter':
-        return goals.quarterly;
+        return g.quarterly;
       default:
-        return goals.monthly;
+        return g.monthly;
     }
   };
 
-  const periodGoals = getGoalsForPeriod();
+  const periodGoals = getGoalsForPeriod(goals);
 
-  // Load VTO settings from localStorage
+  // Load VTO settings from API (single source of truth)
   useEffect(() => {
-    const saved = localStorage.getItem('paintpro_vto');
-    if (saved) {
+    const fetchVTO = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        setSettings({
-          annualTarget: parsed.annualTarget || defaultSettings.annualTarget,
-          formulaParams: {
-            ...defaultSettings.formulaParams,
-            ...parsed.formulaParams,
-          },
-        });
+        const res = await fetch('/api/vto');
+        if (res.ok) {
+          const data = await res.json();
+          setSettings({
+            annualTarget: data.annualTarget || DEFAULT_VTO_SETTINGS.annualTarget,
+            formulaParams: {
+              ...DEFAULT_VTO_SETTINGS.formulaParams,
+              ...data.formulaParams,
+            },
+          });
+        }
       } catch (e) {
         console.error('Error loading VTO settings:', e);
       }
-    }
+    };
+    fetchVTO();
   }, []);
 
   useEffect(() => {
@@ -185,15 +133,8 @@ export default function DashboardPage() {
   const periodLabel =
     period === 'week' ? 'Esta Semana' : period === 'month' ? 'Este Mes' : 'Este Trimestre';
 
-  const formatCurrency = (value: number, compact = false) => {
-    if (compact && value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    }
-    if (compact && value >= 1000) {
-      return `$${(value / 1000).toFixed(0)}K`;
-    }
-    return `$${value.toLocaleString('en-US')}`;
-  };
+  // Use centralized formatCurrency
+  const formatCurrency = formatCurrencyUtil;
 
   const vtoProgress = settings.annualTarget > 0 ? (ytdRevenue / settings.annualTarget) * 100 : 0;
 

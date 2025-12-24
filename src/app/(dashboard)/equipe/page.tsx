@@ -33,7 +33,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
     Users, Plus, Trash2, Mail, Phone, Percent, Wrench,
-    Shield, FileText, Pencil, Loader2
+    Shield, FileText, Pencil, Loader2, Calendar, Copy, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,12 +57,15 @@ interface Subcontractor {
     defaultPayoutPct?: number;
     color?: string;
     isActive: boolean;
+    calendarToken?: string;
 }
 
 const roleLabels: Record<string, string> = {
     sales: 'Vendedor',
     pm: 'Gerente de Projeto',
     both: 'Vendedor + PM',
+    admin: 'Office Admin',
+    owner: 'Dono (Owner)',
 };
 
 const specialtyLabels: Record<string, string> = {
@@ -111,6 +114,7 @@ export default function EquipePage() {
         defaultPayoutPct: 60,
         color: '#10B981',
     });
+    const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -491,6 +495,34 @@ export default function EquipePage() {
                                     Payout: {sub.defaultPayoutPct || 60}%
                                 </div>
                             </div>
+                            {/* Calendar Link */}
+                            {sub.calendarToken && (
+                                <div className="mt-3 pt-3 border-t">
+                                    <button
+                                        onClick={() => {
+                                            const url = `${window.location.origin}/api/calendar/${sub.calendarToken}`;
+                                            navigator.clipboard.writeText(url);
+                                            setCopiedToken(sub.id);
+                                            setTimeout(() => setCopiedToken(null), 2000);
+                                            toast.success('Link copiado! Envie para o subcontratado adicionar ao calendário.');
+                                        }}
+                                        className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 w-full"
+                                    >
+                                        {copiedToken === sub.id ? (
+                                            <>
+                                                <Check className="h-3 w-3" />
+                                                Link copiado!
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Calendar className="h-3 w-3" />
+                                                <span className="truncate">Copiar link do calendário</span>
+                                                <Copy className="h-3 w-3 ml-auto" />
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 ))}
@@ -560,6 +592,8 @@ export default function EquipePage() {
                                         <SelectItem value="sales">Vendedor</SelectItem>
                                         <SelectItem value="pm">Gerente de Projeto</SelectItem>
                                         <SelectItem value="both">Vendedor + PM</SelectItem>
+                                        <SelectItem value="admin">Office Admin</SelectItem>
+                                        <SelectItem value="owner">Dono (Owner)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

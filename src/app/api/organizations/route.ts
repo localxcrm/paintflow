@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, getSessionTokenFromRequest } from '@/lib/supabase';
+import { createServerSupabaseClient, getSessionTokenFromRequest } from '@/lib/supabase-server';
 import { createOrganization, updateSessionOrganization } from '@/lib/auth';
 import { cookies } from 'next/headers';
 

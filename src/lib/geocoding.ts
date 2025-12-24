@@ -19,18 +19,20 @@ interface GeocodingResult {
  * @param address Street address (e.g., "Rua das Flores, 123")
  * @param city City name (e.g., "Sao Paulo")
  * @param state Optional state (e.g., "SP")
+ * @param country Optional country (defaults to Brazil for PT-BR app)
  * @returns Coordinates or null if not found
  */
 export async function geocodeAddress(
   address: string,
   city: string,
-  state?: string | null
+  state?: string | null,
+  country?: string | null
 ): Promise<GeocodingResult | null> {
   try {
     // Build query string
     const parts = [address, city];
     if (state) parts.push(state);
-    parts.push('USA');
+    if (country) parts.push(country);
 
     const query = parts.join(', ');
     const url = `${NOMINATIM_URL}?q=${encodeURIComponent(query)}&format=json&limit=1`;

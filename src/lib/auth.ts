@@ -1,4 +1,5 @@
-import { createServerSupabaseClient } from './supabase';
+import { createServerSupabaseClient } from './supabase-server';
+import { ORG_COOKIE_NAME, SESSION_COOKIE_NAME } from './supabase';
 import { cookies } from 'next/headers';
 import type { User, Session, SessionWithUser } from '@/types/database';
 

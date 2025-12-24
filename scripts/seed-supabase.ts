@@ -17,6 +17,25 @@ async function seed() {
 
   try {
     // ============================================
+    // ORGANIZATION
+    // ============================================
+    console.log('🏢 Creating organization...');
+    const { data: org, error: orgError } = await supabase
+      .from('Organization')
+      .insert({
+        id: 'org_demo_001',
+        name: 'Demo Painting Co',
+        slug: 'demo-painting',
+        plan: 'pro'
+      })
+      .select()
+      .single();
+
+    if (orgError) throw orgError;
+    const orgId = org.id;
+    console.log(`✅ Organization created: ${orgId}\n`);
+
+    // ============================================
     // BUSINESS SETTINGS
     // ============================================
     console.log('📊 Creating business settings...');
@@ -24,6 +43,7 @@ async function seed() {
       .from('BusinessSettings')
       .insert({
         id: 'default-settings',
+        organizationId: orgId,
         subPayoutPct: 60,
         subMaterialsPct: 15,
         subLaborPct: 45,

@@ -22,8 +22,10 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { Job, JobStatus, ProjectType, TeamMember, Subcontractor, JobPhoto } from '@/types';
 import { formatCurrency, getStatusColor, getProfitFlagColor } from '@/lib/utils/job-calculations';
+import { JOB_STATUS_LABELS, PROJECT_TYPE_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_TYPE_LABELS } from '@/lib/constants';
 import {
   User,
   Calendar,
@@ -51,18 +53,11 @@ interface JobDetailModalProps {
   subcontractors: Subcontractor[];
 }
 
-const statusLabels: Record<JobStatus, string> = {
-  lead: 'Lead',
-  got_the_job: 'Fechado',
-  scheduled: 'Agendado',
-  completed: 'Concluído',
-};
-
-const projectTypeLabels: Record<ProjectType, string> = {
-  interior: 'Interior',
-  exterior: 'Exterior',
-  both: 'Interior & Exterior',
-};
+// Using imported constants from @/lib/constants
+const statusLabels = JOB_STATUS_LABELS;
+const projectTypeLabels = PROJECT_TYPE_LABELS;
+const paymentMethodLabels = PAYMENT_METHOD_LABELS;
+const paymentTypeLabels = PAYMENT_TYPE_LABELS;
 
 export function JobDetailModal({
   job,
@@ -803,42 +798,38 @@ export function JobDetailModal({
                 </div>
               </div>
 
-              {/* Add Photo URL */}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Cole a URL da imagem aqui..."
-                  id="photoUrl"
-                  className="flex-1"
-                />
-                <Select defaultValue="before">
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="before">Antes</SelectItem>
-                    <SelectItem value="after">Depois</SelectItem>
-                    <SelectItem value="progress">Progresso</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const input = document.getElementById('photoUrl') as HTMLInputElement;
-                    const typeSelect = document.querySelector('[data-value]') as HTMLElement;
-                    if (input?.value) {
+              {/* Photo Upload */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-slate-600">Adicionar foto &quot;Antes&quot;</Label>
+                  <ImageUpload
+                    folder={`jobs/${editedJob.id}/before`}
+                    onUpload={(url) => {
                       const newPhoto: JobPhoto = {
                         id: Date.now().toString(),
-                        url: input.value,
+                        url,
                         type: 'before',
                         uploadedAt: new Date().toISOString(),
                       };
                       handleFieldChange('photos', [...(editedJob.photos || []), newPhoto]);
-                      input.value = '';
-                    }
-                  }}
-                >
-                  Adicionar
-                </Button>
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-slate-600">Adicionar foto &quot;Depois&quot;</Label>
+                  <ImageUpload
+                    folder={`jobs/${editedJob.id}/after`}
+                    onUpload={(url) => {
+                      const newPhoto: JobPhoto = {
+                        id: Date.now().toString(),
+                        url,
+                        type: 'after',
+                        uploadedAt: new Date().toISOString(),
+                      };
+                      handleFieldChange('photos', [...(editedJob.photos || []), newPhoto]);
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </TabsContent>

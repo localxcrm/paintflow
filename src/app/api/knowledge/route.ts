@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
+import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 
 // GET /api/knowledge - Get all knowledge articles for organization
 export async function GET(request: NextRequest) {

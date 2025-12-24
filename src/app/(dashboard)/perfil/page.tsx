@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { User, Mail, Phone, Save } from 'lucide-react';
+import { User, Mail, Phone, Save, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserProfile {
+    id: string;
     name: string;
     email: string;
     phone: string;
@@ -18,41 +19,161 @@ interface UserProfile {
 
 export default function PerfilPage() {
     const [profile, setProfile] = useState<UserProfile>({
+        id: '',
         name: '',
         email: '',
         phone: '',
     });
+    const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Password change state
+    const [passwordData, setPasswordData] = useState({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+    });
+    const [showPasswords, setShowPasswords] = useState({
+        current: false,
+        new: false,
+        confirm: false,
+    });
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+
     useEffect(() => {
-        // Load from localStorage
-        const stored = localStorage.getItem('paintpro_user');
-        if (stored) {
-            const user = JSON.parse(stored);
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setProfile({
-                name: user.name || '',
-                email: user.email || '',
-                phone: user.phone || '',
-            });
-        }
+        loadProfile();
     }, []);
 
-    const handleSave = () => {
+    const loadProfile = async () => {
+        try {
+            const res = await fetch('/api/users/profile');
+            if (res.ok) {
+                const data = await res.json();
+                setProfile({
+                    id: data.user.id,
+                    name: data.user.name || '',
+                    email: data.user.email || '',
+                    phone: data.user.phone || '',
+                });
+            } else {
+                // Fallback to localStorage if API fails
+                const stored = localStorage.getItem('paintpro_user');
+                if (stored) {
+                    try {
+                        const user = JSON.parse(stored);
+                        setProfile({
+                            id: user.id || '',
+                            name: user.name || '',
+                            email: user.email || '',
+                            phone: user.phone || '',
+                        });
+                    } catch {
+                        // Invalid JSON in localStorage
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading profile:', error);
+            toast.error('Erro ao carregar perfil');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
         setIsSaving(true);
 
-        // Save to localStorage
-        const stored = localStorage.getItem('paintpro_user');
-        const user = stored ? JSON.parse(stored) : {};
-        localStorage.setItem('paintpro_user', JSON.stringify({
-            ...user,
-            ...profile,
-        }));
+        try {
+            const res = await fetch('/api/users/profile', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: profile.name,
+                    phone: profile.phone,
+                }),
+            });
 
-        setTimeout(() => {
-            setIsSaving(false);
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Erro ao salvar');
+            }
+
+            // Update localStorage for header sync
+            const stored = localStorage.getItem('paintpro_user');
+            try {
+                const user = stored ? JSON.parse(stored) : {};
+                localStorage.setItem('paintpro_user', JSON.stringify({
+                    ...user,
+                    name: profile.name,
+                    phone: profile.phone,
+                }));
+            } catch {
+                // Ignore localStorage errors
+            }
+
             toast.success('Perfil atualizado com sucesso!');
-        }, 500);
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            toast.error(error instanceof Error ? error.message : 'Erro ao salvar perfil');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleChangePassword = async () => {
+        // Validation
+        if (!passwordData.currentPassword) {
+            toast.error('Digite a senha atual');
+            return;
+        }
+
+        if (!passwordData.newPassword) {
+            toast.error('Digite a nova senha');
+            return;
+        }
+
+        if (passwordData.newPassword.length < 6) {
+            toast.error('A nova senha deve ter pelo menos 6 caracteres');
+            return;
+        }
+
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            toast.error('As senhas não coincidem');
+            return;
+        }
+
+        setIsChangingPassword(true);
+
+        try {
+            const res = await fetch('/api/users/password', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    currentPassword: passwordData.currentPassword,
+                    newPassword: passwordData.newPassword,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Erro ao alterar senha');
+            }
+
+            // Clear password fields
+            setPasswordData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: '',
+            });
+
+            toast.success('Senha alterada com sucesso!');
+        } catch (error) {
+            console.error('Error changing password:', error);
+            toast.error(error instanceof Error ? error.message : 'Erro ao alterar senha');
+        } finally {
+            setIsChangingPassword(false);
+        }
     };
 
     const getInitials = (name: string) => {
@@ -64,6 +185,14 @@ export default function PerfilPage() {
             .slice(0, 2) || 'U';
     };
 
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6 max-w-2xl">
             <div>
@@ -71,6 +200,7 @@ export default function PerfilPage() {
                 <p className="text-slate-500">Gerencie suas informações pessoais</p>
             </div>
 
+            {/* Personal Info Card */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -121,9 +251,12 @@ export default function PerfilPage() {
                                 id="email"
                                 type="email"
                                 value={profile.email}
-                                onChange={(e) => setProfile(prev => ({ ...prev, email: e.target.value }))}
-                                placeholder="seu@email.com"
+                                disabled
+                                className="bg-slate-50"
                             />
+                            <p className="text-xs text-slate-500">
+                                O email não pode ser alterado
+                            </p>
                         </div>
 
                         <div className="grid gap-2">
@@ -135,15 +268,112 @@ export default function PerfilPage() {
                                 id="phone"
                                 value={profile.phone}
                                 onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
-                                placeholder="(555) 123-4567"
+                                placeholder="(11) 99999-9999"
                             />
                         </div>
                     </div>
 
                     <div className="flex justify-end">
                         <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-                            <Save className="h-4 w-4" />
+                            {isSaving ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="h-4 w-4" />
+                            )}
                             {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Password Change Card */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Lock className="h-5 w-5" />
+                        Alterar Senha
+                    </CardTitle>
+                    <CardDescription>
+                        Atualize sua senha de acesso
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="currentPassword">Senha Atual</Label>
+                        <div className="relative">
+                            <Input
+                                id="currentPassword"
+                                type={showPasswords.current ? 'text' : 'password'}
+                                value={passwordData.currentPassword}
+                                onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                                placeholder="Digite sua senha atual"
+                                className="pr-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                                {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="newPassword">Nova Senha</Label>
+                        <div className="relative">
+                            <Input
+                                id="newPassword"
+                                type={showPasswords.new ? 'text' : 'password'}
+                                value={passwordData.newPassword}
+                                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                placeholder="Mínimo 6 caracteres"
+                                className="pr-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                                {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                        <div className="relative">
+                            <Input
+                                id="confirmPassword"
+                                type={showPasswords.confirm ? 'text' : 'password'}
+                                value={passwordData.confirmPassword}
+                                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                placeholder="Digite novamente a nova senha"
+                                className="pr-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                                {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                        <Button
+                            onClick={handleChangePassword}
+                            disabled={isChangingPassword}
+                            variant="outline"
+                            className="gap-2"
+                        >
+                            {isChangingPassword ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Lock className="h-4 w-4" />
+                            )}
+                            {isChangingPassword ? 'Alterando...' : 'Alterar Senha'}
                         </Button>
                     </div>
                 </CardContent>

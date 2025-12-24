@@ -18,6 +18,9 @@ import {
   CheckCircle2,
   Circle,
   Mountain,
+  Sparkles,
+  Loader2,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRocks } from '@/hooks/useRocks';
@@ -75,9 +78,19 @@ interface DashboardData {
   reviews: { total: number; goal: number; avgRating: number };
 }
 
+interface ThreeYearPicture {
+  revenue?: string;
+  profit?: string;
+  measurables?: string[];
+}
+
 interface VTOSettings {
   annualTarget: number;
   formulaParams: FormulaParams;
+  oneYearVision?: string;
+  oneYearGoals?: string[];
+  tenYearTarget?: string;
+  threeYearPicture?: ThreeYearPicture | string;
 }
 
 const defaultSettings: VTOSettings = {
@@ -88,6 +101,10 @@ const defaultSettings: VTOSettings = {
     marketingPercent: 8,
     productionWeeks: 35,
   },
+  oneYearVision: '',
+  oneYearGoals: [],
+  tenYearTarget: '',
+  threeYearPicture: { revenue: '', profit: '', measurables: [] },
 };
 
 export default function PainelPage() {
@@ -96,6 +113,7 @@ export default function PainelPage() {
   const [ytdRevenue, setYtdRevenue] = useState(0);
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingVTO, setIsLoadingVTO] = useState(true);
 
   const { getCurrentQuarterRocks, updateStatus, currentQuarter, currentYear } = useRocks();
   const quarterRocks = getCurrentQuarterRocks();
@@ -115,22 +133,33 @@ export default function PainelPage() {
 
   const periodGoals = getGoalsForPeriod();
 
+  // Load VTO from API
   useEffect(() => {
-    const saved = localStorage.getItem('paintpro_vto');
-    if (saved) {
+    const fetchVTO = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        setSettings({
-          annualTarget: parsed.annualTarget || defaultSettings.annualTarget,
-          formulaParams: {
-            ...defaultSettings.formulaParams,
-            ...parsed.formulaParams,
-          },
-        });
+        setIsLoadingVTO(true);
+        const res = await fetch('/api/vto');
+        if (res.ok) {
+          const data = await res.json();
+          setSettings({
+            annualTarget: data.annualTarget || defaultSettings.annualTarget,
+            formulaParams: {
+              ...defaultSettings.formulaParams,
+              ...data.formulaParams,
+            },
+            oneYearVision: data.oneYearVision || '',
+            oneYearGoals: data.oneYearGoals || [],
+            tenYearTarget: data.tenYearTarget || '',
+            threeYearPicture: data.threeYearPicture || { revenue: '', profit: '', measurables: [] },
+          });
+        }
       } catch (e) {
         console.error('Error loading VTO settings:', e);
+      } finally {
+        setIsLoadingVTO(false);
       }
-    }
+    };
+    fetchVTO();
   }, []);
 
   useEffect(() => {
@@ -203,6 +232,14 @@ export default function PainelPage() {
     reviews: { total: 0, goal: 10, avgRating: 0 },
   };
 
+  if (isLoading && isLoadingVTO) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#0D5C75]" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -222,100 +259,207 @@ export default function PainelPage() {
         </Tabs>
       </div>
 
-      {/* VTO Summary Card */}
-      <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-white">
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between mb-4">
+      {/* Barra de Progresso da Meta Anual */}
+      <Card className="border border-slate-200 bg-white">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-[#0D5C75]" />
+              <span className="font-semibold text-slate-700">Meta Anual</span>
+            </div>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Target className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Sua Visao</h2>
-                <p className="text-sm text-slate-500">Meta 1 Ano</p>
-              </div>
+              <span className="text-sm text-slate-500">
+                {formatCurrency(ytdRevenue, true)} de {formatCurrency(settings.annualTarget, true)}
+              </span>
+              <span className="text-sm font-bold text-[#0D5C75]">{vtoProgress.toFixed(0)}%</span>
+              <Link href="/metas">
+                <Button variant="ghost" size="sm" className="h-7 px-2">
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
             </div>
-            <Link href="/goals">
-              <Button variant="ghost" size="sm">
-                Editar <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
           </div>
+          <Progress value={Math.min(vtoProgress, 100)} className="h-2" />
+        </CardContent>
+      </Card>
 
-          <div className="space-y-4">
-            {/* Annual Target Progress */}
-            <div>
-              <div className="flex justify-between items-end mb-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {formatCurrency(ytdRevenue, true)}
-                </span>
-                <span className="text-sm text-slate-500">
-                  de {formatCurrency(settings.annualTarget, true)}
-                </span>
+      {/* Meu Foco e Meu Sonho - Cards lado a lado */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Meu Foco - Plano do Ano */}
+        <Card className="border-2 border-[#0D5C75] bg-gradient-to-br from-[#0D5C75]/5 to-[#F26522]/5">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#F26522]/10 rounded-lg">
+                  <Sparkles className="w-6 h-6 text-[#F26522]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-[#0D5C75]">Meu Foco</h2>
+                  <p className="text-sm text-slate-500">Plano do ano</p>
+                </div>
               </div>
-              <Progress
-                value={Math.min(vtoProgress, 100)}
-                className="h-3"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                {vtoProgress.toFixed(0)}% da meta anual
-              </p>
+              <Link href="/metas">
+                <Button variant="ghost" size="sm" className="text-[#0D5C75] hover:text-[#094A5E]">
+                  Editar <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </div>
 
-            {/* Quarterly Rocks */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                  <Mountain className="w-4 h-4" />
-                  Rocks Q{currentQuarter} {currentYear}
-                </h3>
-                <span className="text-xs text-slate-500">
-                  {completedRocks}/{totalRocks} concluidos
-                </span>
+            {settings.oneYearVision ? (
+              <div className="mb-4">
+                <p className="text-base text-slate-700 italic">
+                  &ldquo;{settings.oneYearVision}&rdquo;
+                </p>
               </div>
+            ) : (
+              <div className="mb-4">
+                <p className="text-sm text-slate-500 italic">
+                  Defina seu foco para o ano em Metas
+                </p>
+              </div>
+            )}
+
+            {settings.oneYearGoals && settings.oneYearGoals.length > 0 ? (
               <div className="space-y-2">
-                {quarterRocks.slice(0, 5).map((rock) => (
-                  <div key={rock.id} className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        updateStatus(rock.id, rock.status === 'complete' ? 'on_track' : 'complete')
-                      }
-                    >
-                      {rock.status === 'complete' ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />
-                      )}
-                    </button>
-                    <span
-                      className={`text-sm flex-1 ${rock.status === 'complete' ? 'text-slate-400 line-through' : 'text-slate-700'
-                        }`}
-                    >
-                      {rock.title}
-                    </span>
-                    {rock.progress > 0 && (
-                      <span className="text-xs text-slate-500">{rock.progress}%</span>
-                    )}
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Objetivos</p>
+                {settings.oneYearGoals.map((goal, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Circle className="w-4 h-4 text-[#F26522]" />
+                    <span className="text-sm text-slate-700">{goal}</span>
                   </div>
                 ))}
-                {quarterRocks.length === 0 && (
-                  <p className="text-sm text-slate-500">
-                    Nenhum rock para este trimestre.{' '}
-                    <Link href="/rocks" className="text-blue-600 hover:underline">
-                      Adicionar rocks
-                    </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Objetivos</p>
+                <p className="text-sm text-slate-400">Nenhum objetivo definido ainda</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Meu Sonho - Visao de Longo Prazo */}
+        <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Eye className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-purple-700">Meu Sonho</h2>
+                  <p className="text-sm text-slate-500">Visao de longo prazo</p>
+                </div>
+              </div>
+              <Link href="/metas">
+                <Button variant="ghost" size="sm" className="text-purple-600 hover:text-purple-700">
+                  Editar <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+
+            {/* Visao 3 Anos - primeiro */}
+            {(() => {
+              const picture = settings.threeYearPicture;
+              const hasContent = picture && (
+                typeof picture === 'string'
+                  ? picture.trim() !== ''
+                  : (picture.revenue || picture.profit)
+              );
+              const displayText = typeof picture === 'string'
+                ? picture
+                : picture?.revenue
+                  ? `Faturamento: ${picture.revenue}${picture.profit ? ` | Lucro: ${picture.profit}` : ''}`
+                  : '';
+
+              return hasContent ? (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Visao 3 Anos</p>
+                  <p className="text-base text-slate-700 italic">
+                    &ldquo;{displayText}&rdquo;
                   </p>
-                )}
-                {quarterRocks.length > 5 && (
-                  <Link
-                    href="/rocks"
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    Ver todos os {quarterRocks.length} rocks
-                  </Link>
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Visao 3 Anos</p>
+                  <p className="text-sm text-slate-400 italic">
+                    Defina sua visao de 3 anos em Metas
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* Meta 10 Anos - depois */}
+            {settings.tenYearTarget ? (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Meta 10 Anos</p>
+                <p className="text-base text-slate-700 italic">
+                  &ldquo;{settings.tenYearTarget}&rdquo;
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Meta 10 Anos</p>
+                <p className="text-sm text-slate-400 italic">
+                  Defina sua meta de 10 anos em Metas
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Rocks do Trimestre */}
+      <Card className="border border-slate-200">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Mountain className="w-5 h-5 text-slate-600" />
+              <h3 className="font-semibold text-slate-700">
+                Rocks Q{currentQuarter} {currentYear}
+              </h3>
+            </div>
+            <span className="text-sm text-slate-500">
+              {completedRocks}/{totalRocks} concluidos
+            </span>
+          </div>
+          <div className="space-y-2">
+            {quarterRocks.slice(0, 5).map((rock) => (
+              <div key={rock.id} className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    updateStatus(rock.id, rock.status === 'complete' ? 'on_track' : 'complete')
+                  }
+                >
+                  {rock.status === 'complete' ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />
+                  )}
+                </button>
+                <span
+                  className={`text-sm flex-1 ${rock.status === 'complete' ? 'text-slate-400 line-through' : 'text-slate-700'}`}
+                >
+                  {rock.title}
+                </span>
+                {rock.progress > 0 && rock.status !== 'complete' && (
+                  <span className="text-xs text-slate-500">{rock.progress}%</span>
                 )}
               </div>
-            </div>
+            ))}
+            {quarterRocks.length === 0 && (
+              <p className="text-sm text-slate-500">
+                Nenhum rock para este trimestre.{' '}
+                <Link href="/rocks" className="text-[#0D5C75] hover:underline">
+                  Adicionar rocks
+                </Link>
+              </p>
+            )}
+            {quarterRocks.length > 5 && (
+              <Link href="/rocks" className="flex items-center gap-1 text-sm text-[#0D5C75] hover:underline mt-2">
+                Ver todos os {quarterRocks.length} rocks <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>

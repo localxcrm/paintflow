@@ -77,7 +77,7 @@ export interface TeamMember {
   name: string;
   email: string;
   phone?: string;
-  role: 'sales' | 'pm' | 'both';
+  role: 'sales' | 'pm' | 'both' | 'admin' | 'owner';
   defaultCommissionPct: number;
   isActive: boolean;
 }
@@ -175,8 +175,11 @@ export interface Job {
   // Photos (before/after)
   photos?: JobPhoto[];
 
-  // Payment History
+  // Payment History (legacy)
   paymentHistory?: PaymentHistoryItem[];
+
+  // New Payment Tracking (Excel-like)
+  payments?: JobPayment[];
 
   // Legacy field (keep for backward compatibility)
   crewLeader?: string;
@@ -192,7 +195,7 @@ export interface JobPhoto {
   uploadedAt: string;
 }
 
-// Payment History Item
+// Payment History Item (legacy - kept for backward compatibility)
 export interface PaymentHistoryItem {
   id: string;
   date: string;
@@ -200,6 +203,32 @@ export interface PaymentHistoryItem {
   method: PaymentMethod;
   amount: number;
   notes?: string;
+}
+
+// Job Payment (new - for Excel-like payment tracking)
+export type JobPaymentType =
+  | 'client_deposit'
+  | 'client_partial'
+  | 'client_final'
+  | 'sales_commission'
+  | 'pm_commission'
+  | 'subcontractor';
+
+export type JobPaymentCategory = 'income' | 'expense';
+
+export interface JobPayment {
+  id: string;
+  type: JobPaymentType;
+  category: JobPaymentCategory;
+  description: string;
+  amount: number;
+  dueDate?: string;
+  status: 'pending' | 'paid';
+  paidDate?: string;
+  method?: PaymentMethod | 'pix';
+  recipientName?: string; // Name of who receives/pays
+  notes?: string;
+  createdAt: string;
 }
 
 // Job KPI Summary Types

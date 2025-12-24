@@ -17,9 +17,19 @@ import {
   Settings,
   Mountain,
   ArrowRight,
+  Plus,
+  X,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRocks } from '@/hooks/useRocks';
+import {
+  calculateGoals,
+  formatCurrency,
+  FormulaParams,
+  DEFAULT_VTO_SETTINGS,
+} from '@/lib/utils/goal-calculations';
 
 // Preset targets
 const PRESETS = [
@@ -29,74 +39,6 @@ const PRESETS = [
   { label: '$2M', value: 2000000 },
 ];
 
-interface FormulaParams {
-  avgTicket: number;
-  leadConversionRate: number; // Lead → Estimate %
-  closingRate: number; // Estimate → Sale %
-  marketingPercent: number;
-  productionWeeks: number;
-}
-
-// Calculate goals based on annual revenue target and formula parameters
-function calculateGoals(annualTarget: number, params: FormulaParams) {
-  const { avgTicket, leadConversionRate, closingRate, marketingPercent, productionWeeks } = params;
-
-  const jobsPerYear = Math.round(annualTarget / avgTicket);
-  const jobsPerWeek = jobsPerYear / productionWeeks;
-
-  // Calculate estimates needed based on closing rate (Estimate → Sale)
-  const estimatesPerYear = Math.round(jobsPerYear / (closingRate / 100));
-
-  // Calculate leads needed based on lead conversion rate (Lead → Estimate)
-  const leadsPerYear = Math.round(estimatesPerYear / (leadConversionRate / 100));
-  const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
-  const estimatesPerWeek = Math.round(estimatesPerYear / productionWeeks);
-
-  const revenuePerWeek = annualTarget / productionWeeks;
-  const marketingAnnual = annualTarget * (marketingPercent / 100);
-
-  return {
-    annual: {
-      revenue: annualTarget,
-      jobs: jobsPerYear,
-      estimates: estimatesPerYear,
-      leads: leadsPerYear,
-      marketing: marketingAnnual,
-    },
-    monthly: {
-      revenue: Math.round(annualTarget / 12),
-      jobs: Math.round(jobsPerYear / 12),
-      estimates: Math.round(estimatesPerYear / 12),
-      leads: Math.round(leadsPerYear / 12),
-      marketing: Math.round(marketingAnnual / 12),
-    },
-    weekly: {
-      revenue: Math.round(revenuePerWeek),
-      jobs: Math.round(jobsPerWeek * 10) / 10,
-      estimates: estimatesPerWeek,
-      leads: leadsPerWeek,
-      marketing: Math.round(marketingAnnual / 52),
-    },
-    quarterly: {
-      revenue: Math.round(annualTarget / 4),
-      jobs: Math.round(jobsPerYear / 4),
-      estimates: Math.round(estimatesPerYear / 4),
-      leads: Math.round(leadsPerYear / 4),
-      marketing: Math.round(marketingAnnual / 4),
-    },
-  };
-}
-
-function formatCurrency(value: number, compact = false) {
-  if (compact && value >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`;
-  }
-  if (compact && value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
-  }
-  return `$${value.toLocaleString('en-US')}`;
-}
-
 interface VTOData {
   annualTarget: number;
   formulaParams: FormulaParams;
@@ -104,27 +46,27 @@ interface VTOData {
   coreFocus: string;
   tenYearTarget: string;
   threeYearPicture: string;
+  oneYearVision: string;
+  oneYearGoals: string[];
 }
 
 const defaultVTO: VTOData = {
-  annualTarget: 1000000,
-  formulaParams: {
-    avgTicket: 9500,
-    leadConversionRate: 85, // Lead → Estimate (default 85%)
-    closingRate: 30, // Estimate → Sale (default 30%)
-    marketingPercent: 8,
-    productionWeeks: 35,
-  },
+  annualTarget: DEFAULT_VTO_SETTINGS.annualTarget,
+  formulaParams: { ...DEFAULT_VTO_SETTINGS.formulaParams },
   coreValues: '',
   coreFocus: '',
   tenYearTarget: '',
   threeYearPicture: '',
+  oneYearVision: '',
+  oneYearGoals: [],
 };
 
 export default function GoalsPage() {
   const [vto, setVto] = useState<VTOData>(defaultVTO);
   const [customTarget, setCustomTarget] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [newGoal, setNewGoal] = useState('');
 
   // Get rocks from shared hook
   const { getCurrentQuarterRocks, currentQuarter, currentYear, updateStatus } = useRocks();
@@ -132,36 +74,54 @@ export default function GoalsPage() {
 
   const goals = calculateGoals(vto.annualTarget, vto.formulaParams);
 
-  // Load from localStorage
+  // Load from API
   useEffect(() => {
-    const saved = localStorage.getItem('paintpro_vto');
-    if (saved) {
+    const fetchVTO = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        // Merge with defaults to handle missing fields from old saves
-        // Remove old rocks field if present (now using shared rocks)
-        const { rocks, ...rest } = parsed;
-        setVto({
-          ...defaultVTO,
-          ...rest,
-          formulaParams: {
-            ...defaultVTO.formulaParams,
-            ...parsed.formulaParams,
-          },
-        });
+        setIsLoading(true);
+        const res = await fetch('/api/vto');
+        if (res.ok) {
+          const data = await res.json();
+          setVto({
+            annualTarget: data.annualTarget || defaultVTO.annualTarget,
+            formulaParams: {
+              ...defaultVTO.formulaParams,
+              ...data.formulaParams,
+            },
+            coreValues: data.coreValues || '',
+            coreFocus: data.coreFocus || '',
+            tenYearTarget: data.tenYearTarget || '',
+            threeYearPicture: data.threeYearPicture || '',
+            oneYearVision: data.oneYearVision || '',
+            oneYearGoals: data.oneYearGoals || [],
+          });
+        }
       } catch (e) {
         console.error('Error loading VTO:', e);
+        toast.error('Erro ao carregar dados');
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+    fetchVTO();
   }, []);
 
-  // Save to localStorage
-  const handleSave = () => {
+  // Save to API
+  const handleSave = async () => {
     setIsSaving(true);
     try {
-      localStorage.setItem('paintpro_vto', JSON.stringify(vto));
-      toast.success('Configuracoes salvas!');
+      const res = await fetch('/api/vto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vto),
+      });
+      if (res.ok) {
+        toast.success('Configuracoes salvas!');
+      } else {
+        throw new Error('Failed to save');
+      }
     } catch (e) {
+      console.error('Error saving VTO:', e);
       toast.error('Erro ao salvar');
     } finally {
       setIsSaving(false);
@@ -190,17 +150,48 @@ export default function GoalsPage() {
     });
   };
 
+  const addGoal = () => {
+    if (newGoal.trim() && vto.oneYearGoals.length < 5) {
+      setVto({
+        ...vto,
+        oneYearGoals: [...vto.oneYearGoals, newGoal.trim()],
+      });
+      setNewGoal('');
+    }
+  };
+
+  const removeGoal = (index: number) => {
+    setVto({
+      ...vto,
+      oneYearGoals: vto.oneYearGoals.filter((_, i) => i !== index),
+    });
+  };
+
+  const updateGoal = (index: number, value: string) => {
+    const updated = [...vto.oneYearGoals];
+    updated[index] = value;
+    setVto({ ...vto, oneYearGoals: updated });
+  };
+
   // Rocks stats
   const completedRocks = quarterRocks.filter((r) => r.status === 'complete').length;
   const totalRocks = quarterRocks.length;
   const rocksProgress = totalRocks > 0 ? Math.round((completedRocks / totalRocks) * 100) : 0;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#0D5C75]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Blueprint 2026</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Blueprint</h1>
           <p className="text-slate-500">Formula $1 Milhao - Configure sua meta anual</p>
         </div>
         <Button onClick={handleSave} disabled={isSaving}>
@@ -260,6 +251,88 @@ export default function GoalsPage() {
             <p className="text-sm text-slate-500 mb-1">Meta selecionada:</p>
             <p className="text-4xl font-bold text-blue-600">
               {formatCurrency(vto.annualTarget)}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Plano de 1 Ano */}
+      <Card className="border-2 border-[#0D5C75] bg-gradient-to-r from-[#0D5C75]/5 to-[#F26522]/5">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#F26522]/10 rounded-lg">
+              <Sparkles className="w-6 h-6 text-[#F26522]" />
+            </div>
+            <div>
+              <CardTitle className="text-[#0D5C75]">Meu Plano do Ano</CardTitle>
+              <CardDescription>Defina sua visao e objetivos para este ano</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Visao do Ano */}
+          <div>
+            <Label className="text-[#0D5C75] font-semibold">Visao do Ano</Label>
+            <Textarea
+              value={vto.oneYearVision}
+              onChange={(e) => setVto({ ...vto, oneYearVision: e.target.value })}
+              placeholder="Ex: Faturar $1M, construir equipe solida e expandir para novos bairros da cidade..."
+              rows={3}
+              className="mt-1"
+            />
+          </div>
+
+          {/* Objetivos do Ano */}
+          <div>
+            <Label className="text-[#0D5C75] font-semibold">Objetivos do Ano (ate 5)</Label>
+            <div className="space-y-2 mt-2">
+              {vto.oneYearGoals.map((goal, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Circle className="w-4 h-4 text-[#F26522] flex-shrink-0" />
+                  <Input
+                    value={goal}
+                    onChange={(e) => updateGoal(index, e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeGoal(index)}
+                    className="text-slate-400 hover:text-red-500"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              {vto.oneYearGoals.length < 5 && (
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <Input
+                    value={newGoal}
+                    onChange={(e) => setNewGoal(e.target.value)}
+                    placeholder="Adicionar objetivo..."
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addGoal();
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addGoal}
+                    disabled={!newGoal.trim()}
+                    className="border-[#0D5C75] text-[#0D5C75] hover:bg-[#0D5C75] hover:text-white"
+                  >
+                    Adicionar
+                  </Button>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              {vto.oneYearGoals.length}/5 objetivos definidos
             </p>
           </div>
         </CardContent>

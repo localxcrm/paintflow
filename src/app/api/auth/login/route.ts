@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { verifyPassword, createSession } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import type { User } from '@/types/database';
@@ -121,6 +121,7 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role,
       },
       organizations,
       currentOrganization: defaultOrg || null,

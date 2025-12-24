@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { geocodeAddress } from '@/lib/geocoding';
 
 // Helper function to calculate job financials
@@ -207,6 +207,15 @@ export async function PATCH(
     if (body.salesRepId !== undefined) updateData.salesRepId = body.salesRepId;
     if (body.projectManagerId !== undefined) updateData.projectManagerId = body.projectManagerId;
     if (body.subcontractorId !== undefined) updateData.subcontractorId = body.subcontractorId;
+
+    // Payment tracking fields
+    if (body.depositPaymentMethod !== undefined) updateData.depositPaymentMethod = body.depositPaymentMethod;
+    if (body.depositPaymentDate !== undefined) updateData.depositPaymentDate = body.depositPaymentDate;
+    if (body.jobPaymentMethod !== undefined) updateData.jobPaymentMethod = body.jobPaymentMethod;
+    if (body.jobPaymentDate !== undefined) updateData.jobPaymentDate = body.jobPaymentDate;
+    if (body.paymentHistory !== undefined) updateData.paymentHistory = body.paymentHistory;
+    if (body.payments !== undefined) updateData.payments = body.payments;
+    if (body.photos !== undefined) updateData.photos = body.photos;
 
     // Merge calculated financials
     Object.assign(updateData, financials);

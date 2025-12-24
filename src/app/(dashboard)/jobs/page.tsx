@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -8,7 +9,6 @@ import {
   JobFilters,
   JobCharts,
   JobTable,
-  JobDetailModal,
   JobCreateModal,
   JobDeleteDialog,
   JobKanban,
@@ -39,6 +39,8 @@ interface PaymentState {
 }
 
 export default function JobsPage() {
+  const router = useRouter();
+
   // Data state
   const [jobs, setJobs] = useState<Job[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -53,8 +55,6 @@ export default function JobsPage() {
   const [subcontractorFilter, setSubcontractorFilter] = useState<string>('all');
 
   // Modal states
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
@@ -137,8 +137,31 @@ export default function JobsPage() {
     setSubcontractorFilter('all');
   };
 
+  // Helper to update payment status via API
+  const updatePaymentStatus = async (jobId: string, payload: Record<string, unknown>) => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Failed to update');
+
+      const updatedJob = await res.json();
+      setJobs(prev =>
+        prev.map(j => j.id === jobId ? { ...j, ...updatedJob } : j)
+      );
+      return true;
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast.error('Erro ao atualizar pagamento');
+      return false;
+    }
+  };
+
   // Open payment dialog instead of toggling directly
-  const handleToggleDepositPaid = (jobId: string, value: boolean) => {
+  const handleToggleDepositPaid = async (jobId: string, value: boolean) => {
     if (value) {
       const job = jobs.find(j => j.id === jobId);
       if (job) {
@@ -151,17 +174,19 @@ export default function JobsPage() {
         });
       }
     } else {
-      setJobs(prev =>
-        prev.map(job =>
-          job.id === jobId
-            ? { ...job, depositPaid: false, balanceDue: job.jobValue }
-            : job
-        )
-      );
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        await updatePaymentStatus(jobId, {
+          depositPaid: false,
+          depositPaymentMethod: null,
+          depositPaymentDate: null,
+          balanceDue: job.jobValue,
+        });
+      }
     }
   };
 
-  const handleToggleJobPaid = (jobId: string, value: boolean) => {
+  const handleToggleJobPaid = async (jobId: string, value: boolean) => {
     if (value) {
       const job = jobs.find(j => j.id === jobId);
       if (job) {
@@ -174,17 +199,19 @@ export default function JobsPage() {
         });
       }
     } else {
-      setJobs(prev =>
-        prev.map(job =>
-          job.id === jobId
-            ? { ...job, jobPaid: false, balanceDue: job.jobValue - (job.depositPaid ? job.depositRequired : 0) }
-            : job
-        )
-      );
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        await updatePaymentStatus(jobId, {
+          jobPaid: false,
+          jobPaymentMethod: null,
+          jobPaymentDate: null,
+          balanceDue: job.jobValue - (job.depositPaid ? job.depositRequired : 0),
+        });
+      }
     }
   };
 
-  const handleToggleSalesCommissionPaid = (jobId: string, value: boolean) => {
+  const handleToggleSalesCommissionPaid = async (jobId: string, value: boolean) => {
     if (value) {
       const job = jobs.find(j => j.id === jobId);
       if (job) {
@@ -197,15 +224,11 @@ export default function JobsPage() {
         });
       }
     } else {
-      setJobs(prev =>
-        prev.map(job =>
-          job.id === jobId ? { ...job, salesCommissionPaid: false } : job
-        )
-      );
+      await updatePaymentStatus(jobId, { salesCommissionPaid: false });
     }
   };
 
-  const handleTogglePMCommissionPaid = (jobId: string, value: boolean) => {
+  const handleTogglePMCommissionPaid = async (jobId: string, value: boolean) => {
     if (value) {
       const job = jobs.find(j => j.id === jobId);
       if (job) {
@@ -218,15 +241,11 @@ export default function JobsPage() {
         });
       }
     } else {
-      setJobs(prev =>
-        prev.map(job =>
-          job.id === jobId ? { ...job, pmCommissionPaid: false } : job
-        )
-      );
+      await updatePaymentStatus(jobId, { pmCommissionPaid: false });
     }
   };
 
-  const handleToggleSubPaid = (jobId: string, value: boolean) => {
+  const handleToggleSubPaid = async (jobId: string, value: boolean) => {
     if (value) {
       const job = jobs.find(j => j.id === jobId);
       if (job) {
@@ -239,101 +258,105 @@ export default function JobsPage() {
         });
       }
     } else {
-      setJobs(prev =>
-        prev.map(job =>
-          job.id === jobId ? { ...job, subcontractorPaid: false } : job
-        )
-      );
+      await updatePaymentStatus(jobId, { subcontractorPaid: false });
     }
   };
 
   // Handle payment confirmation
-  const handlePaymentConfirm = (data: PaymentDialogData) => {
+  const handlePaymentConfirm = async (data: PaymentDialogData) => {
     const { jobId, type } = paymentState;
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
 
-    setJobs(prev =>
-      prev.map(job => {
-        if (job.id !== jobId) return job;
+    // Create payment history entry
+    const historyEntry: PaymentHistoryItem = {
+      id: Date.now().toString(),
+      date: data.date,
+      type: type === 'deposit' ? 'deposit' :
+        type === 'job_payment' ? 'final_payment' :
+          type === 'sales_commission' ? 'sales_commission' :
+            type === 'pm_commission' ? 'pm_commission' : 'subcontractor',
+      method: data.method,
+      amount: paymentState.amount,
+      notes: data.notes,
+    };
 
-        // Create payment history entry
-        const historyEntry: PaymentHistoryItem = {
-          id: Date.now().toString(),
-          date: data.date,
-          type: type === 'deposit' ? 'deposit' :
-            type === 'job_payment' ? 'final_payment' :
-              type === 'sales_commission' ? 'sales_commission' :
-                type === 'pm_commission' ? 'pm_commission' : 'subcontractor',
-          method: data.method,
-          amount: paymentState.amount,
-          notes: data.notes,
+    const updatedHistory = [...(job.paymentHistory || []), historyEntry];
+
+    // Build update payload based on payment type
+    let updatePayload: Record<string, unknown> = {
+      paymentHistory: updatedHistory,
+    };
+
+    switch (type) {
+      case 'deposit':
+        updatePayload = {
+          ...updatePayload,
+          depositPaid: true,
+          depositPaymentMethod: data.method,
+          depositPaymentDate: data.date,
+          balanceDue: job.jobValue - job.depositRequired,
         };
+        break;
+      case 'job_payment':
+        updatePayload = {
+          ...updatePayload,
+          jobPaid: true,
+          jobPaymentMethod: data.method,
+          jobPaymentDate: data.date,
+          balanceDue: 0,
+        };
+        break;
+      case 'sales_commission':
+        updatePayload = {
+          ...updatePayload,
+          salesCommissionPaid: true,
+        };
+        break;
+      case 'pm_commission':
+        updatePayload = {
+          ...updatePayload,
+          pmCommissionPaid: true,
+        };
+        break;
+      case 'subcontractor':
+        updatePayload = {
+          ...updatePayload,
+          subcontractorPaid: true,
+        };
+        break;
+    }
 
-        const updatedHistory = [...(job.paymentHistory || []), historyEntry];
+    try {
+      // Persist to backend
+      const res = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload),
+      });
 
-        switch (type) {
-          case 'deposit':
-            return {
-              ...job,
-              depositPaid: true,
-              depositPaymentMethod: data.method,
-              depositPaymentDate: data.date,
-              balanceDue: job.jobValue - job.depositRequired,
-              paymentHistory: updatedHistory,
-            };
-          case 'job_payment':
-            return {
-              ...job,
-              jobPaid: true,
-              jobPaymentMethod: data.method,
-              jobPaymentDate: data.date,
-              balanceDue: 0,
-              paymentHistory: updatedHistory,
-            };
-          case 'sales_commission':
-            return {
-              ...job,
-              salesCommissionPaid: true,
-              paymentHistory: updatedHistory,
-            };
-          case 'pm_commission':
-            return {
-              ...job,
-              pmCommissionPaid: true,
-              paymentHistory: updatedHistory,
-            };
-          case 'subcontractor':
-            return {
-              ...job,
-              subcontractorPaid: true,
-              paymentHistory: updatedHistory,
-            };
-          default:
-            return job;
-        }
-      })
-    );
+      if (!res.ok) {
+        throw new Error('Failed to save payment');
+      }
 
-    setPaymentState(prev => ({ ...prev, isOpen: false }));
-    toast.success('Pagamento registrado com sucesso!');
+      const updatedJob = await res.json();
+
+      // Update local state with response from server
+      setJobs(prev =>
+        prev.map(j => j.id === jobId ? { ...j, ...updatedJob } : j)
+      );
+
+      setPaymentState(prev => ({ ...prev, isOpen: false }));
+      toast.success('Pagamento registrado com sucesso!');
+    } catch (error) {
+      console.error('Error saving payment:', error);
+      toast.error('Erro ao salvar pagamento. Tente novamente.');
+    }
   };
 
-  // Detail Modal handlers
+  // Navigate to job detail page
   const handleJobClick = (job: Job) => {
-    setSelectedJob(job);
-    setIsDetailModalOpen(true);
-  };
-
-  const handleCloseDetailModal = () => {
-    setIsDetailModalOpen(false);
-    setSelectedJob(null);
-  };
-
-  const handleSaveJob = (updatedJob: Job) => {
-    setJobs(prev =>
-      prev.map(job =>
-        job.id === updatedJob.id ? updatedJob : job
-      )
-    );
+    router.push(`/jobs/${job.id}`);
   };
 
   // Create Modal handlers
@@ -505,16 +528,6 @@ export default function JobsPage() {
           <JobMapView jobs={jobs} subcontractors={subcontractors} />
         </TabsContent>
       </Tabs>
-
-      {/* Job Detail Modal */}
-      <JobDetailModal
-        job={selectedJob}
-        isOpen={isDetailModalOpen}
-        onClose={handleCloseDetailModal}
-        onSave={handleSaveJob}
-        teamMembers={teamMembers}
-        subcontractors={subcontractors}
-      />
 
       {/* Job Create Modal */}
       <JobCreateModal

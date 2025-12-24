@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
+import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 
 // GET /api/team - Get all team members
 export async function GET(request: NextRequest) {
@@ -126,6 +126,45 @@ export async function PUT(request: NextRequest) {
     console.error('Error updating team member:', error);
     return NextResponse.json(
       { error: 'Failed to update team member' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/team - Delete a team member
+export async function DELETE(request: NextRequest) {
+  try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organization required' }, { status: 400 });
+    }
+
+    const supabase = createServerSupabaseClient();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Team member ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from('TeamMember')
+      .delete()
+      .eq('id', id)
+      .eq('organizationId', organizationId);
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting team member:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete team member' },
       { status: 500 }
     );
   }

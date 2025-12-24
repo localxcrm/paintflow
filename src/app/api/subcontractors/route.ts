@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase';
+import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
+import { randomBytes } from 'crypto';
+
+// Generate a unique calendar token
+function generateCalendarToken(): string {
+  return randomBytes(16).toString('hex');
+}
 
 // GET /api/subcontractors - Get all subcontractors
 export async function GET(request: NextRequest) {
@@ -61,6 +67,7 @@ export async function POST(request: NextRequest) {
         defaultPayoutPct: body.defaultPayoutPct || 60,
         color: body.color || '#10B981',
         isActive: body.isActive !== false,
+        calendarToken: generateCalendarToken(),
       })
       .select()
       .single();
@@ -123,6 +130,45 @@ export async function PUT(request: NextRequest) {
     console.error('Error updating subcontractor:', error);
     return NextResponse.json(
       { error: 'Failed to update subcontractor' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/subcontractors - Delete a subcontractor
+export async function DELETE(request: NextRequest) {
+  try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organization required' }, { status: 400 });
+    }
+
+    const supabase = createServerSupabaseClient();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Subcontractor ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from('Subcontractor')
+      .delete()
+      .eq('id', id)
+      .eq('organizationId', organizationId);
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting subcontractor:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete subcontractor' },
       { status: 500 }
     );
   }

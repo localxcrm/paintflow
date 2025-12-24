@@ -22,6 +22,12 @@ import {
 } from '@/components/ui/table';
 import { Save, TrendingUp, Users, FileText, DollarSign, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  calculateGoals,
+  formatCurrency,
+  VTOSettings,
+  DEFAULT_VTO_SETTINGS,
+} from '@/lib/utils/goal-calculations';
 
 interface MarketingChannel {
   id: string;
@@ -56,70 +62,6 @@ interface ChannelData {
   estimates: number;
   sales: number;
   revenue: number;
-}
-
-interface FormulaParams {
-  avgTicket: number;
-  leadConversionRate: number; // Lead → Estimate %
-  closingRate: number; // Estimate → Sale %
-  marketingPercent: number;
-  productionWeeks: number;
-}
-
-interface VTOData {
-  annualTarget: number;
-  formulaParams: FormulaParams;
-}
-
-const defaultVTO: VTOData = {
-  annualTarget: 1000000,
-  formulaParams: {
-    avgTicket: 9500,
-    leadConversionRate: 85,
-    closingRate: 30,
-    marketingPercent: 8,
-    productionWeeks: 35,
-  },
-};
-
-// Calculate goals based on annual revenue target and formula parameters
-function calculateGoals(annualTarget: number, params: FormulaParams) {
-  const { avgTicket, leadConversionRate, closingRate, productionWeeks } = params;
-
-  const jobsPerYear = Math.round(annualTarget / avgTicket);
-  const jobsPerWeek = jobsPerYear / productionWeeks;
-
-  // Calculate estimates needed based on closing rate (Estimate → Sale)
-  const estimatesPerYear = Math.round(jobsPerYear / (closingRate / 100));
-
-  // Calculate leads needed based on lead conversion rate (Lead → Estimate)
-  const leadsPerYear = Math.round(estimatesPerYear / (leadConversionRate / 100));
-  const leadsPerWeek = Math.round(leadsPerYear / productionWeeks);
-  const estimatesPerWeek = Math.round(estimatesPerYear / productionWeeks);
-
-  const revenuePerWeek = annualTarget / productionWeeks;
-
-  return {
-    monthly: {
-      revenue: Math.round(annualTarget / 12),
-      jobs: Math.round(jobsPerYear / 12),
-      estimates: Math.round(estimatesPerYear / 12),
-      leads: Math.round(leadsPerYear / 12),
-    },
-    weekly: {
-      revenue: Math.round(revenuePerWeek),
-      jobs: Math.round(jobsPerWeek * 10) / 10,
-      estimates: estimatesPerWeek,
-      leads: leadsPerWeek,
-    },
-  };
-}
-
-function formatCurrency(value: number, compact = false) {
-  if (compact && value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
-  }
-  return `$${value.toLocaleString('en-US')}`;
 }
 
 const currentYear = new Date().getFullYear();
@@ -162,7 +104,7 @@ export default function VendasPage() {
   const [entries, setEntries] = useState<WeeklyEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string>(''); // Currently selected week for editing
-  const [vto, setVto] = useState<VTOData>(defaultVTO);
+  const [vto, setVto] = useState<VTOSettings>(DEFAULT_VTO_SETTINGS);
   const [availableChannels, setAvailableChannels] = useState<MarketingChannel[]>(DEFAULT_CHANNELS);
 
   // Channel data state - now tracks edits for the current selected week
@@ -181,10 +123,10 @@ export default function VendasPage() {
         if (vtoRes.ok) {
           const vtoData = await vtoRes.json();
           setVto({
-            ...defaultVTO,
+            ...DEFAULT_VTO_SETTINGS,
             ...vtoData,
             formulaParams: {
-              ...defaultVTO.formulaParams,
+              ...DEFAULT_VTO_SETTINGS.formulaParams,
               ...vtoData.formulaParams,
             },
           });

@@ -1,7 +1,7 @@
 // Database helper for Supabase
 // This file provides a simple wrapper similar to Prisma's API
 
-import { createServerSupabaseClient } from './supabase';
+import { createServerSupabaseClient } from './supabase-server';
 
 // Export the Supabase client creator for direct use
 export function getSupabaseClient() {
