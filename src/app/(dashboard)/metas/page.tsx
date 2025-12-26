@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import {
   X,
   Sparkles,
   Loader2,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRocks } from '@/hooks/useRocks';
@@ -488,7 +490,12 @@ export default function GoalsPage() {
                 </CardDescription>
               </div>
             </div>
-{/* Rocks are managed inline below */}
+<Link href="/metas/rocks">
+              <Button variant="outline" size="sm">
+                Gerenciar Rocks
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
@@ -526,7 +533,10 @@ export default function GoalsPage() {
             ))}
             {quarterRocks.length === 0 && (
               <p className="text-center text-slate-500 py-4">
-                Nenhum rock para este trimestre.
+                Nenhum rock para este trimestre.{' '}
+                <Link href="/metas/rocks?new=1" className="text-blue-600 hover:underline">
+                  Adicionar rocks
+                </Link>
               </p>
             )}
           </div>

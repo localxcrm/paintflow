@@ -21,7 +21,7 @@ export interface StatusChange {
 export interface Rock {
   id: string;
   title: string;
-  description?: string;
+  description?: string | null;
   owner: string;
   rockType: 'company' | 'individual';
   quarter: number;
@@ -50,8 +50,6 @@ export const ROCK_STATUS_CONFIG: Record<RockStatus, { label: string; className: 
   dropped: { label: 'Abandonado', className: 'text-slate-700', bgClass: 'bg-slate-100' },
 };
 
-const STORAGE_KEY = 'paintpro_rocks';
-
 // Helper functions
 function getCurrentQuarter(): number {
   return Math.ceil((new Date().getMonth() + 1) / 3);
@@ -67,79 +65,9 @@ function getQuarterEndDate(quarter: number, year: number): string {
   return `${year}-${String(monthEnd).padStart(2, '0')}-${lastDay}`;
 }
 
-// Default rocks for new users
-function getDefaultRocks(): Rock[] {
-  const quarter = getCurrentQuarter();
-  const year = getCurrentYear();
-  const now = new Date().toISOString();
-
-  return [
-    {
-      id: '1',
-      title: 'Contratar 2 pintores',
-      description: 'Aumentar equipe para atender demanda de projetos',
-      owner: 'Voce',
-      rockType: 'company',
-      quarter,
-      year,
-      status: 'on_track',
-      dueDate: getQuarterEndDate(quarter, year),
-      progress: 0,
-      milestones: [
-        { id: '1a', title: 'Publicar vaga', completed: false },
-        { id: '1b', title: 'Entrevistar candidatos', completed: false },
-        { id: '1c', title: 'Contratar e treinar', completed: false },
-      ],
-      statusHistory: [],
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: '2',
-      title: 'Implementar CRM',
-      description: 'Organizar gestao de leads e clientes',
-      owner: 'Voce',
-      rockType: 'company',
-      quarter,
-      year,
-      status: 'on_track',
-      dueDate: getQuarterEndDate(quarter, year),
-      progress: 0,
-      milestones: [
-        { id: '2a', title: 'Escolher sistema', completed: false },
-        { id: '2b', title: 'Configurar', completed: false },
-        { id: '2c', title: 'Treinar equipe', completed: false },
-      ],
-      statusHistory: [],
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: '3',
-      title: 'Conseguir 15 avaliacoes Google',
-      description: 'Melhorar presenca online',
-      owner: 'Voce',
-      rockType: 'individual',
-      quarter,
-      year,
-      status: 'on_track',
-      dueDate: getQuarterEndDate(quarter, year),
-      progress: 0,
-      milestones: [
-        { id: '3a', title: '5 avaliacoes', completed: false },
-        { id: '3b', title: '10 avaliacoes', completed: false },
-        { id: '3c', title: '15 avaliacoes', completed: false },
-      ],
-      statusHistory: [],
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
-}
-
 // Calculate progress based on milestones
 function calculateProgress(milestones: Milestone[]): number {
-  if (milestones.length === 0) return 0;
+  if (!milestones || milestones.length === 0) return 0;
   const completed = milestones.filter(m => m.completed).length;
   return Math.round((completed / milestones.length) * 100);
 }
@@ -150,173 +78,170 @@ export interface UseRocksReturn {
   currentQuarter: number;
   currentYear: number;
   // CRUD operations
-  addRock: (rock: Omit<Rock, 'id' | 'createdAt' | 'updatedAt' | 'statusHistory' | 'progress'>) => void;
-  updateRock: (id: string, updates: Partial<Rock>) => void;
-  deleteRock: (id: string) => void;
+  addRock: (rock: Omit<Rock, 'id' | 'createdAt' | 'updatedAt' | 'statusHistory' | 'progress'>) => Promise<void>;
+  updateRock: (id: string, updates: Partial<Rock>) => Promise<void>;
+  deleteRock: (id: string) => Promise<void>;
   // Status operations
-  updateStatus: (id: string, status: RockStatus, note?: string) => void;
+  updateStatus: (id: string, status: RockStatus, note?: string) => Promise<void>;
   // Milestone operations
-  toggleMilestone: (rockId: string, milestoneId: string) => void;
-  addMilestone: (rockId: string, title: string) => void;
-  deleteMilestone: (rockId: string, milestoneId: string) => void;
+  toggleMilestone: (rockId: string, milestoneId: string) => Promise<void>;
+  addMilestone: (rockId: string, title: string) => Promise<void>;
+  deleteMilestone: (rockId: string, milestoneId: string) => Promise<void>;
   // Filters
   getRocksByQuarter: (quarter: number, year: number) => Rock[];
   getRocksByOwner: (owner: string) => Rock[];
   getCompanyRocks: () => Rock[];
   getIndividualRocks: () => Rock[];
   getCurrentQuarterRocks: () => Rock[];
+  // Refresh
+  refresh: () => Promise<void>;
 }
 
 export function useRocks(): UseRocksReturn {
   const [rocks, setRocks] = useState<Rock[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load rocks from localStorage on mount
-  useEffect(() => {
+  const quarter = getCurrentQuarter();
+  const year = getCurrentYear();
+
+  // Fetch rocks from API
+  const fetchRocks = useCallback(async () => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setRocks(JSON.parse(stored));
-      } else {
-        const defaults = getDefaultRocks();
-        setRocks(defaults);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+      const res = await fetch(`/api/rocks?quarter=${quarter}&year=${year}`);
+      if (res.ok) {
+        const data = await res.json();
+        const rocksWithProgress = (data.rocks || []).map((rock: Rock) => ({
+          ...rock,
+          progress: calculateProgress(rock.milestones || []),
+        }));
+        setRocks(rocksWithProgress);
       }
     } catch (error) {
-      console.error('Error loading rocks:', error);
-      setRocks(getDefaultRocks());
+      console.error('Error fetching rocks:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [quarter, year]);
 
-  // Save to localStorage whenever rocks change
-  const saveRocks = useCallback((newRocks: Rock[]) => {
-    setRocks(newRocks);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newRocks));
-  }, []);
+  // Load rocks on mount
+  useEffect(() => {
+    fetchRocks();
+  }, [fetchRocks]);
 
   // Add a new rock
-  const addRock = useCallback((rock: Omit<Rock, 'id' | 'createdAt' | 'updatedAt' | 'statusHistory' | 'progress'>) => {
-    const now = new Date().toISOString();
-    const newRock: Rock = {
-      ...rock,
-      id: Date.now().toString(),
-      progress: calculateProgress(rock.milestones || []),
-      statusHistory: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    saveRocks([newRock, ...rocks]);
-  }, [rocks, saveRocks]);
+  const addRock = useCallback(async (rock: Omit<Rock, 'id' | 'createdAt' | 'updatedAt' | 'statusHistory' | 'progress'>) => {
+    try {
+      const res = await fetch('/api/rocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...rock,
+          statusHistory: [],
+        }),
+      });
+
+      if (res.ok) {
+        await fetchRocks();
+      }
+    } catch (error) {
+      console.error('Error adding rock:', error);
+    }
+  }, [fetchRocks]);
 
   // Update a rock
-  const updateRock = useCallback((id: string, updates: Partial<Rock>) => {
-    const newRocks = rocks.map(rock => {
-      if (rock.id !== id) return rock;
-      const updated = {
-        ...rock,
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      };
-      // Recalculate progress if milestones changed
-      if (updates.milestones) {
-        updated.progress = calculateProgress(updates.milestones);
+  const updateRock = useCallback(async (id: string, updates: Partial<Rock>) => {
+    try {
+      const rock = rocks.find(r => r.id === id);
+      if (!rock) return;
+
+      const res = await fetch('/api/rocks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          ...updates,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchRocks();
       }
-      return updated;
-    });
-    saveRocks(newRocks);
-  }, [rocks, saveRocks]);
+    } catch (error) {
+      console.error('Error updating rock:', error);
+    }
+  }, [rocks, fetchRocks]);
 
   // Delete a rock
-  const deleteRock = useCallback((id: string) => {
-    saveRocks(rocks.filter(rock => rock.id !== id));
-  }, [rocks, saveRocks]);
+  const deleteRock = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/rocks?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        await fetchRocks();
+      }
+    } catch (error) {
+      console.error('Error deleting rock:', error);
+    }
+  }, [fetchRocks]);
 
   // Update status with history tracking
-  const updateStatus = useCallback((id: string, newStatus: RockStatus, note?: string) => {
-    const newRocks = rocks.map(rock => {
-      if (rock.id !== id) return rock;
+  const updateStatus = useCallback(async (id: string, newStatus: RockStatus, note?: string) => {
+    const rock = rocks.find(r => r.id === id);
+    if (!rock) return;
 
-      const statusChange: StatusChange = {
-        from: rock.status,
-        to: newStatus,
-        date: new Date().toISOString(),
-        note,
-      };
+    const statusChange: StatusChange = {
+      from: rock.status,
+      to: newStatus,
+      date: new Date().toISOString(),
+      note,
+    };
 
-      return {
-        ...rock,
-        status: newStatus,
-        statusHistory: [...rock.statusHistory, statusChange],
-        updatedAt: new Date().toISOString(),
-      };
+    await updateRock(id, {
+      status: newStatus,
+      statusHistory: [...(rock.statusHistory || []), statusChange],
     });
-    saveRocks(newRocks);
-  }, [rocks, saveRocks]);
+  }, [rocks, updateRock]);
 
   // Toggle milestone completion
-  const toggleMilestone = useCallback((rockId: string, milestoneId: string) => {
-    const newRocks = rocks.map(rock => {
-      if (rock.id !== rockId) return rock;
+  const toggleMilestone = useCallback(async (rockId: string, milestoneId: string) => {
+    const rock = rocks.find(r => r.id === rockId);
+    if (!rock) return;
 
-      const newMilestones = rock.milestones.map(m =>
-        m.id === milestoneId ? { ...m, completed: !m.completed } : m
-      );
+    const newMilestones = (rock.milestones || []).map(m =>
+      m.id === milestoneId ? { ...m, completed: !m.completed } : m
+    );
 
-      return {
-        ...rock,
-        milestones: newMilestones,
-        progress: calculateProgress(newMilestones),
-        updatedAt: new Date().toISOString(),
-      };
-    });
-    saveRocks(newRocks);
-  }, [rocks, saveRocks]);
+    await updateRock(rockId, { milestones: newMilestones });
+  }, [rocks, updateRock]);
 
   // Add milestone
-  const addMilestone = useCallback((rockId: string, title: string) => {
-    const newRocks = rocks.map(rock => {
-      if (rock.id !== rockId) return rock;
+  const addMilestone = useCallback(async (rockId: string, title: string) => {
+    const rock = rocks.find(r => r.id === rockId);
+    if (!rock) return;
 
-      const newMilestone: Milestone = {
-        id: `${rockId}-${Date.now()}`,
-        title,
-        completed: false,
-      };
+    const newMilestone: Milestone = {
+      id: `${rockId}-${Date.now()}`,
+      title,
+      completed: false,
+    };
 
-      const newMilestones = [...rock.milestones, newMilestone];
-
-      return {
-        ...rock,
-        milestones: newMilestones,
-        progress: calculateProgress(newMilestones),
-        updatedAt: new Date().toISOString(),
-      };
+    await updateRock(rockId, {
+      milestones: [...(rock.milestones || []), newMilestone],
     });
-    saveRocks(newRocks);
-  }, [rocks, saveRocks]);
+  }, [rocks, updateRock]);
 
   // Delete milestone
-  const deleteMilestone = useCallback((rockId: string, milestoneId: string) => {
-    const newRocks = rocks.map(rock => {
-      if (rock.id !== rockId) return rock;
+  const deleteMilestone = useCallback(async (rockId: string, milestoneId: string) => {
+    const rock = rocks.find(r => r.id === rockId);
+    if (!rock) return;
 
-      const newMilestones = rock.milestones.filter(m => m.id !== milestoneId);
-
-      return {
-        ...rock,
-        milestones: newMilestones,
-        progress: calculateProgress(newMilestones),
-        updatedAt: new Date().toISOString(),
-      };
+    await updateRock(rockId, {
+      milestones: (rock.milestones || []).filter(m => m.id !== milestoneId),
     });
-    saveRocks(newRocks);
-  }, [rocks, saveRocks]);
+  }, [rocks, updateRock]);
 
   // Filter functions
-  const getRocksByQuarter = useCallback((quarter: number, year: number) => {
-    return rocks.filter(r => r.quarter === quarter && r.year === year);
+  const getRocksByQuarter = useCallback((q: number, y: number) => {
+    return rocks.filter(r => r.quarter === q && r.year === y);
   }, [rocks]);
 
   const getRocksByOwner = useCallback((owner: string) => {
@@ -352,6 +277,7 @@ export function useRocks(): UseRocksReturn {
     getCompanyRocks,
     getIndividualRocks,
     getCurrentQuarterRocks,
+    refresh: fetchRocks,
   };
 }
 

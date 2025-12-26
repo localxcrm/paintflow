@@ -35,7 +35,11 @@ export async function GET(request: NextRequest) {
 
     const { data: rocks, error } = await query;
 
+    console.log('Fetching rocks for org:', organizationId, 'quarter:', quarter, 'year:', year);
+    console.log('Rocks result:', rocks?.length || 0, 'items');
+
     if (error) {
+      console.error('Supabase error fetching rocks:', error);
       throw error;
     }
 
@@ -60,28 +64,34 @@ export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient();
     const body = await request.json();
 
+    const insertData = {
+      organizationId,
+      title: body.title,
+      description: body.description || null,
+      owner: body.owner,
+      rockType: body.rockType || 'company',
+      quarter: body.quarter,
+      year: body.year,
+      status: body.status || 'on_track',
+      dueDate: body.dueDate,
+      milestones: body.milestones || [],
+      statusHistory: body.statusHistory || [],
+    };
+
+    console.log('Creating rock with data:', insertData);
+
     const { data: rock, error } = await supabase
       .from('Rock')
-      .insert({
-        organizationId,
-        title: body.title,
-        description: body.description || null,
-        owner: body.owner,
-        rockType: body.rockType || 'company',
-        quarter: body.quarter,
-        year: body.year,
-        status: body.status || 'on_track',
-        dueDate: body.dueDate,
-        milestones: body.milestones || [],
-        statusHistory: body.statusHistory || [],
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
-      throw error;
+      console.error('Supabase error creating rock:', error);
+      return NextResponse.json({ error: error.message, details: error }, { status: 500 });
     }
 
+    console.log('Rock created:', rock);
     return NextResponse.json(rock, { status: 201 });
   } catch (error) {
     console.error('Error creating rock:', error);
