@@ -241,259 +241,302 @@ export default function PainelPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-700">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Painel</h1>
-          <p className="text-slate-500">
-            Acompanhe suas metas e resultados
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Painel</h1>
+          <p className="text-slate-500 font-medium">
+            Bem-vindo ao centro de comando do seu negócio
           </p>
         </div>
-        <Tabs value={period} onValueChange={setPeriod}>
-          <TabsList>
-            <TabsTrigger value="week">Semana</TabsTrigger>
-            <TabsTrigger value="month">Mes</TabsTrigger>
-            <TabsTrigger value="quarter">Trimestre</TabsTrigger>
+        <Tabs value={period} onValueChange={setPeriod} className="glass p-1 rounded-xl shadow-inner">
+          <TabsList className="bg-transparent border-none">
+            <TabsTrigger value="week" className="data-[state=active]:bg-white data-[state=active]:text-brand-teal data-[state=active]:shadow-sm rounded-lg transition-all font-semibold">Semana</TabsTrigger>
+            <TabsTrigger value="month" className="data-[state=active]:bg-white data-[state=active]:text-brand-teal data-[state=active]:shadow-sm rounded-lg transition-all font-semibold">Mes</TabsTrigger>
+            <TabsTrigger value="quarter" className="data-[state=active]:bg-white data-[state=active]:text-brand-teal data-[state=active]:shadow-sm rounded-lg transition-all font-semibold">Trimestre</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
       {/* Barra de Progresso da Meta Anual */}
-      <Card className="border border-slate-200 bg-white">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-[#0D5C75]" />
-              <span className="font-semibold text-slate-700">Meta Anual</span>
-            </div>
+      <Card variant="glass" className="border-white/40 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-8 pointer-events-none opacity-5">
+          <Target className="w-32 h-32" />
+        </div>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-slate-500">
-                {formatCurrency(ytdRevenue, true)} de {formatCurrency(settings.annualTarget, true)}
-              </span>
-              <span className="text-sm font-bold text-[#0D5C75]">{vtoProgress.toFixed(0)}%</span>
+              <div className="p-2 bg-brand-teal/10 rounded-lg">
+                <Target className="w-6 h-6 text-brand-teal" />
+              </div>
+              <span className="font-bold text-lg text-slate-800 tracking-tight">Progresso Meta Anual</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <span className="block text-xs uppercase font-bold text-slate-400 tracking-wider mb-0.5">Faturamento YTD</span>
+                <span className="text-sm font-bold text-slate-700">
+                  {formatCurrency(ytdRevenue, true)} <span className="text-slate-400 font-medium text-xs">/ {formatCurrency(settings.annualTarget, true)}</span>
+                </span>
+              </div>
+              <div className="h-10 w-10 flex items-center justify-center rounded-full bg-brand-teal text-white font-bold text-sm shadow-lg shadow-brand-teal/20">
+                {vtoProgress.toFixed(0)}%
+              </div>
               <Link href="/metas">
-                <Button variant="ghost" size="sm" className="h-7 px-2">
-                  <ArrowRight className="w-4 h-4" />
+                <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-100/50">
+                  <ArrowRight className="w-5 h-5 text-slate-400" />
                 </Button>
               </Link>
             </div>
           </div>
-          <Progress value={Math.min(vtoProgress, 100)} className="h-2" />
+          <div className="relative h-3 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+            <div
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-brand-teal to-brand-teal-light transition-all duration-1000 ease-out rounded-full shadow-[0_0_10px_rgba(26,122,140,0.3)]"
+              style={{ width: `${Math.min(vtoProgress, 100)}%` }}
+            />
+          </div>
         </CardContent>
       </Card>
 
       {/* Meu Foco e Meu Sonho - Cards lado a lado */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Meu Foco - Plano do Ano */}
-        <Card className="border-2 border-[#0D5C75] bg-gradient-to-br from-[#0D5C75]/5 to-[#F26522]/5">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F26522]/10 rounded-lg">
-                  <Sparkles className="w-6 h-6 text-[#F26522]" />
+        <Card variant="glass" className="border-brand-teal/20 bg-gradient-to-br from-brand-teal/5 to-transparent hover:shadow-brand-teal/5 hover:translate-y-[-2px] transition-all">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-brand-orange/10 rounded-2xl shadow-inner shadow-brand-orange/5">
+                  <Sparkles className="w-6 h-6 text-brand-orange animate-pulse" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-[#0D5C75]">Meu Foco</h2>
-                  <p className="text-sm text-slate-500">Plano do ano</p>
+                  <h2 className="text-xl font-bold text-brand-teal tracking-tight">Meu Foco</h2>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Plano do Ano</p>
                 </div>
               </div>
               <Link href="/metas">
-                <Button variant="ghost" size="sm" className="text-[#0D5C75] hover:text-[#094A5E]">
-                  Editar <ArrowRight className="w-4 h-4 ml-1" />
+                <Button variant="ghost" size="sm" className="font-bold text-brand-teal hover:bg-brand-teal/5">
+                  Configurar <ArrowRight className="w-4 h-4 ml-1.5" />
                 </Button>
               </Link>
             </div>
 
-            {settings.oneYearVision ? (
-              <div className="mb-4">
-                <p className="text-base text-slate-700 italic">
-                  &ldquo;{settings.oneYearVision}&rdquo;
-                </p>
-              </div>
-            ) : (
-              <div className="mb-4">
-                <p className="text-sm text-slate-500 italic">
-                  Defina seu foco para o ano em Metas
-                </p>
-              </div>
-            )}
+            <div className="space-y-6">
+              {settings.oneYearVision ? (
+                <div className="relative p-4 bg-white/40 rounded-xl border border-white/60 shadow-inner">
+                  <p className="text-lg text-slate-700 italic font-medium leading-relaxed">
+                    &ldquo;{settings.oneYearVision}&rdquo;
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 border-2 border-dashed border-slate-200/50 rounded-xl text-center">
+                  <p className="text-sm text-slate-400 font-medium italic">
+                    Defina seu foco para o ano em Metas
+                  </p>
+                </div>
+              )}
 
-            {settings.oneYearGoals && settings.oneYearGoals.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Objetivos</p>
-                {settings.oneYearGoals.map((goal, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Circle className="w-4 h-4 text-[#F26522]" />
-                    <span className="text-sm text-slate-700">{goal}</span>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Principais Objetivos</p>
+                <div className="grid gap-2">
+                  {settings.oneYearGoals && settings.oneYearGoals.length > 0 ? (
+                    settings.oneYearGoals.map((goal, index) => (
+                      <div key={index} className="flex items-start gap-3 p-2 group hover:bg-white/30 rounded-lg transition-colors">
+                        <div className="mt-1 w-4 h-4 rounded-full border-2 border-brand-orange flex items-center justify-center shrink-0">
+                          <div className="w-1.5 h-1.5 rounded-full bg-brand-orange" />
+                        </div>
+                        <span className="text-sm text-slate-700 font-semibold group-hover:text-brand-teal transition-colors">{goal}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-400 pl-1">Nenhum objetivo definido</p>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Objetivos</p>
-                <p className="text-sm text-slate-400">Nenhum objetivo definido ainda</p>
-              </div>
-            )}
+            </div>
           </CardContent>
         </Card>
 
         {/* Meu Sonho - Visao de Longo Prazo */}
-        <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
+        <Card variant="glass" className="border-purple-200/50 bg-gradient-to-br from-purple-50/50 to-pink-50/50 hover:shadow-purple-500/5 hover:translate-y-[-2px] transition-all">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-100 rounded-2xl shadow-inner">
                   <Eye className="w-6 h-6 text-purple-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-purple-700">Meu Sonho</h2>
-                  <p className="text-sm text-slate-500">Visao de longo prazo</p>
+                  <h2 className="text-xl font-bold text-purple-700 tracking-tight">Meu Sonho</h2>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Norte Magnético</p>
                 </div>
               </div>
               <Link href="/metas">
-                <Button variant="ghost" size="sm" className="text-purple-600 hover:text-purple-700">
-                  Editar <ArrowRight className="w-4 h-4 ml-1" />
+                <Button variant="ghost" size="sm" className="font-bold text-purple-600 hover:bg-purple-100/50">
+                  Ajustar <ArrowRight className="w-4 h-4 ml-1.5" />
                 </Button>
               </Link>
             </div>
 
-            {/* Visao 3 Anos - primeiro */}
-            {(() => {
-              const picture = settings.threeYearPicture;
-              const hasContent = picture && (
-                typeof picture === 'string'
-                  ? picture.trim() !== ''
-                  : (picture.revenue || picture.profit)
-              );
-              const displayText = typeof picture === 'string'
-                ? picture
-                : picture?.revenue
-                  ? `Faturamento: ${picture.revenue}${picture.profit ? ` | Lucro: ${picture.profit}` : ''}`
-                  : '';
+            <div className="space-y-6">
+              {/* Visao 3 Anos */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Onde estaremos em 3 anos</p>
+                {(() => {
+                  const picture = settings.threeYearPicture;
+                  const hasContent = picture && (
+                    typeof picture === 'string'
+                      ? picture.trim() !== ''
+                      : (picture.revenue || picture.profit)
+                  );
+                  const displayText = typeof picture === 'string'
+                    ? picture
+                    : picture?.revenue
+                      ? `Faturamento: ${picture.revenue}${picture.profit ? ` | Lucro: ${picture.profit}` : ''}`
+                      : '';
 
-              return hasContent ? (
-                <div className="mb-4">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Visao 3 Anos</p>
-                  <p className="text-base text-slate-700 italic">
-                    &ldquo;{displayText}&rdquo;
-                  </p>
-                </div>
-              ) : (
-                <div className="mb-4">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Visao 3 Anos</p>
-                  <p className="text-sm text-slate-400 italic">
-                    Defina sua visao de 3 anos em Metas
-                  </p>
-                </div>
-              );
-            })()}
+                  return hasContent ? (
+                    <div className="p-4 bg-white/40 rounded-xl border border-white/60 shadow-inner">
+                      <p className="text-base text-slate-700 italic font-medium">
+                        &ldquo;{displayText}&rdquo;
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 border-2 border-dashed border-slate-200/50 rounded-xl text-center">
+                      <p className="text-sm text-slate-400 italic">Defina sua visão de 3 anos</p>
+                    </div>
+                  );
+                })()}
+              </div>
 
-            {/* Meta 10 Anos - depois */}
-            {settings.tenYearTarget ? (
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Meta 10 Anos</p>
-                <p className="text-base text-slate-700 italic">
-                  &ldquo;{settings.tenYearTarget}&rdquo;
-                </p>
+              {/* Meta 10 Anos */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Meta de 10 Anos</p>
+                {settings.tenYearTarget ? (
+                  <div className="p-4 bg-purple-600 text-white rounded-xl shadow-lg shadow-purple-200 border border-purple-400">
+                    <p className="text-base text-white font-bold leading-relaxed">
+                      &ldquo;{settings.tenYearTarget}&rdquo;
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-4 border-2 border-dashed border-purple-200/50 rounded-xl text-center">
+                    <p className="text-sm text-slate-400 italic">Qual é o seu Everest?</p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Meta 10 Anos</p>
-                <p className="text-sm text-slate-400 italic">
-                  Defina sua meta de 10 anos em Metas
-                </p>
-              </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Rocks do Trimestre */}
-      <Card className="border border-slate-200">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Mountain className="w-5 h-5 text-slate-600" />
-              <h3 className="font-semibold text-slate-700">
-                Rocks Q{currentQuarter} {currentYear}
-              </h3>
-            </div>
-            <span className="text-sm text-slate-500">
-              {completedRocks}/{totalRocks} concluidos
-            </span>
-          </div>
-          <div className="space-y-2">
-            {quarterRocks.slice(0, 5).map((rock) => (
-              <div key={rock.id} className="flex items-center gap-2">
-                <button
-                  onClick={() =>
-                    updateStatus(rock.id, rock.status === 'complete' ? 'on_track' : 'complete')
-                  }
-                >
-                  {rock.status === 'complete' ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />
-                  )}
-                </button>
-                <span
-                  className={`text-sm flex-1 ${rock.status === 'complete' ? 'text-slate-400 line-through' : 'text-slate-700'}`}
-                >
-                  {rock.title}
-                </span>
-                {rock.progress > 0 && rock.status !== 'complete' && (
-                  <span className="text-xs text-slate-500">{rock.progress}%</span>
+      {/* Rocks e Ações Rápidas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Rocks do Trimestre */}
+        <div className="lg:col-span-2">
+          <Card variant="glass" className="h-full border-slate-200/40">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 rounded-lg">
+                    <Mountain className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <CardTitle className="text-lg font-bold text-slate-800">Rocks Q{currentQuarter} {currentYear}</CardTitle>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-full uppercase tracking-tight">
+                    {completedRocks}/{totalRocks} Concluídos
+                  </span>
+                  <Link href="/rocks">
+                    <Button variant="ghost" size="sm" className="h-8 px-2 font-bold text-brand-teal">
+                      Ver Todos
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {quarterRocks.slice(0, 6).map((rock) => (
+                  <div key={rock.id} className="flex items-center gap-3 p-3 bg-white/40 hover:bg-white/60 rounded-xl border border-white/60 transition-all group">
+                    <button
+                      className="shrink-0 transition-transform active:scale-95"
+                      onClick={() =>
+                        updateStatus(rock.id, rock.status === 'complete' ? 'on_track' : 'complete')
+                      }
+                    >
+                      {rock.status === 'complete' ? (
+                        <div className="w-6 h-6 rounded-lg bg-green-500 flex items-center justify-center shadow-lg shadow-green-200">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 rounded-lg border-2 border-slate-300 group-hover:border-brand-teal transition-colors" />
+                      )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-bold truncate ${rock.status === 'complete' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                        {rock.title}
+                      </p>
+                      {rock.status !== 'complete' && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="h-1 w-12 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-brand-teal rounded-full" style={{ width: `${rock.progress}%` }} />
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400">{rock.progress}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {quarterRocks.length === 0 && (
+                  <div className="col-span-2 py-8 text-center text-slate-400 font-medium italic">
+                    Nenhum rock para este trimestre. Foco na operação!
+                  </div>
                 )}
               </div>
-            ))}
-            {quarterRocks.length === 0 && (
-              <p className="text-sm text-slate-500">
-                Nenhum rock para este trimestre.{' '}
-                <Link href="/rocks" className="text-[#0D5C75] hover:underline">
-                  Adicionar rocks
-                </Link>
-              </p>
-            )}
-            {quarterRocks.length > 5 && (
-              <Link href="/rocks" className="flex items-center gap-1 text-sm text-[#0D5C75] hover:underline mt-2">
-                Ver todos os {quarterRocks.length} rocks <ArrowRight className="w-4 h-4" />
-              </Link>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Link href="/vendas?action=lead">
-          <Button className="w-full h-14 text-base bg-blue-600 hover:bg-blue-700">
-            <Plus className="w-5 h-5 mr-2" />
-            Novo Lead
-          </Button>
-        </Link>
-        <Link href="/vendas?action=sale">
-          <Button variant="outline" className="w-full h-14 text-base border-2">
-            <TrendingUp className="w-5 h-5 mr-2" />
-            Registrar Venda
-          </Button>
-        </Link>
-        <Link href="/marketing">
-          <Button variant="outline" className="w-full h-14 text-base border-2">
-            <Megaphone className="w-5 h-5 mr-2" />
-            Marketing
-          </Button>
-        </Link>
-        <Link href="/conhecimento">
-          <Button variant="outline" className="w-full h-14 text-base border-2">
-            <FileText className="w-5 h-5 mr-2" />
-            SOPs
-          </Button>
-        </Link>
+        {/* Quick Actions */}
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Atalhos de Venda</p>
+          <Link href="/vendas?action=lead" className="block">
+            <Button variant="premium" size="lg" className="w-full h-16 justify-between px-6 shadow-blue-500/10 hover:shadow-blue-500/20">
+              <span className="flex items-center gap-3">
+                <Plus className="w-6 h-6" />
+                <span className="font-bold text-lg">Novo Lead</span>
+              </span>
+              <ArrowRight className="w-5 h-5 opacity-50" />
+            </Button>
+          </Link>
+          <Link href="/vendas?action=sale" className="block">
+            <Button variant="outline" size="lg" className="w-full h-16 justify-between px-6 bg-white shadow-xl hover:bg-slate-50 border-slate-200/50">
+              <span className="flex items-center gap-3 text-slate-700">
+                <TrendingUp className="w-6 h-6 text-brand-teal" />
+                <span className="font-bold text-lg">Venda</span>
+              </span>
+              <ArrowRight className="w-5 h-5 text-slate-400" />
+            </Button>
+          </Link>
+
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1 mt-6">Gestão & Treinamento</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/marketing">
+              <Card className="p-4 hover:bg-white/60 transition-colors cursor-pointer border-slate-200/40 shadow-sm text-center">
+                <Megaphone className="w-6 h-6 text-brand-orange mx-auto mb-2" />
+                <span className="text-xs font-bold text-slate-700">Marketing</span>
+              </Card>
+            </Link>
+            <Link href="/conhecimento">
+              <Card className="p-4 hover:bg-white/60 transition-colors cursor-pointer border-slate-200/40 shadow-sm text-center">
+                <FileText className="w-6 h-6 text-brand-teal mx-auto mb-2" />
+                <span className="text-xs font-bold text-slate-700">Processos</span>
+              </Card>
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* Main KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <ProgressCard
           title="Leads"
           subtitle={periodLabel}
@@ -518,112 +561,107 @@ export default function PainelPage() {
         />
       </div>
 
-      {/* Secondary Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Marketing ROI Card */}
-        <Card>
+      {/* ROI & Avaliações Side-by-Side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+        <Card variant="glass" className="border-purple-200/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Megaphone className="w-5 h-5 text-purple-500" />
+            <CardTitle className="text-lg font-bold flex items-center gap-3 text-slate-800">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Megaphone className="w-5 h-5 text-purple-600" />
+              </div>
               ROI de Marketing
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-slate-900">
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-3 gap-6 text-center">
+              <div className="space-y-1">
+                <p className="text-2xl font-black text-slate-800 tracking-tighter">
                   {formatCurrency(displayData.marketing.spent, true)}
                 </p>
-                <p className="text-xs text-slate-500">Investido</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Investido</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-900">
+              <div className="space-y-1">
+                <p className="text-2xl font-black text-slate-800 tracking-tighter">
                   ${displayData.marketing.cpl.toFixed(0)}
                 </p>
-                <p className="text-xs text-slate-500">Custo/Lead</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Custo/Lead</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-green-600">
+              <div className="space-y-1">
+                <p className="text-3xl font-black text-green-500 tracking-tighter">
                   {displayData.marketing.roi.toFixed(1)}x
                 </p>
-                <p className="text-xs text-slate-500">ROI</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ROI</p>
               </div>
             </div>
-            <Link href="/marketing" className="block mt-4">
-              <Button variant="ghost" className="w-full text-sm">
-                Ver detalhes <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
           </CardContent>
         </Card>
 
-        {/* Reviews Card */}
-        <Card>
+        <Card variant="glass" className="border-yellow-200/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-500" />
-              Avaliacoes
+            <CardTitle className="text-lg font-bold flex items-center gap-3 text-slate-800">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+              </div>
+              Avaliações & Satisfação
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-4xl font-bold text-slate-900">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between gap-8">
+              <div className="flex items-end gap-2">
+                <p className="text-5xl font-black text-slate-800 leading-none tracking-tighter">
                   {displayData.reviews.avgRating > 0
                     ? displayData.reviews.avgRating.toFixed(1)
-                    : '-'}
+                    : '5.0'}
                 </p>
-                <p className="text-sm text-slate-500">Nota media</p>
+                <div className="flex flex-col mb-1">
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`w-3 h-3 ${star <= Math.round(displayData.reviews.avgRating || 5)
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-slate-200'
+                          }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Nota Média</p>
+                </div>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-slate-900">{displayData.reviews.total}</p>
-                <p className="text-sm text-slate-500">de {displayData.reviews.goal} avaliacoes</p>
+                <p className="text-2xl font-black text-slate-800 tracking-tighter">{displayData.reviews.total}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total acumulado</p>
+                <div className="mt-2 h-1.5 w-24 bg-slate-100 rounded-full ml-auto overflow-hidden">
+                  <div className="h-full bg-yellow-400" style={{ width: `${(displayData.reviews.total / displayData.reviews.goal) * 100}%` }} />
+                </div>
               </div>
-            </div>
-            <div className="flex gap-1 mt-4">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={`w-6 h-6 ${star <= Math.round(displayData.reviews.avgRating)
-                    ? 'text-yellow-400 fill-yellow-400'
-                    : 'text-slate-200'
-                    }`}
-                />
-              ))}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Formula Reference */}
-      <Card className="bg-slate-50">
-        <CardContent className="p-4">
-          <h3 className="font-semibold text-slate-700 mb-2">
-            Formula para {formatCurrency(settings.annualTarget, true)}
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="text-slate-500">Leads/semana:</span>
-              <span className="font-medium ml-2">{goals.weekly.leads}</span>
+      {/* Floating Formula Reference */}
+      <div className="fixed bottom-6 right-6 z-50 group">
+        <Card variant="glass" className="p-1 pr-6 shadow-2xl border-white/60 flex items-center gap-4 max-w-xs md:max-w-none transition-all duration-500 hover:max-w-xl">
+          <div className="h-10 w-10 bg-slate-800 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
+            <div className="text-white font-black text-lg font-mono">F</div>
+          </div>
+          <div className="flex items-center gap-6 overflow-hidden">
+            <div className="whitespace-nowrap">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Alvo Semanal</p>
+              <p className="text-sm font-bold text-slate-800">{formatCurrency(goals.weekly.revenue, true)}/venda</p>
             </div>
-            <div>
-              <span className="text-slate-500">Vendas/semana:</span>
-              <span className="font-medium ml-2">{goals.weekly.jobs}</span>
+            <div className="whitespace-nowrap hidden md:block border-l border-slate-200 pl-6">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cota Leads</p>
+              <p className="text-sm font-bold text-slate-800">{goals.weekly.leads} leads/sem</p>
             </div>
-            <div>
-              <span className="text-slate-500">Faturamento/semana:</span>
-              <span className="font-medium ml-2">{formatCurrency(goals.weekly.revenue, true)}</span>
-            </div>
-            <div>
-              <span className="text-slate-500">Marketing/ano:</span>
-              <span className="font-medium ml-2">{formatCurrency(goals.annual.marketing, true)}</span>
+            <div className="whitespace-nowrap border-l border-slate-200 pl-6">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fechamento</p>
+              <p className="text-sm font-bold text-slate-800">{settings.formulaParams.closingRate}%</p>
             </div>
           </div>
-          <p className="text-xs text-slate-500 mt-3">
-            Taxa de fechamento: {settings.formulaParams.closingRate}% | Ticket medio: {formatCurrency(settings.formulaParams.avgTicket)} | {settings.formulaParams.productionWeeks} semanas de producao
-          </p>
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

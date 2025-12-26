@@ -74,23 +74,25 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
-      <div className="flex items-center justify-between h-20 px-4 lg:px-6">
-        {/* Logo */}
-        <div className="flex items-center gap-6">
-          <Link href="/painel" className="flex-shrink-0">
-            <Image
-              src={organization?.logo || '/logo.png'}
-              alt={organization?.name || 'PaintFlow'}
-              width={270}
-              height={72}
-              className="h-[60px] w-auto object-contain"
-              priority
-            />
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm transition-all duration-300">
+      <div className="flex items-center justify-between h-20 px-4 lg:px-8 max-w-[2000px] mx-auto">
+        {/* Logo & Nav */}
+        <div className="flex items-center gap-10">
+          <Link href="/painel" className="flex-shrink-0 group">
+            <div className="relative">
+              <Image
+                src={organization?.logo || '/logo.png'}
+                alt={organization?.name || 'PaintFlow'}
+                width={270}
+                height={72}
+                className="h-[56px] w-auto object-contain transition-transform group-hover:scale-105 duration-300"
+                priority
+              />
+            </div>
           </Link>
 
           {/* Navigation */}
-          <nav className="flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-2 p-1.5 bg-slate-100/50 rounded-2xl border border-slate-200/30">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -99,69 +101,77 @@ export function Header() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    'flex items-center gap-2.5 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200',
                     active
-                      ? 'bg-[#0D5C75] text-white'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-brand-teal text-white shadow-lg shadow-brand-teal/20 scale-105'
+                      : 'text-slate-600 hover:bg-white hover:text-brand-teal hover:shadow-sm'
                   )}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span className="hidden sm:inline">{item.label}</span>
+                  <Icon className={cn("w-4 h-4", active ? "animate-pulse" : "")} />
+                  <span>{item.label}</span>
                 </Link>
               );
             })}
           </nav>
         </div>
 
-        {/* User menu - only render after mount to avoid hydration mismatch */}
+        {/* User menu */}
         {mounted ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 px-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-[#0D5C75] text-white text-sm">
-                    {user ? getInitials(user.name) : 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden md:flex md:flex-col md:items-start">
-                  <span className="text-sm font-medium">{user?.name || 'User'}</span>
-                  <span className="text-xs text-slate-500">Owner</span>
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col">
-                  <span>{user?.name || 'User'}</span>
-                  <span className="text-xs font-normal text-slate-500">{user?.email}</span>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/perfil" className="flex items-center gap-2 cursor-pointer">
-                  <User className="w-4 h-4" />
-                  Perfil
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/configuracoes" className="flex items-center gap-2 cursor-pointer">
-                  <Settings className="w-4 h-4" />
-                  Configurações
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/equipe" className="flex items-center gap-2 cursor-pointer">
-                  <Users className="w-4 h-4" />
-                  Equipe
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Sair
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-4">
+            <button className="hidden md:flex p-2 text-slate-400 hover:text-brand-teal hover:bg-slate-50 rounded-full transition-colors">
+              <Settings className="w-5 h-5" />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-3 px-3 h-12 rounded-2xl hover:bg-slate-50 border border-transparent hover:border-slate-200/50 transition-all">
+                  <div className="relative">
+                    <Avatar className="h-9 w-9 border-2 border-white shadow-md">
+                      <AvatarFallback className="bg-gradient-to-br from-brand-teal to-brand-teal-light text-white text-xs font-bold">
+                        {user ? getInitials(user.name) : 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+                  </div>
+                  <div className="hidden md:flex md:flex-col md:items-start leading-tight">
+                    <span className="text-sm font-bold text-slate-800">{user?.name || 'User'}</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Business Owner</span>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col">
+                    <span>{user?.name || 'User'}</span>
+                    <span className="text-xs font-normal text-slate-500">{user?.email}</span>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/perfil" className="flex items-center gap-2 cursor-pointer">
+                    <User className="w-4 h-4" />
+                    Perfil
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/configuracoes" className="flex items-center gap-2 cursor-pointer">
+                    <Settings className="w-4 h-4" />
+                    Configurações
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/equipe" className="flex items-center gap-2 cursor-pointer">
+                    <Users className="w-4 h-4" />
+                    Equipe
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         ) : (
           <div className="flex items-center gap-2 px-2">
             <div className="h-8 w-8 rounded-full bg-slate-200 animate-pulse" />
