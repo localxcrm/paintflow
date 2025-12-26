@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getSubSessionToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 
 const SUB_SESSION_COOKIE = 'paintpro_sub_session';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get(SUB_SESSION_COOKIE)?.value;
+    const sessionToken = await getSubSessionToken();
 
     if (!sessionToken) {
       return NextResponse.json(
         { error: 'Não autenticado' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -28,7 +38,7 @@ export async function GET() {
     if (sessionError || !session) {
       return NextResponse.json(
         { error: 'Sessão inválida' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -36,7 +46,7 @@ export async function GET() {
     if (new Date(session.expiresAt) < new Date()) {
       return NextResponse.json(
         { error: 'Sessão expirada' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -46,7 +56,7 @@ export async function GET() {
     if (user.role !== 'subcontractor') {
       return NextResponse.json(
         { error: 'Acesso não autorizado' },
-        { status: 403 }
+        { status: 403, headers: corsHeaders }
       );
     }
 
@@ -65,12 +75,12 @@ export async function GET() {
         role: user.role,
       },
       subcontractor: subcontractor || null,
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error('Get subcontractor me error:', error);
     return NextResponse.json(
       { error: 'Erro ao buscar dados' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -78,8 +88,7 @@ export async function GET() {
 // Logout
 export async function DELETE() {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get(SUB_SESSION_COOKIE)?.value;
+    const sessionToken = await getSubSessionToken();
 
     if (sessionToken) {
       const supabase = createServerSupabaseClient();
@@ -91,15 +100,18 @@ export async function DELETE() {
         .eq('token', sessionToken);
     }
 
-    // Clear cookie
-    cookieStore.delete(SUB_SESSION_COOKIE);
+    // Clear cookie if it exists
+    const cookieStore = await cookies();
+    if (cookieStore.get(SUB_SESSION_COOKIE)) {
+      cookieStore.delete(SUB_SESSION_COOKIE);
+    }
 
-    return NextResponse.json({ message: 'Logout realizado' });
+    return NextResponse.json({ message: 'Logout realizado' }, { headers: corsHeaders });
   } catch (error) {
     console.error('Subcontractor logout error:', error);
     return NextResponse.json(
       { error: 'Erro ao fazer logout' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

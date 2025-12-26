@@ -1,9 +1,25 @@
 import { createServerSupabaseClient } from './supabase-server';
 import { ORG_COOKIE_NAME, SESSION_COOKIE_NAME } from './supabase';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import type { User, Session, SessionWithUser } from '@/types/database';
 
 import { createHash, randomBytes } from 'crypto';
+
+const SUB_SESSION_COOKIE = 'paintpro_sub_session';
+
+// Get session token from cookie or Authorization header (for mobile apps)
+export async function getSubSessionToken(): Promise<string | null> {
+  // First try Authorization header (Bearer token)
+  const headersList = await headers();
+  const authHeader = headersList.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+
+  // Fall back to cookie
+  const cookieStore = await cookies();
+  return cookieStore.get(SUB_SESSION_COOKIE)?.value || null;
+}
 
 // Simple hash function for demo purposes
 // In production, use bcrypt or argon2

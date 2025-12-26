@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { cookies } from 'next/headers';
+import { getSubSessionToken } from '@/lib/auth';
 
-const SUB_SESSION_COOKIE = 'paintpro_sub_session';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get(SUB_SESSION_COOKIE)?.value;
+    const sessionToken = await getSubSessionToken();
 
     if (!sessionToken) {
       return NextResponse.json(
         { error: 'Não autenticado' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -28,7 +35,7 @@ export async function GET() {
     if (sessionError || !session) {
       return NextResponse.json(
         { error: 'Sessão inválida' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -42,7 +49,7 @@ export async function GET() {
     if (subError || !subcontractor) {
       return NextResponse.json(
         { error: 'Subcontratado não encontrado' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -76,7 +83,7 @@ export async function GET() {
       console.error('Error fetching jobs:', jobsError);
       return NextResponse.json(
         { error: 'Erro ao buscar trabalhos' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -98,12 +105,12 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ jobs: jobsWithProgress });
+    return NextResponse.json({ jobs: jobsWithProgress }, { headers: corsHeaders });
   } catch (error) {
     console.error('Error in sub jobs route:', error);
     return NextResponse.json(
       { error: 'Erro interno' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
