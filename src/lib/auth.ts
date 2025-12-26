@@ -3,21 +3,42 @@ import { ORG_COOKIE_NAME, SESSION_COOKIE_NAME } from './supabase';
 import { cookies } from 'next/headers';
 import type { User, Session, SessionWithUser } from '@/types/database';
 
+import { createHash, randomBytes } from 'crypto';
+
 // Simple hash function for demo purposes
 // In production, use bcrypt or argon2
 export function hashPassword(password: string): string {
+  // Use SHA-256 with salt for better security
+  const salt = randomBytes(16).toString('hex');
+  const hash = createHash('sha256').update(password + salt).digest('hex');
+  return `sha256:${salt}:${hash}`;
+}
+
+// Legacy hash function for backwards compatibility
+function legacyHashPassword(password: string): string {
   let hash = 0;
   for (let i = 0; i < password.length; i++) {
     const char = password.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
     hash = hash & hash;
   }
-  // Add a salt-like prefix and convert to hex
   return 'pp_' + Math.abs(hash).toString(16).padStart(8, '0');
 }
 
-export function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash;
+export function verifyPassword(password: string, storedHash: string): boolean {
+  // Check new SHA-256 format
+  if (storedHash.startsWith('sha256:')) {
+    const [, salt, hash] = storedHash.split(':');
+    const computedHash = createHash('sha256').update(password + salt).digest('hex');
+    return computedHash === hash;
+  }
+
+  // Check legacy format (pp_...)
+  if (storedHash.startsWith('pp_')) {
+    return legacyHashPassword(password) === storedHash;
+  }
+
+  return false;
 }
 
 // Generate a secure session token

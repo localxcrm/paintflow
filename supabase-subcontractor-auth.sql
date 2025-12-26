@@ -31,3 +31,61 @@ SELECT
 FROM information_schema.columns
 WHERE table_name = 'Subcontractor'
 AND column_name = 'userId';
+
+-- =====================================================
+-- EXEMPLO: Criar um subcontratado com senha
+-- =====================================================
+-- Substitua os valores abaixo pelos dados reais
+
+-- Passo 1: Gerar hash da senha (você pode usar bcrypt online: https://bcrypt-generator.com/)
+-- Exemplo: senha "123456" gera hash "$2a$10$..."
+
+-- Passo 2: Inserir o User com role 'subcontractor'
+/*
+INSERT INTO "User" (id, email, name, "passwordHash", role, "createdAt", "updatedAt")
+VALUES (
+  gen_random_uuid()::text,
+  'pintor@email.com',
+  'João Pintor',
+  '$2a$10$XXXXX...', -- Hash bcrypt da senha
+  'subcontractor',
+  NOW(),
+  NOW()
+);
+*/
+
+-- Passo 3: Atualizar o Subcontractor existente para linkar com o User
+/*
+UPDATE "Subcontractor"
+SET "userId" = (SELECT id FROM "User" WHERE email = 'pintor@email.com')
+WHERE email = 'pintor@email.com';
+*/
+
+-- OU criar tudo de uma vez (se o Subcontractor não existir):
+/*
+WITH new_user AS (
+  INSERT INTO "User" (id, email, name, "passwordHash", role, "createdAt", "updatedAt")
+  VALUES (
+    gen_random_uuid()::text,
+    'pintor@email.com',
+    'João Pintor',
+    '$2a$10$rQZ5HxL5vR8K5rQZ5HxL5eQZ5HxL5vR8K5rQZ5HxL5eQZ5HxL5vR8', -- bcrypt hash de "123456"
+    'subcontractor',
+    NOW(),
+    NOW()
+  )
+  RETURNING id, email
+)
+INSERT INTO "Subcontractor" (id, "organizationId", name, email, phone, specialty, "userId", "createdAt", "updatedAt")
+SELECT
+  gen_random_uuid()::text,
+  'SEU_ORGANIZATION_ID_AQUI', -- Pegue da tabela Organization
+  'João Pintor',
+  new_user.email,
+  '11999999999',
+  'Pintura Residencial',
+  new_user.id,
+  NOW(),
+  NOW()
+FROM new_user;
+*/

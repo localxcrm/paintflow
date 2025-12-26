@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 import { randomBytes } from 'crypto';
+import { hashPassword } from '@/lib/auth';
 
 // Generate a unique calendar token
 function generateCalendarToken(): string {
@@ -56,6 +57,58 @@ export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient();
     const body = await request.json();
 
+    let userId = null;
+
+    // If app access is enabled, create a User account
+    if (body.enableAppAccess && body.email && body.password) {
+      // Check if email already exists
+      const { data: existingUser } = await supabase
+        .from('User')
+        .select('id')
+        .eq('email', body.email)
+        .single();
+
+      if (existingUser) {
+        return NextResponse.json(
+          { error: 'Email já está em uso' },
+          { status: 400 }
+        );
+      }
+
+      // Create User with subcontractor role
+      const { data: newUser, error: userError } = await supabase
+        .from('User')
+        .insert({
+          email: body.email,
+          name: body.name,
+          passwordHash: hashPassword(body.password),
+          role: 'subcontractor',
+        })
+        .select('id')
+        .single();
+
+      if (userError) {
+        console.error('Error creating user:', userError);
+        return NextResponse.json(
+          { error: 'Erro ao criar usuário para o app' },
+          { status: 500 }
+        );
+      }
+
+      userId = newUser.id;
+      console.log('Created user for subcontractor:', {
+        userId: newUser.id,
+        email: body.email,
+        hashFormat: 'sha256',
+      });
+    } else {
+      console.log('Subcontractor created without app access:', {
+        enableAppAccess: body.enableAppAccess,
+        hasEmail: !!body.email,
+        hasPassword: !!body.password,
+      });
+    }
+
     const { data: subcontractor, error } = await supabase
       .from('Subcontractor')
       .insert({
@@ -68,11 +121,16 @@ export async function POST(request: NextRequest) {
         color: body.color || '#10B981',
         isActive: body.isActive !== false,
         calendarToken: generateCalendarToken(),
+        userId: userId,
       })
       .select()
       .single();
 
     if (error) {
+      // If subcontractor creation fails, delete the user we just created
+      if (userId) {
+        await supabase.from('User').delete().eq('id', userId);
+      }
       throw error;
     }
 
@@ -104,6 +162,77 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Get current subcontractor
+    const { data: currentSub } = await supabase
+      .from('Subcontractor')
+      .select('userId')
+      .eq('id', body.id)
+      .eq('organizationId', organizationId)
+      .single();
+
+    let userId = currentSub?.userId;
+
+    // Handle app access changes
+    if (body.enableAppAccess && body.email) {
+      if (!userId && body.password) {
+        // Create new user for app access
+        const { data: existingUser } = await supabase
+          .from('User')
+          .select('id')
+          .eq('email', body.email)
+          .single();
+
+        if (existingUser) {
+          return NextResponse.json(
+            { error: 'Email já está em uso por outro usuário' },
+            { status: 400 }
+          );
+        }
+
+        const { data: newUser, error: userError } = await supabase
+          .from('User')
+          .insert({
+            email: body.email,
+            name: body.name,
+            passwordHash: hashPassword(body.password),
+            role: 'subcontractor',
+          })
+          .select('id')
+          .single();
+
+        if (userError) {
+          console.error('Error creating user:', userError);
+          return NextResponse.json(
+            { error: 'Erro ao criar usuário para o app' },
+            { status: 500 }
+          );
+        }
+
+        userId = newUser.id;
+      } else if (userId && body.password) {
+        // Update password for existing user
+        await supabase
+          .from('User')
+          .update({
+            passwordHash: hashPassword(body.password),
+            updatedAt: new Date().toISOString(),
+          })
+          .eq('id', userId);
+      }
+
+      // Update user email/name if changed
+      if (userId) {
+        await supabase
+          .from('User')
+          .update({
+            email: body.email,
+            name: body.name,
+            updatedAt: new Date().toISOString(),
+          })
+          .eq('id', userId);
+      }
+    }
+
     const { data: subcontractor, error } = await supabase
       .from('Subcontractor')
       .update({
@@ -114,6 +243,7 @@ export async function PUT(request: NextRequest) {
         defaultPayoutPct: body.defaultPayoutPct,
         color: body.color,
         isActive: body.isActive,
+        userId: userId,
         updatedAt: new Date().toISOString(),
       })
       .eq('id', body.id)
@@ -154,6 +284,14 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Get the subcontractor to check if it has a linked user
+    const { data: sub } = await supabase
+      .from('Subcontractor')
+      .select('userId')
+      .eq('id', id)
+      .eq('organizationId', organizationId)
+      .single();
+
     const { error } = await supabase
       .from('Subcontractor')
       .delete()
@@ -162,6 +300,11 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       throw error;
+    }
+
+    // Also delete the linked user if exists
+    if (sub?.userId) {
+      await supabase.from('User').delete().eq('id', sub.userId);
     }
 
     return NextResponse.json({ success: true });

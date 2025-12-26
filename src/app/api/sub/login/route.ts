@@ -18,15 +18,28 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServerSupabaseClient();
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // Find user by email
-    const { data: user, error: userError } = await supabase
+    // Find user by email (try both exact and lowercase)
+    let { data: user, error: userError } = await supabase
       .from('User')
       .select('*')
-      .eq('email', email.toLowerCase())
+      .eq('email', normalizedEmail)
       .single();
 
+    // If not found, try with original email (case-sensitive)
     if (userError || !user) {
+      const result = await supabase
+        .from('User')
+        .select('*')
+        .ilike('email', normalizedEmail)
+        .single();
+      user = result.data;
+      userError = result.error;
+    }
+
+    if (userError || !user) {
+      console.log('User not found for email:', normalizedEmail);
       return NextResponse.json(
         { error: 'Email ou senha inválidos' },
         { status: 401 }
@@ -35,6 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user is a subcontractor
     if (user.role !== 'subcontractor') {
+      console.log('User role is not subcontractor:', user.role);
       return NextResponse.json(
         { error: 'Acesso não autorizado. Use o login principal.' },
         { status: 403 }
@@ -42,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is active
-    if (!user.isActive) {
+    if (user.isActive === false) {
       return NextResponse.json(
         { error: 'Conta desativada. Entre em contato com a empresa.' },
         { status: 403 }
@@ -50,12 +64,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password
-    if (!verifyPassword(password, user.passwordHash)) {
+    console.log('Login attempt details:', {
+      email: normalizedEmail,
+      userId: user.id,
+      role: user.role,
+      hashFormat: user.passwordHash?.startsWith('sha256:') ? 'sha256' :
+                  user.passwordHash?.startsWith('pp_') ? 'legacy' : 'unknown',
+      hashLength: user.passwordHash?.length,
+    });
+
+    const passwordValid = verifyPassword(password, user.passwordHash);
+    if (!passwordValid) {
+      console.log('Password verification FAILED for:', normalizedEmail);
+      console.log('Stored hash prefix:', user.passwordHash?.substring(0, 20) + '...');
       return NextResponse.json(
         { error: 'Email ou senha inválidos' },
         { status: 401 }
       );
     }
+
+    console.log('Password verification SUCCESS for:', normalizedEmail);
 
     // Get subcontractor data
     const { data: subcontractor } = await supabase

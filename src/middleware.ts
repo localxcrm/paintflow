@@ -52,6 +52,15 @@ export function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.includes(pathname);
   const isPublicPath = publicPathPrefixes.some(prefix => pathname.startsWith(prefix));
 
+  // Special handling for root path - redirect subcontractors to their dashboard
+  if (pathname === '/' || pathname === '/login') {
+    const subSessionToken = request.cookies.get(SUB_SESSION_COOKIE)?.value;
+    if (subSessionToken) {
+      // Subcontractor is logged in, redirect to their dashboard
+      return NextResponse.redirect(new URL('/sub/dashboard', request.url));
+    }
+  }
+
   // Allow public routes
   if (isPublicRoute || isPublicPath) {
     return NextResponse.next();
@@ -82,6 +91,21 @@ export function middleware(request: NextRequest) {
 
   // Regular admin routes - check for session cookie
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
+  const subSessionToken = request.cookies.get(SUB_SESSION_COOKIE)?.value;
+
+  // If a subcontractor (has sub session but no admin session) tries to access admin routes,
+  // redirect them to the subcontractor dashboard
+  if (!sessionToken && subSessionToken) {
+    // Subcontractor trying to access admin area - redirect to sub dashboard
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Access denied. This area is for company admins only.', code: 'SUB_ACCESS_DENIED' },
+        { status: 403 }
+      );
+    }
+    // Redirect to subcontractor dashboard
+    return NextResponse.redirect(new URL('/sub/dashboard', request.url));
+  }
 
   // If no session and trying to access protected route
   if (!sessionToken) {

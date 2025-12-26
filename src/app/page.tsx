@@ -46,7 +46,7 @@ export default function LoginPage() {
           name: formData.email.split('@')[0],
           loggedInAt: new Date().toISOString(),
         }));
-        router.push('/dashboard');
+        router.push('/painel');
       } else {
         setError(result.error);
         setIsLoading(false);
@@ -57,7 +57,7 @@ export default function LoginPage() {
         ...result.data.user,
         loggedInAt: new Date().toISOString(),
       }));
-      router.push('/dashboard');
+      router.push('/painel');
     }
   };
 

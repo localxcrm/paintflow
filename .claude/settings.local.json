@@ -15,7 +15,9 @@
       "Bash(git config:*)",
       "Bash(npm run build:*)",
       "Bash(curl:*)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx:*)",
+      "Bash(echo:*)"
     ]
   }
 }

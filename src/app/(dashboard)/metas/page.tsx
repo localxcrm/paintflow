@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +15,6 @@ import {
   Save,
   Settings,
   Mountain,
-  ArrowRight,
   Plus,
   X,
   Sparkles,
@@ -490,12 +488,7 @@ export default function GoalsPage() {
                 </CardDescription>
               </div>
             </div>
-            <Link href="/rocks">
-              <Button variant="outline" size="sm">
-                Gerenciar Rocks
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
+{/* Rocks are managed inline below */}
           </div>
         </CardHeader>
         <CardContent>
@@ -533,19 +526,8 @@ export default function GoalsPage() {
             ))}
             {quarterRocks.length === 0 && (
               <p className="text-center text-slate-500 py-4">
-                Nenhum rock para este trimestre.{' '}
-                <Link href="/rocks" className="text-blue-600 hover:underline">
-                  Adicionar rocks
-                </Link>
+                Nenhum rock para este trimestre.
               </p>
-            )}
-            {quarterRocks.length > 5 && (
-              <Link
-                href="/rocks"
-                className="block text-center text-sm text-blue-600 hover:underline pt-2"
-              >
-                Ver todos os {quarterRocks.length} rocks
-              </Link>
             )}
           </div>
         </CardContent>

@@ -33,7 +33,8 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
     Users, Plus, Trash2, Mail, Phone, Percent, Wrench,
-    Shield, FileText, Pencil, Loader2, Calendar, Copy, Check
+    Shield, FileText, Pencil, Loader2, Calendar, Copy, Check,
+    Key, Eye, EyeOff, Smartphone
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -58,6 +59,8 @@ interface Subcontractor {
     color?: string;
     isActive: boolean;
     calendarToken?: string;
+    userId?: string; // Link to User for app login
+    hasAppAccess?: boolean;
 }
 
 const roleLabels: Record<string, string> = {
@@ -113,8 +116,12 @@ export default function EquipePage() {
         specialty: 'both',
         defaultPayoutPct: 60,
         color: '#10B981',
+        password: '',
+        enableAppAccess: false,
     });
     const [copiedToken, setCopiedToken] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [isSavingSub, setIsSavingSub] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -240,6 +247,8 @@ export default function EquipePage() {
                 specialty: sub.specialty || 'both',
                 defaultPayoutPct: sub.defaultPayoutPct || 60,
                 color: sub.color || '#10B981',
+                password: '',
+                enableAppAccess: !!sub.userId,
             });
         } else {
             setEditingSub(null);
@@ -250,21 +259,46 @@ export default function EquipePage() {
                 specialty: 'both',
                 defaultPayoutPct: 60,
                 color: '#10B981',
+                password: '',
+                enableAppAccess: false,
             });
         }
+        setShowPassword(false);
         setIsSubModalOpen(true);
     };
 
     const handleSaveSub = async () => {
         if (!subForm.name.trim()) return;
 
+        // Validate password if enabling app access
+        if (subForm.enableAppAccess && !editingSub?.userId && !subForm.password) {
+            toast.error('Senha é obrigatória para acesso ao app');
+            return;
+        }
+
+        if (subForm.enableAppAccess && !subForm.email) {
+            toast.error('Email é obrigatório para acesso ao app');
+            return;
+        }
+
+        if (subForm.password && subForm.password.length < 6) {
+            toast.error('Senha deve ter pelo menos 6 caracteres');
+            return;
+        }
+
+        setIsSavingSub(true);
         try {
             if (editingSub) {
                 // Update
                 const res = await fetch('/api/subcontractors', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: editingSub.id, ...subForm }),
+                    body: JSON.stringify({
+                        id: editingSub.id,
+                        ...subForm,
+                        // Only send password if it was changed
+                        password: subForm.password || undefined,
+                    }),
                 });
                 if (res.ok) {
                     const updated = await res.json();
@@ -285,7 +319,11 @@ export default function EquipePage() {
                 if (res.ok) {
                     const created = await res.json();
                     setSubcontractors(prev => [...prev, created]);
-                    toast.success('Subcontratado adicionado!');
+                    if (subForm.enableAppAccess) {
+                        toast.success('Subcontratado criado com acesso ao app!');
+                    } else {
+                        toast.success('Subcontratado adicionado!');
+                    }
                     setIsSubModalOpen(false);
                 } else {
                     const error = await res.json();
@@ -295,6 +333,8 @@ export default function EquipePage() {
         } catch (error) {
             console.error('Error saving subcontractor:', error);
             toast.error('Erro ao salvar subcontratado');
+        } finally {
+            setIsSavingSub(false);
         }
     };
 
@@ -453,9 +493,17 @@ export default function EquipePage() {
                                     </Avatar>
                                     <div>
                                         <p className="font-medium">{sub.name}</p>
-                                        <Badge variant="outline" className="text-xs">
-                                            {specialtyLabels[sub.specialty] || sub.specialty}
-                                        </Badge>
+                                        <div className="flex items-center gap-1">
+                                            <Badge variant="outline" className="text-xs">
+                                                {specialtyLabels[sub.specialty] || sub.specialty}
+                                            </Badge>
+                                            {sub.userId && (
+                                                <Badge className="text-xs bg-blue-100 text-blue-700">
+                                                    <Smartphone className="h-3 w-3 mr-1" />
+                                                    App
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex gap-1">
@@ -713,12 +761,71 @@ export default function EquipePage() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* App Access Section */}
+                        <Separator />
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Smartphone className="h-4 w-4 text-blue-600" />
+                                    <Label className="font-medium">Acesso ao App</Label>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant={subForm.enableAppAccess ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setSubForm(prev => ({ ...prev, enableAppAccess: !prev.enableAppAccess }))}
+                                >
+                                    {subForm.enableAppAccess ? 'Ativado' : 'Desativado'}
+                                </Button>
+                            </div>
+
+                            {subForm.enableAppAccess && (
+                                <div className="space-y-3 p-3 bg-blue-50 rounded-lg">
+                                    <p className="text-xs text-blue-700">
+                                        {editingSub?.userId
+                                            ? 'O subcontratado já tem acesso ao app. Deixe a senha em branco para manter a atual.'
+                                            : 'O subcontratado poderá acessar o app com email e senha.'}
+                                    </p>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="subPassword">
+                                            {editingSub?.userId ? 'Nova Senha (opcional)' : 'Senha *'}
+                                        </Label>
+                                        <div className="relative">
+                                            <Input
+                                                id="subPassword"
+                                                type={showPassword ? 'text' : 'password'}
+                                                value={subForm.password}
+                                                onChange={(e) => setSubForm(prev => ({ ...prev, password: e.target.value }))}
+                                                placeholder={editingSub?.userId ? 'Deixe em branco para manter' : 'Mínimo 6 caracteres'}
+                                                className="pr-10"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                            >
+                                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="flex justify-end gap-2 pt-4">
                             <Button variant="outline" onClick={() => setIsSubModalOpen(false)}>
                                 Cancelar
                             </Button>
-                            <Button onClick={handleSaveSub} disabled={!subForm.name}>
-                                {editingSub ? 'Salvar' : 'Adicionar'}
+                            <Button onClick={handleSaveSub} disabled={!subForm.name || isSavingSub}>
+                                {isSavingSub ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Salvando...
+                                    </>
+                                ) : (
+                                    editingSub ? 'Salvar' : 'Adicionar'
+                                )}
                             </Button>
                         </div>
                     </div>
