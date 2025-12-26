@@ -6,6 +6,13 @@ const SESSION_COOKIE = 'paintpro_session';
 const ORG_COOKIE = 'paintpro_org_id';
 const SUB_SESSION_COOKIE = 'paintpro_sub_session';
 
+// CORS headers for mobile app
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 // Routes that don't require authentication
 const publicRoutes = [
   '/',
@@ -48,6 +55,13 @@ const subRoutes = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Handle CORS preflight for /api/sub/* routes (mobile app)
+  if (pathname.startsWith('/api/sub/')) {
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, { status: 200, headers: corsHeaders });
+    }
+  }
+
   // Check if the route is public
   const isPublicRoute = publicRoutes.includes(pathname);
   const isPublicPath = publicPathPrefixes.some(prefix => pathname.startsWith(prefix));
@@ -78,14 +92,21 @@ export function middleware(request: NextRequest) {
       if (pathname.startsWith('/api/sub/')) {
         return NextResponse.json(
           { error: 'Authentication required' },
-          { status: 401 }
+          { status: 401, headers: corsHeaders }
         );
       }
       // Redirect to sub login
       return NextResponse.redirect(new URL('/sub/login', request.url));
     }
 
-    // Sub session exists, allow the request
+    // Sub session exists, allow the request with CORS headers
+    if (pathname.startsWith('/api/sub/')) {
+      const response = NextResponse.next();
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+      return response;
+    }
     return NextResponse.next();
   }
 
