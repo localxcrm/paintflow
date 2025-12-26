@@ -33,7 +33,7 @@ const config: CapacitorConfig = {
     preferredContentMode: 'mobile',
     backgroundColor: '#f8fafc',
     path: 'ios',
-    scheme: 'PaintPro Sub',
+    scheme: 'App',
   },
   plugins: {
     PushNotifications: {
@@ -50,7 +50,7 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true,
     },
     StatusBar: {
-      style: 'light',
+      style: 'dark',
       backgroundColor: '#ffffff',
     },
   },

@@ -5,6 +5,16 @@ import { cookies } from 'next/headers';
 
 const SUB_SESSION_COOKIE = 'paintpro_sub_session';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -13,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email e senha são obrigatórios' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -42,7 +52,7 @@ export async function POST(request: NextRequest) {
       console.log('User not found for email:', normalizedEmail);
       return NextResponse.json(
         { error: 'Email ou senha inválidos' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -51,7 +61,7 @@ export async function POST(request: NextRequest) {
       console.log('User role is not subcontractor:', user.role);
       return NextResponse.json(
         { error: 'Acesso não autorizado. Use o login principal.' },
-        { status: 403 }
+        { status: 403, headers: corsHeaders }
       );
     }
 
@@ -59,7 +69,7 @@ export async function POST(request: NextRequest) {
     if (user.isActive === false) {
       return NextResponse.json(
         { error: 'Conta desativada. Entre em contato com a empresa.' },
-        { status: 403 }
+        { status: 403, headers: corsHeaders }
       );
     }
 
@@ -79,7 +89,7 @@ export async function POST(request: NextRequest) {
       console.log('Stored hash prefix:', user.passwordHash?.substring(0, 20) + '...');
       return NextResponse.json(
         { error: 'Email ou senha inválidos' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -119,13 +129,14 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
       subcontractor: subcontractor || null,
+      session: { token: session.token },
       message: 'Login realizado com sucesso',
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error('Subcontractor login error:', error);
     return NextResponse.json(
       { error: 'Erro ao fazer login' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

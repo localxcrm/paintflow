@@ -74,8 +74,8 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm transition-all duration-300">
-      <div className="flex items-center justify-between h-20 px-4 lg:px-8 max-w-[2000px] mx-auto">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm transition-all duration-300 safe-top">
+      <div className="flex items-center justify-between h-20 md:h-24 px-4 lg:px-8 max-w-[2000px] mx-auto">
         {/* Logo & Nav */}
         <div className="flex items-center gap-10">
           <Link href="/painel" className="flex-shrink-0 group">
