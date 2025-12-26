@@ -62,55 +62,59 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-mesh p-4 relative overflow-hidden">
+      {/* Decorative Orbs */}
+      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-brand-teal/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-orange/10 rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="w-full max-w-md relative z-10">
         {/* Logo */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
           <Image
             src="/logo.png"
             alt="PaintFlow"
             width={360}
             height={96}
-            className="h-20 w-auto object-contain mx-auto"
+            className="h-20 w-auto object-contain mx-auto drop-shadow-sm"
             priority
           />
         </div>
 
         {/* Login Card */}
-        <Card className="shadow-xl border-0">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
-            <CardDescription className="text-center">
+        <Card variant="glass" className="border-white/20 animate-in fade-in zoom-in-95 duration-500">
+          <CardHeader className="space-y-1 pb-6">
+            <CardTitle className="text-3xl text-center font-bold tracking-tight text-gradient">Welcome back</CardTitle>
+            <CardDescription className="text-center text-slate-500 font-medium">
               Sign in to your account to continue
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-100">
+                <div className="p-3 text-sm text-red-600 bg-red-50/50 backdrop-blur-sm rounded-lg border border-red-100/50 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                   {error}
                 </div>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-slate-700 font-semibold ml-1">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@company.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="h-11"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between ml-1">
+                  <Label htmlFor="password" className="text-slate-700 font-semibold">Password</Label>
                   <button
                     type="button"
-                    className="text-sm text-[#0D5C75] hover:text-[#094A5E] font-medium"
+                    className="text-sm text-[#0D5C75] hover:text-[#094A5E] font-bold transition-colors"
                     onClick={() => alert('Password reset coming soon!')}
                   >
                     Forgot password?
@@ -123,13 +127,13 @@ export default function LoginPage() {
                     placeholder="Enter your password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="h-11 pr-10"
+                    className="pr-12"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -138,12 +142,14 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-[#0D5C75] hover:bg-[#094A5E] text-white font-medium"
+                variant="premium"
+                size="lg"
+                className="w-full mt-2"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     Signing in...
                   </>
                 ) : (
@@ -152,25 +158,26 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6">
+            <div className="mt-8">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
+                  <div className="w-full border-t border-slate-200/50" />
                 </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-slate-500">Demo credentials</span>
+                <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold">
+                  <span className="px-3 bg-white/0 text-slate-400 backdrop-blur-sm">Demo Access</span>
                 </div>
               </div>
 
-              <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-sm text-slate-600 text-center">
-                  Use any email and password to access the demo
+              <div className="mt-6 p-5 bg-white/30 backdrop-blur-md rounded-xl border border-white/40 shadow-inner">
+                <p className="text-xs text-slate-500 text-center leading-relaxed">
+                  Use any email and password to access the demo environment
                 </p>
-                <div className="mt-2 flex gap-2 justify-center">
+                <div className="mt-4 flex justify-center">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="bg-white/50 hover:bg-white/80 border-slate-200/50 font-bold"
                     onClick={() => {
                       setFormData({
                         email: 'demo@paintpro.com',
@@ -187,19 +194,19 @@ export default function LoginPage() {
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-sm text-slate-500 mt-6">
+        <p className="text-center text-sm text-slate-600 mt-8 font-medium">
           Don&apos;t have an account?{' '}
           <button
             type="button"
-            className="text-[#F26522] hover:text-[#D4571D] font-medium"
+            className="text-[#F26522] hover:text-[#D4571D] font-bold transition-colors"
             onClick={() => router.push('/register')}
           >
             Sign up
           </button>
         </p>
 
-        <p className="text-center text-xs text-slate-400 mt-4">
-          &copy; {new Date().getFullYear()} PaintPro. All rights reserved.
+        <p className="text-center text-xs text-slate-400 mt-6 font-medium">
+          &copy; {new Date().getFullYear()} PaintFlow. Premium Painting OS.
         </p>
       </div>
     </div>

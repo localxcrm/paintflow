@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -88,7 +88,7 @@ function getQuarterEndDate(quarter: number, year: number): string {
   return `${year}-${String(monthEnd).padStart(2, '0')}-${lastDay}`;
 }
 
-export default function RocksPage() {
+function RocksPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [rocks, setRocks] = useState<Rock[]>([]);
@@ -680,5 +680,17 @@ export default function RocksPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function RocksPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#0D5C75]" />
+      </div>
+    }>
+      <RocksPageContent />
+    </Suspense>
   );
 }
