@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { ChatWithMessages, ChatMessage } from '@/types/chat';
 import { MediaMessage } from '@/components/chat/media-message';
 import { AudioRecorder } from '@/components/chat/audio-recorder';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, uploadFileDirect } from '@/lib/supabase';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -198,34 +198,29 @@ export default function SubChatViewPage({ params }: PageProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Get org ID from chat
+    const organizationId = chat?.organizationId;
+    if (!organizationId) {
+      toast.error('Organização não encontrada');
+      return;
+    }
+
     console.log('[Chat] handleFileUpload called');
     console.log('[Chat] File:', file.name, 'size:', file.size, 'type:', file.type);
     console.log('[Chat] Media type:', mediaType);
 
     setIsUploadingMedia(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('context', 'chat');
-      formData.append('workOrderId', chat?.workOrderId || '');
+      // Use direct upload to bypass Vercel's 4.5MB limit
+      const data = await uploadFileDirect(
+        file,
+        organizationId,
+        'chat',
+        chat?.workOrderId,
+        file.name
+      );
 
-      console.log('[Chat] Uploading file...');
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('[Chat] Upload response status:', res.status);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('[Chat] Upload failed:', errorText);
-        throw new Error('Upload failed: ' + errorText);
-      }
-
-      const data = await res.json();
       console.log('[Chat] Upload success, url:', data.url);
-
       await sendMessage(undefined, mediaType, data.url, data.path);
     } catch (error) {
       console.error('[Chat] Error uploading:', error);
@@ -240,6 +235,13 @@ export default function SubChatViewPage({ params }: PageProps) {
     console.log('[Chat] handleAudioComplete called');
     console.log('[Chat] Blob size:', audioBlob.size, 'type:', audioBlob.type);
     console.log('[Chat] Duration:', duration, 'mimeType:', mimeType);
+
+    // Get org ID from chat
+    const organizationId = chat?.organizationId;
+    if (!organizationId) {
+      toast.error('Organização não encontrada');
+      return;
+    }
 
     setIsUploadingMedia(true);
     try {
@@ -256,26 +258,15 @@ export default function SubChatViewPage({ params }: PageProps) {
       }
       console.log('[Chat] Using extension:', ext);
 
-      const formData = new FormData();
-      formData.append('file', audioBlob, `audio.${ext}`);
-      formData.append('context', 'chat');
-      formData.append('workOrderId', chat?.workOrderId || '');
+      // Use direct upload to bypass Vercel's 4.5MB limit
+      const data = await uploadFileDirect(
+        audioBlob,
+        organizationId,
+        'chat',
+        chat?.workOrderId,
+        `audio.${ext}`
+      );
 
-      console.log('[Chat] Uploading audio...');
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('[Chat] Upload response status:', res.status);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('[Chat] Upload failed:', errorText);
-        throw new Error('Upload failed: ' + errorText);
-      }
-
-      const data = await res.json();
       console.log('[Chat] Upload success, url:', data.url);
 
       await sendMessage(undefined, 'audio', data.url, data.path, duration);

@@ -64,3 +64,107 @@ export const SESSION_COOKIE_NAME = 'paintpro_session';
 // SERVER-SIDE SUPABASE MOVED TO @/lib/supabase-server.ts
 // ============================================
 
+// ============================================
+// CLIENT-SIDE DIRECT UPLOAD TO SUPABASE STORAGE
+// ============================================
+
+interface UploadResult {
+  url: string;
+  path: string;
+  filename: string;
+  type: 'image' | 'audio' | 'video';
+  mimeType: string;
+  size: number;
+}
+
+function getFileType(mimeType: string): 'image' | 'audio' | 'video' | null {
+  const baseMimeType = mimeType.split(';')[0].trim();
+  if (baseMimeType.startsWith('image/')) return 'image';
+  if (baseMimeType.startsWith('audio/')) return 'audio';
+  if (baseMimeType.startsWith('video/')) return 'video';
+  return null;
+}
+
+function getExtensionFromMimeType(mimeType: string): string {
+  const baseMimeType = mimeType.split(';')[0].trim();
+  const mimeToExt: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'audio/webm': 'webm',
+    'audio/mp4': 'm4a',
+    'audio/x-m4a': 'm4a',
+    'audio/mpeg': 'mp3',
+    'audio/ogg': 'ogg',
+    'audio/wav': 'wav',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/quicktime': 'mov',
+  };
+  return mimeToExt[baseMimeType] || 'bin';
+}
+
+/**
+ * Upload file directly to Supabase Storage from client
+ * Bypasses Vercel's 4.5MB serverless function limit
+ */
+export async function uploadFileDirect(
+  file: File | Blob,
+  organizationId: string,
+  context: string = 'general',
+  workOrderId?: string,
+  filename?: string
+): Promise<UploadResult> {
+  const supabase = getSupabaseClient();
+
+  const mimeType = file.type || 'application/octet-stream';
+  const fileType = getFileType(mimeType);
+
+  if (!fileType) {
+    throw new Error('Tipo de arquivo não suportado');
+  }
+
+  // Generate unique filename
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 8);
+  const extension = filename?.split('.').pop() || getExtensionFromMimeType(mimeType);
+  const generatedFilename = `${timestamp}-${randomString}.${extension}`;
+
+  // Build path
+  const folder = fileType === 'image' ? 'images' : fileType === 'audio' ? 'audio' : 'video';
+  let path = `${organizationId}/${context}`;
+  if (workOrderId) {
+    path += `/${workOrderId}`;
+  }
+  path += `/${folder}/${generatedFilename}`;
+
+  // Upload to Supabase Storage
+  const { data, error } = await supabase.storage
+    .from('uploads')
+    .upload(path, file, {
+      contentType: mimeType,
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (error) {
+    console.error('[DirectUpload] Error:', error);
+    throw new Error(`Erro ao fazer upload: ${error.message}`);
+  }
+
+  // Get public URL
+  const { data: urlData } = supabase.storage
+    .from('uploads')
+    .getPublicUrl(data.path);
+
+  return {
+    url: urlData.publicUrl,
+    path: data.path,
+    filename: filename || generatedFilename,
+    type: fileType,
+    mimeType,
+    size: file.size,
+  };
+}
+

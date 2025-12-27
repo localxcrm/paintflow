@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { ChatWithMessages, ChatMessage } from '@/types/chat';
 import { MediaMessage } from '@/components/chat/media-message';
 import { AudioRecorder } from '@/components/chat/audio-recorder';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, uploadFileDirect, ORG_COOKIE_NAME } from '@/lib/supabase';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -159,6 +159,13 @@ export default function ChatViewPage({ params }: PageProps) {
     }
   };
 
+  // Helper to get org ID from cookie
+  const getOrgIdFromCookie = (): string | null => {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(new RegExp(`${ORG_COOKIE_NAME}=([^;]+)`));
+    return match ? match[1] : null;
+  };
+
   const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     mediaType: 'image' | 'video'
@@ -166,29 +173,25 @@ export default function ChatViewPage({ params }: PageProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const organizationId = getOrgIdFromCookie();
+    if (!organizationId) {
+      toast.error('Organização não encontrada. Faça login novamente.');
+      return;
+    }
+
     setIsUploadingMedia(true);
     try {
-      console.log('[Admin Chat] Uploading file:', file.name, 'size:', file.size, 'type:', file.type);
+      console.log('[Admin Chat] Uploading file directly:', file.name, 'size:', file.size, 'type:', file.type);
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('context', 'chat');
-      formData.append('workOrderId', chat?.workOrderId || '');
+      // Use direct upload to bypass Vercel's 4.5MB limit
+      const data = await uploadFileDirect(
+        file,
+        organizationId,
+        'chat',
+        chat?.workOrderId,
+        file.name
+      );
 
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('[Admin Chat] Upload response status:', res.status);
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('[Admin Chat] Upload error:', errorData);
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const data = await res.json();
       console.log('[Admin Chat] Upload success, url:', data.url);
       await sendMessage(undefined, mediaType, data.url, data.path);
     } catch (error) {
@@ -205,6 +208,12 @@ export default function ChatViewPage({ params }: PageProps) {
     console.log('[Admin Chat] Blob size:', audioBlob.size, 'type:', audioBlob.type);
     console.log('[Admin Chat] Duration:', duration, 'mimeType:', mimeType);
 
+    const organizationId = getOrgIdFromCookie();
+    if (!organizationId) {
+      toast.error('Organização não encontrada. Faça login novamente.');
+      return;
+    }
+
     setIsUploadingMedia(true);
     try {
       // Get correct file extension based on mime type
@@ -220,26 +229,15 @@ export default function ChatViewPage({ params }: PageProps) {
       }
       console.log('[Admin Chat] Using extension:', ext);
 
-      const formData = new FormData();
-      formData.append('file', audioBlob, `audio.${ext}`);
-      formData.append('context', 'chat');
-      formData.append('workOrderId', chat?.workOrderId || '');
+      // Use direct upload to bypass Vercel's 4.5MB limit
+      const data = await uploadFileDirect(
+        audioBlob,
+        organizationId,
+        'chat',
+        chat?.workOrderId,
+        `audio.${ext}`
+      );
 
-      console.log('[Admin Chat] Uploading audio...');
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('[Admin Chat] Upload response status:', res.status);
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('[Admin Chat] Upload error:', errorData);
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const data = await res.json();
       console.log('[Admin Chat] Upload success, url:', data.url);
       await sendMessage(undefined, 'audio', data.url, data.path, duration);
       setIsRecordingAudio(false);
