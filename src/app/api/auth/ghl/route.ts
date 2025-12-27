@@ -216,7 +216,7 @@ async function findOrCreateUser(
       email,
       name,
       passwordHash, // Random hash - user can only login via GHL SSO
-      role: 'user',
+      role: 'member', // Use 'member' to match DB constraint (not 'user')
       isActive: true,
       ghlUserId: ghlUserId,
       ghlLocationId: ghlLocationId,
