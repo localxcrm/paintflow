@@ -34,11 +34,18 @@ export const PLAN_LIMITS = {
 export type PlanType = keyof typeof PLAN_LIMITS;
 
 // ============================================
-// CLIENT-SIDE SUPABASE
+// CLIENT-SIDE SUPABASE (SINGLETON)
 // ============================================
 
-// Get client-side Supabase client (lazy initialization)
-export function getSupabaseClient() {
+// Singleton instance to avoid "Multiple GoTrueClient instances" warning
+let supabaseInstance: SupabaseClient | null = null;
+
+// Get client-side Supabase client (singleton pattern)
+export function getSupabaseClient(): SupabaseClient {
+  if (supabaseInstance) {
+    return supabaseInstance;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -46,7 +53,8 @@ export function getSupabaseClient() {
     throw new Error('Supabase URL and Anon Key are required');
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey);
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+  return supabaseInstance;
 }
 
 // Export a default instance for convenience (client-side only)
