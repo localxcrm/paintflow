@@ -52,6 +52,11 @@ const subRoutes = [
   '/api/sub/',
 ];
 
+// Routes that can be accessed by both admins and subcontractors
+const sharedApiRoutes = [
+  '/api/upload',
+];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -114,9 +119,17 @@ export function middleware(request: NextRequest) {
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
   const subSessionToken = request.cookies.get(SUB_SESSION_COOKIE)?.value;
 
+  // Check if it's a shared API route (accessible by both admins and subcontractors)
+  const isSharedApiRoute = sharedApiRoutes.some(route => pathname.startsWith(route));
+
   // If a subcontractor (has sub session but no admin session) tries to access admin routes,
-  // redirect them to the subcontractor dashboard
+  // redirect them to the subcontractor dashboard (but allow shared routes)
   if (!sessionToken && subSessionToken) {
+    // Allow shared API routes for subcontractors
+    if (isSharedApiRoute) {
+      return NextResponse.next();
+    }
+
     // Subcontractor trying to access admin area - redirect to sub dashboard
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
