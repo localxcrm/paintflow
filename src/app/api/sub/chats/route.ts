@@ -1,158 +1,115 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { cookies } from 'next/headers';
+import { getSubSessionToken } from '@/lib/auth';
+import { ChatListItem, ChatListResponse } from '@/types/chat';
 
-const SUB_SESSION_COOKIE = 'paintpro_sub_session';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
+// Helper to get subcontractor from session
+async function getSubcontractorFromSession() {
+  const sessionToken = await getSubSessionToken();
+  if (!sessionToken) return null;
+
+  const supabase = createServerSupabaseClient();
+
+  const { data: session } = await supabase
+    .from('Session')
+    .select('*, User(*)')
+    .eq('token', sessionToken)
+    .single();
+
+  if (!session || new Date(session.expiresAt) < new Date()) return null;
+  if (session.User.role !== 'subcontractor') return null;
+
+  const { data: subcontractor } = await supabase
+    .from('Subcontractor')
+    .select('*')
+    .eq('userId', session.User.id)
+    .single();
+
+  return subcontractor ? { ...subcontractor, user: session.User } : null;
+}
+
+// GET /api/sub/chats - List all chats for the subcontractor
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get(SUB_SESSION_COOKIE)?.value;
-
-    if (!sessionToken) {
+    const sub = await getSubcontractorFromSession();
+    if (!sub) {
       return NextResponse.json(
-        { error: 'Nao autenticado' },
-        { status: 401 }
+        { error: 'Não autenticado' },
+        { status: 401, headers: corsHeaders }
       );
     }
 
     const supabase = createServerSupabaseClient();
 
-    // Get session with user
-    const { data: session, error: sessionError } = await supabase
-      .from('Session')
-      .select('*, User(*)')
-      .eq('token', sessionToken)
-      .single();
-
-    if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Sessao invalida' },
-        { status: 401 }
-      );
-    }
-
-    // Get subcontractor linked to this user
-    const { data: subcontractor, error: subError } = await supabase
-      .from('Subcontractor')
-      .select('id, organizationId')
-      .eq('userId', session.userId)
-      .single();
-
-    if (subError || !subcontractor) {
-      return NextResponse.json(
-        { error: 'Subcontratado nao encontrado' },
-        { status: 404 }
-      );
-    }
-
-    // Get jobs with their work orders that have comments
-    const { data: jobs, error: jobsError } = await supabase
-      .from('Job')
+    // Get all chats for this subcontractor from the new Chat table
+    const { data: chats, error } = await supabase
+      .from('Chat')
       .select(`
-        id,
-        jobNumber,
-        clientName,
-        address,
-        city,
-        scheduledStartDate,
-        WorkOrder (
+        *,
+        workOrder:WorkOrder (
           id,
+          title,
+          status,
           osNumber,
-          comments,
-          status
+          jobSite:jobSiteId (
+            address,
+            city,
+            state,
+            zip
+          )
         )
       `)
-      .eq('subcontractorId', subcontractor.id)
-      .in('status', ['scheduled', 'got_the_job', 'completed'])
-      .order('scheduledStartDate', { ascending: false });
+      .eq('subcontractorId', sub.id)
+      .order('lastMessageAt', { ascending: false, nullsFirst: false });
 
-    if (jobsError) {
-      console.error('Error fetching jobs:', jobsError);
+    if (error) {
+      console.error('Error fetching chats:', error);
       return NextResponse.json(
         { error: 'Erro ao buscar conversas' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
-    // Transform jobs into chat list format
-    const chats = (jobs || [])
-      .filter(job => {
-        // Only include jobs with work orders that have comments
-        const workOrder = job.WorkOrder?.[0];
-        if (!workOrder) return false;
-        const comments = workOrder.comments as { text?: string; type?: string; createdAt?: string; authorType?: string }[] || [];
-        return comments.length > 0;
-      })
-      .map(job => {
-        const workOrder = job.WorkOrder![0];
-        const comments = workOrder.comments as { text?: string; type?: string; createdAt?: string; authorType?: string }[] || [];
-        const lastComment = comments[comments.length - 1];
+    // Transform data to match ChatListItem interface
+    const chatList: ChatListItem[] = (chats || []).map((chat) => ({
+      ...chat,
+      workOrder: chat.workOrder ? {
+        id: chat.workOrder.id,
+        title: chat.workOrder.title || `OS #${chat.workOrder.osNumber}`,
+        status: chat.workOrder.status,
+        jobSite: chat.workOrder.jobSite,
+      } : undefined,
+      subcontractor: {
+        id: sub.id,
+        name: sub.user.name,
+        phone: sub.user.phone,
+      },
+    }));
 
-        // Extract first name and street number + name
-        const firstName = job.clientName?.split(' ')[0] || 'Cliente';
+    // Calculate total unread count (for subcontractor)
+    const totalUnread = chatList.reduce((sum, chat) => sum + (chat.unreadCountSubcontractor || 0), 0);
 
-        // Extract number and street from address
-        // Formats: "123 Rua das Flores" or "Rua das Flores, 123"
-        const addressMatch = job.address?.match(/^(\d+)\s+(.+)$/) ||
-                            job.address?.match(/^(.+?),?\s*(\d+)$/);
+    const response: ChatListResponse = {
+      chats: chatList,
+      totalUnread,
+    };
 
-        let displayAddress = job.address || '';
-        if (addressMatch) {
-          // Check which group has the number
-          const num = addressMatch[1].match(/^\d+$/) ? addressMatch[1] : addressMatch[2];
-          const street = addressMatch[1].match(/^\d+$/) ? addressMatch[2] : addressMatch[1];
-          displayAddress = `${num} ${street}`;
-        }
-
-        // Check for unread messages (from company, after last viewed)
-        const hasUnread = comments.some(c => c.authorType === 'company');
-
-        // Format last message preview
-        let lastMessagePreview = '';
-        if (lastComment) {
-          if (lastComment.type === 'text') {
-            lastMessagePreview = lastComment.text?.substring(0, 50) || '';
-            if ((lastComment.text?.length || 0) > 50) {
-              lastMessagePreview += '...';
-            }
-          } else if (lastComment.type === 'image') {
-            lastMessagePreview = 'Foto enviada';
-          } else if (lastComment.type === 'video') {
-            lastMessagePreview = 'Video enviado';
-          } else if (lastComment.type === 'audio') {
-            lastMessagePreview = 'Audio enviado';
-          }
-        }
-
-        return {
-          id: workOrder.id,
-          jobId: job.id,
-          displayName: `${firstName} • ${displayAddress}`,
-          clientName: job.clientName,
-          address: job.address,
-          city: job.city,
-          osNumber: workOrder.osNumber,
-          lastMessage: lastMessagePreview,
-          lastMessageTime: lastComment?.createdAt,
-          lastMessageType: lastComment?.type || 'text',
-          hasUnread,
-          messageCount: comments.length,
-        };
-      })
-      .sort((a, b) => {
-        // Sort by last message time, most recent first
-        if (!a.lastMessageTime) return 1;
-        if (!b.lastMessageTime) return -1;
-        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
-      });
-
-    return NextResponse.json({ chats });
+    return NextResponse.json(response, { headers: corsHeaders });
   } catch (error) {
-    console.error('Error in sub chats route:', error);
+    console.error('Error in GET /api/sub/chats:', error);
     return NextResponse.json(
       { error: 'Erro interno' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
