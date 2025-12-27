@@ -295,9 +295,9 @@ export default function SubChatViewPage({ params }: PageProps) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className="flex flex-col h-[100dvh] bg-white">
       {/* Header */}
-      <div className="bg-white border-b p-4 safe-area-top">
+      <div className="bg-white border-b p-4 safe-area-top shrink-0">
         <div className="flex items-center gap-3 mb-3">
           <Button variant="ghost" size="icon" onClick={() => router.push('/sub/chats')}>
             <ArrowLeft className="h-5 w-5" />
@@ -382,7 +382,7 @@ export default function SubChatViewPage({ params }: PageProps) {
       </div>
 
       {/* Input Area */}
-      <div className="border-t p-4 bg-white safe-area-bottom">
+      <div className="border-t p-4 bg-white safe-area-bottom shrink-0">
         {isRecordingAudio ? (
           <AudioRecorder
             onRecordingComplete={handleAudioComplete}

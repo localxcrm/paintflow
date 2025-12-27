@@ -4,7 +4,16 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Play, Pause, Trash2, Send, Loader2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { VoiceRecorder } from 'capacitor-voice-recorder';
+
+// Dynamically import VoiceRecorder only when needed
+let VoiceRecorder: typeof import('capacitor-voice-recorder').VoiceRecorder | null = null;
+if (typeof window !== 'undefined') {
+  import('capacitor-voice-recorder').then(module => {
+    VoiceRecorder = module.VoiceRecorder;
+  }).catch(() => {
+    console.log('VoiceRecorder plugin not available');
+  });
+}
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number, mimeType: string) => void;
@@ -32,6 +41,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [mimeType, setMimeType] = useState('audio/mp4');
+  const [useNativeRecording, setUseNativeRecording] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -44,78 +54,23 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
   const isNative = Capacitor.isNativePlatform();
   const isIOS = Capacitor.getPlatform() === 'ios';
 
-  // Native iOS recording using VoiceRecorder plugin
-  const startNativeRecording = useCallback(async () => {
-    try {
-      // Request permission first
-      const permission = await VoiceRecorder.requestAudioRecordingPermission();
-      if (!permission.value) {
-        alert('Permissão para microfone negada');
-        onCancel();
-        return;
-      }
-
-      // Start recording
-      await VoiceRecorder.startRecording();
-      setIsRecording(true);
-      setHasStarted(true);
-      startTimeRef.current = Date.now();
-
-      // Start timer
-      timerRef.current = setInterval(() => {
-        setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
-      }, 1000);
-    } catch (error) {
-      console.error('Error starting native recording:', error);
-      alert('Erro ao iniciar gravação');
-      onCancel();
-    }
-  }, [onCancel]);
-
-  const stopNativeRecording = useCallback(async () => {
-    try {
-      const result = await VoiceRecorder.stopRecording();
-
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-
-      setIsRecording(false);
-
-      if (result.value && result.value.recordDataBase64) {
-        // iOS records as AAC in m4a container - widely compatible
-        const audioMimeType = 'audio/mp4';
-        setMimeType(audioMimeType);
-
-        // Convert base64 to blob
-        const blob = base64ToBlob(result.value.recordDataBase64, audioMimeType);
-        setAudioBlob(blob);
-
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-      }
-    } catch (error) {
-      console.error('Error stopping native recording:', error);
-    }
-  }, []);
-
-  // Web recording using MediaRecorder API
+  // Web recording using MediaRecorder API (defined first so it can be used as fallback)
   const startWebRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
       // Determine best mime type for the browser
-      let selectedMimeType = 'audio/mp4';
-      if (!MediaRecorder.isTypeSupported('audio/mp4')) {
-        if (MediaRecorder.isTypeSupported('audio/webm')) {
-          selectedMimeType = 'audio/webm';
-        } else if (MediaRecorder.isTypeSupported('audio/mpeg')) {
-          selectedMimeType = 'audio/mpeg';
-        }
+      let selectedMimeType = 'audio/webm'; // Default to webm for better compatibility
+      if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        selectedMimeType = 'audio/mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        selectedMimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        selectedMimeType = 'audio/webm';
       }
       setMimeType(selectedMimeType);
+      setUseNativeRecording(false);
 
       const mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
       mediaRecorderRef.current = mediaRecorder;
@@ -145,10 +100,9 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
       }, 1000);
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
-      onCancel();
+      throw error;
     }
-  }, [onCancel]);
+  }, []);
 
   const stopWebRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -161,9 +115,96 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
     }
   }, []);
 
+  // Native iOS recording using VoiceRecorder plugin
+  const startNativeRecording = useCallback(async () => {
+    try {
+      // Check if VoiceRecorder is available
+      if (!VoiceRecorder) {
+        console.log('VoiceRecorder not available, falling back to web recording');
+        await startWebRecording();
+        return;
+      }
+
+      // Check if plugin has the method
+      if (typeof VoiceRecorder.requestAudioRecordingPermission !== 'function') {
+        console.log('VoiceRecorder methods not available, falling back to web recording');
+        await startWebRecording();
+        return;
+      }
+
+      // Request permission first
+      const permission = await VoiceRecorder.requestAudioRecordingPermission();
+      if (!permission.value) {
+        // Permission denied, try web recording as fallback
+        console.log('Native permission denied, trying web recording');
+        await startWebRecording();
+        return;
+      }
+
+      // Start recording
+      await VoiceRecorder.startRecording();
+      setIsRecording(true);
+      setHasStarted(true);
+      setUseNativeRecording(true);
+      startTimeRef.current = Date.now();
+
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }, 1000);
+    } catch (error) {
+      console.error('Error starting native recording:', error);
+      // Fall back to web recording
+      console.log('Falling back to web recording due to native error');
+      try {
+        await startWebRecording();
+      } catch (webError) {
+        console.error('Web recording also failed:', webError);
+        alert('Erro ao iniciar gravação. Verifique as permissões do microfone.');
+        onCancel();
+      }
+    }
+  }, [onCancel, startWebRecording]);
+
+  const stopNativeRecording = useCallback(async () => {
+    try {
+      if (!VoiceRecorder || typeof VoiceRecorder.stopRecording !== 'function') {
+        // Not using native recording, stop web recording instead
+        stopWebRecording();
+        return;
+      }
+
+      const result = await VoiceRecorder.stopRecording();
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      setIsRecording(false);
+
+      if (result.value && result.value.recordDataBase64) {
+        // iOS records as AAC in m4a container - widely compatible
+        const audioMimeType = 'audio/mp4';
+        setMimeType(audioMimeType);
+
+        // Convert base64 to blob
+        const blob = base64ToBlob(result.value.recordDataBase64, audioMimeType);
+        setAudioBlob(blob);
+
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+      }
+    } catch (error) {
+      console.error('Error stopping native recording:', error);
+      // Try stopping web recording as fallback
+      stopWebRecording();
+    }
+  }, [stopWebRecording]);
+
   // Unified start/stop functions
   const startRecording = useCallback(async () => {
-    if (isNative && isIOS) {
+    if (isNative && isIOS && VoiceRecorder) {
       await startNativeRecording();
     } else {
       await startWebRecording();
@@ -171,12 +212,12 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
   }, [isNative, isIOS, startNativeRecording, startWebRecording]);
 
   const stopRecording = useCallback(async () => {
-    if (isNative && isIOS) {
+    if (useNativeRecording) {
       await stopNativeRecording();
     } else {
       stopWebRecording();
     }
-  }, [isNative, isIOS, stopNativeRecording, stopWebRecording]);
+  }, [useNativeRecording, stopNativeRecording, stopWebRecording]);
 
   // Auto-start recording when component mounts
   useEffect(() => {
