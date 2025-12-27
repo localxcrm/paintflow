@@ -57,16 +57,31 @@ function getExtensionFromMimeType(mimeType: string): string {
 // POST /api/upload - Upload file to Supabase Storage
 export async function POST(request: NextRequest) {
   try {
-    const organizationId = getOrganizationIdFromRequest(request);
-    if (!organizationId) {
-      return NextResponse.json({ error: 'Organization required' }, { status: 400 });
-    }
-
     const supabase = createServerSupabaseClient();
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const context = formData.get('context') as string || 'general'; // 'chat', 'work-order', 'photo'
     const workOrderId = formData.get('workOrderId') as string | null;
+
+    // Try to get organization ID from cookie first
+    let organizationId = getOrganizationIdFromRequest(request);
+
+    // If no org ID and we have a workOrderId, get it from the work order (for subcontractors)
+    if (!organizationId && workOrderId) {
+      const { data: workOrder } = await supabase
+        .from('WorkOrder')
+        .select('organizationId')
+        .eq('id', workOrderId)
+        .single();
+
+      if (workOrder?.organizationId) {
+        organizationId = workOrder.organizationId;
+      }
+    }
+
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organization required' }, { status: 400 });
+    }
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });

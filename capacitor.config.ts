@@ -18,7 +18,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 // Set this to your production URL when deploying
 // The middleware will handle redirecting to /sub/login if not authenticated
-const SERVER_URL = 'http://localhost:3000/sub/dashboard';
+const SERVER_URL = 'https://os.prohousepaintersofputnam.com/sub/dashboard';
 
 const config: CapacitorConfig = {
   appId: 'com.paintpro.sub',
@@ -26,7 +26,8 @@ const config: CapacitorConfig = {
   webDir: 'out', // Not used in server mode, but required
   server: {
     url: SERVER_URL,
-    cleartext: true, // Allow HTTP (for local dev)
+    cleartext: false,
+    allowNavigation: ['os.prohousepaintersofputnam.com', '*.prohousepaintersofputnam.com'],
   },
   ios: {
     contentInset: 'automatic',
@@ -45,7 +46,7 @@ const config: CapacitorConfig = {
       saveToGallery: false,
     },
     Keyboard: {
-      resize: 'body',
+      resize: 'native',
       style: 'light',
       resizeOnFullScreen: true,
     },

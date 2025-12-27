@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CAPACITOR_DEBUG</key>
+	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>paintflow</string>
+	<string>paintflow</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -47,5 +47,20 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.business</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PaintFlow needs access to your photo library to attach photos to estimates and job documentation.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PaintFlow needs access to your camera to take photos for estimates and job documentation.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>PaintFlow needs access to your microphone to record voice notes and videos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>PaintFlow needs permission to save photos to your library.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
