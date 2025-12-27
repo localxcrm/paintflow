@@ -193,7 +193,7 @@ export default function SubChatPage({ params }: PageProps) {
     }
   };
 
-  const handleAudioRecordingComplete = async (audioBlob: Blob) => {
+  const handleAudioRecordingComplete = async (audioBlob: Blob, duration: number) => {
     if (!workOrder) return;
 
     setIsUploadingMedia(true);
@@ -221,6 +221,7 @@ export default function SubChatPage({ params }: PageProps) {
         authorType: 'subcontractor',
         type: 'audio',
         mediaUrl: url,
+        mediaDuration: duration,
         createdAt: new Date().toISOString(),
       };
 
