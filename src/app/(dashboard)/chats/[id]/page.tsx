@@ -167,7 +167,6 @@ export default function ChatViewPage({ params }: PageProps) {
     if (!file) return;
 
     setIsUploadingMedia(true);
-    setShowMediaSheet(false);
     try {
       const formData = new FormData();
       formData.append('file', file);
