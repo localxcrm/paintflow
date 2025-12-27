@@ -40,6 +40,7 @@ const publicRoutes = [
 const publicPathPrefixes = [
   '/api/estimates/', // Allow public estimate viewing/signing
   '/api/os/',        // Allow public OS viewing (via token)
+  '/api/webhooks/',  // Allow webhooks from external services (GHL, etc)
   '/os/',            // Public OS page
   '/_next',
   '/favicon',
