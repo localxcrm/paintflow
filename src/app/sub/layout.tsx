@@ -24,6 +24,8 @@ export default function SubLayout({ children }: SubLayoutProps) {
 
   // Pages that don't need the bottom nav
   const isAuthPage = pathname === '/sub/login' || pathname === '/sub/register';
+  // Chat detail page has its own full-screen layout
+  const isChatDetailPage = pathname.startsWith('/sub/chats/') && pathname !== '/sub/chats';
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -67,6 +69,16 @@ export default function SubLayout({ children }: SubLayoutProps) {
         <Toaster position="top-center" richColors />
         {children}
       </>
+    );
+  }
+
+  // Chat detail page renders full screen without bottom nav
+  if (isChatDetailPage) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Toaster position="top-center" richColors />
+        {children}
+      </div>
     );
   }
 
