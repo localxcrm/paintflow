@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { User, Mail, Phone, Save, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { User, Mail, Phone, Save, Lock, Eye, EyeOff, Loader2, Link2, Unlink } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserProfile {
@@ -15,6 +16,13 @@ interface UserProfile {
     name: string;
     email: string;
     phone: string;
+}
+
+interface GhlStatus {
+    isLinked: boolean;
+    ghlUserId: string | null;
+    ghlLocationId: string | null;
+    ghlLinkedAt: string | null;
 }
 
 export default function PerfilPage() {
@@ -26,6 +34,12 @@ export default function PerfilPage() {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+
+    // GHL status
+    const [ghlStatus, setGhlStatus] = useState<GhlStatus | null>(null);
+    const [isUnlinkingGhl, setIsUnlinkingGhl] = useState(false);
+    const [unlinkPassword, setUnlinkPassword] = useState('');
+    const [showUnlinkPassword, setShowUnlinkPassword] = useState(false);
 
     // Password change state
     const [passwordData, setPasswordData] = useState({
@@ -42,6 +56,7 @@ export default function PerfilPage() {
 
     useEffect(() => {
         loadProfile();
+        loadGhlStatus();
     }, []);
 
     const loadProfile = async () => {
@@ -77,6 +92,50 @@ export default function PerfilPage() {
             toast.error('Erro ao carregar perfil');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const loadGhlStatus = async () => {
+        try {
+            const res = await fetch('/api/users/ghl-status');
+            if (res.ok) {
+                const data = await res.json();
+                setGhlStatus(data);
+            }
+        } catch (error) {
+            console.error('Error loading GHL status:', error);
+        }
+    };
+
+    const handleUnlinkGhl = async () => {
+        if (!unlinkPassword) {
+            toast.error('Digite sua senha para desvincular');
+            return;
+        }
+
+        setIsUnlinkingGhl(true);
+
+        try {
+            const res = await fetch('/api/users/ghl-unlink', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: unlinkPassword }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Erro ao desvincular');
+            }
+
+            setGhlStatus({ isLinked: false, ghlUserId: null, ghlLocationId: null, ghlLinkedAt: null });
+            setUnlinkPassword('');
+            toast.success('Conta GoHighLevel desvinculada com sucesso!');
+        } catch (error) {
+            console.error('Error unlinking GHL:', error);
+            toast.error(error instanceof Error ? error.message : 'Erro ao desvincular');
+        } finally {
+            setIsUnlinkingGhl(false);
         }
     };
 
@@ -376,6 +435,93 @@ export default function PerfilPage() {
                             {isChangingPassword ? 'Alterando...' : 'Alterar Senha'}
                         </Button>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* GoHighLevel Integration Card */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Link2 className="h-5 w-5" />
+                        Integracao GoHighLevel
+                    </CardTitle>
+                    <CardDescription>
+                        Gerencie sua conexao com o GoHighLevel
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {ghlStatus?.isLinked ? (
+                        <>
+                            <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                                <Badge variant="default" className="bg-green-600">
+                                    Vinculado
+                                </Badge>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-green-800">
+                                        Conta vinculada ao GoHighLevel
+                                    </p>
+                                    {ghlStatus.ghlLinkedAt && (
+                                        <p className="text-xs text-green-600">
+                                            Vinculado em {new Date(ghlStatus.ghlLinkedAt).toLocaleDateString('pt-BR')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-3">
+                                <p className="text-sm text-slate-600">
+                                    Para desvincular sua conta do GoHighLevel, digite sua senha:
+                                </p>
+                                <div className="relative">
+                                    <Input
+                                        type={showUnlinkPassword ? 'text' : 'password'}
+                                        value={unlinkPassword}
+                                        onChange={(e) => setUnlinkPassword(e.target.value)}
+                                        placeholder="Digite sua senha"
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowUnlinkPassword(!showUnlinkPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    >
+                                        {showUnlinkPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                                <div className="flex justify-end">
+                                    <Button
+                                        onClick={handleUnlinkGhl}
+                                        disabled={isUnlinkingGhl}
+                                        variant="destructive"
+                                        className="gap-2"
+                                    >
+                                        {isUnlinkingGhl ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Unlink className="h-4 w-4" />
+                                        )}
+                                        {isUnlinkingGhl ? 'Desvinculando...' : 'Desvincular'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <Badge variant="outline" className="text-slate-500">
+                                Nao Vinculado
+                            </Badge>
+                            <div className="flex-1">
+                                <p className="text-sm text-slate-600">
+                                    Sua conta nao esta vinculada ao GoHighLevel.
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Acesse pelo menu do GoHighLevel para vincular automaticamente.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>

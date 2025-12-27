@@ -39,6 +39,10 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   lastLoginAt: string | null;
+  // GHL SSO fields (optional - null if not linked to GHL)
+  ghlUserId: string | null;
+  ghlLocationId: string | null;
+  ghlLinkedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -405,6 +409,27 @@ export interface AIMessage {
   suggestedRiskModifiers: string[];
   createdAt: string;
   conversationId: string;
+}
+
+export interface GhlLocation {
+  id: string;
+  ghlLocationId: string;
+  organizationId: string;
+  locationName: string | null;
+  createdAt: string;
+}
+
+// ============================================
+// GHL SSO TYPES
+// ============================================
+
+export interface GhlSsoParams {
+  location_id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string;
+  timestamp: number;
+  signature: string;
 }
 
 // ============================================

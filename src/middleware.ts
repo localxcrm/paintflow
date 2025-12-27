@@ -21,6 +21,9 @@ const publicRoutes = [
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/logout',
+  // GHL SSO routes
+  '/api/ghl/generate-sso-url',
+  '/api/auth/ghl',
   // Subcontractor public routes
   '/sub/login',
   '/sub/register',
