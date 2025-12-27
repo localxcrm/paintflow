@@ -58,14 +58,15 @@ export async function GET() {
         *,
         workOrder:WorkOrder (
           id,
-          title,
-          status,
           osNumber,
-          jobSite:jobSiteId (
+          status,
+          job:Job (
+            jobNumber,
+            clientName,
             address,
             city,
             state,
-            zip
+            zipCode
           )
         )
       `)
@@ -85,9 +86,14 @@ export async function GET() {
       ...chat,
       workOrder: chat.workOrder ? {
         id: chat.workOrder.id,
-        title: chat.workOrder.title || `OS #${chat.workOrder.osNumber}`,
+        title: chat.workOrder.job?.clientName || `OS #${chat.workOrder.osNumber}`,
         status: chat.workOrder.status,
-        jobSite: chat.workOrder.jobSite,
+        jobSite: chat.workOrder.job ? {
+          address: chat.workOrder.job.address,
+          city: chat.workOrder.job.city,
+          state: chat.workOrder.job.state,
+          zip: chat.workOrder.job.zipCode,
+        } : undefined,
       } : undefined,
       subcontractor: {
         id: sub.id,

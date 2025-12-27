@@ -243,12 +243,14 @@ export default function SubOSDetailPage({ params }: PageProps) {
     await saveWorkOrder({ comments: updatedComments });
   };
 
-  const handleAudioRecordingComplete = async (audioBlob: Blob, duration: number) => {
+  const handleAudioRecordingComplete = async (audioBlob: Blob, duration: number, mimeType: string) => {
     if (!workOrder) return;
     setIsUploadingMedia(true);
     try {
+      // Get correct file extension based on mime type
+      const ext = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('mpeg') ? 'mp3' : 'webm';
       const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.webm');
+      formData.append('file', audioBlob, `audio.${ext}`);
       formData.append('context', 'chat');
       formData.append('workOrderId', workOrder.id);
 

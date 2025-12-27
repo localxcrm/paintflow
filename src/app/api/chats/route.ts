@@ -19,21 +19,20 @@ export async function GET(request: NextRequest) {
         *,
         workOrder:WorkOrder (
           id,
-          title,
+          osNumber,
           status,
-          jobSite:jobSiteId (
+          job:Job (
+            jobNumber,
+            clientName,
             address,
             city,
             state,
-            zip
+            zipCode
           )
         ),
         subcontractor:Subcontractor (
           id,
-          user:User (
-            name,
-            phone
-          )
+          name
         )
       `)
       .eq('organizationId', organizationId)
@@ -49,14 +48,18 @@ export async function GET(request: NextRequest) {
       ...chat,
       workOrder: chat.workOrder ? {
         id: chat.workOrder.id,
-        title: chat.workOrder.title,
+        title: chat.workOrder.job?.clientName || chat.workOrder.osNumber,
         status: chat.workOrder.status,
-        jobSite: chat.workOrder.jobSite,
+        jobSite: chat.workOrder.job ? {
+          address: chat.workOrder.job.address,
+          city: chat.workOrder.job.city,
+          state: chat.workOrder.job.state,
+          zip: chat.workOrder.job.zipCode,
+        } : undefined,
       } : undefined,
       subcontractor: chat.subcontractor ? {
         id: chat.subcontractor.id,
-        name: chat.subcontractor.user?.name || 'Unknown',
-        phone: chat.subcontractor.user?.phone,
+        name: chat.subcontractor.name || 'Unknown',
       } : undefined,
     }));
 

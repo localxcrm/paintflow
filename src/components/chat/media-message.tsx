@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import Image from 'next/image';
-import { Play, Pause, Volume2 } from 'lucide-react';
+import { Play, Pause, Volume2, AlertCircle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WorkOrderComment } from '@/types/work-order';
 
@@ -14,6 +14,7 @@ export function MediaMessage({ comment }: MediaMessageProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(comment.mediaDuration || 0);
+  const [hasError, setHasError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -23,16 +24,32 @@ export function MediaMessage({ comment }: MediaMessageProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
     const media = comment.type === 'audio' ? audioRef.current : videoRef.current;
     if (!media) return;
 
     if (isPlaying) {
       media.pause();
+      setIsPlaying(false);
     } else {
-      media.play();
+      try {
+        await media.play();
+        setIsPlaying(true);
+      } catch (error) {
+        console.error('Error playing media:', error);
+        setHasError(true);
+      }
     }
-    setIsPlaying(!isPlaying);
+  };
+
+  const handleError = () => {
+    setHasError(true);
+  };
+
+  const handleDownload = () => {
+    if (comment.mediaUrl) {
+      window.open(comment.mediaUrl, '_blank');
+    }
   };
 
   const handleTimeUpdate = () => {
@@ -68,6 +85,29 @@ export function MediaMessage({ comment }: MediaMessageProps) {
   if (comment.type === 'audio' && comment.mediaUrl) {
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+    // Show error state if audio can't be played (e.g., webm on Safari)
+    if (hasError) {
+      return (
+        <div className="flex items-center gap-3 bg-slate-100 rounded-lg p-3 max-w-[280px]">
+          <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+            <AlertCircle className="h-5 w-5 text-amber-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-slate-600">Formato não suportado</p>
+            <p className="text-xs text-slate-400">Toque para baixar</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleDownload}
+            className="h-8 w-8 text-blue-500"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center gap-3 bg-slate-100 rounded-lg p-3 max-w-[280px]">
         <audio
@@ -76,6 +116,7 @@ export function MediaMessage({ comment }: MediaMessageProps) {
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={handleEnded}
+          onError={handleError}
           className="hidden"
         />
 

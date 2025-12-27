@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Mic, Square, Play, Pause, Trash2, Send, Loader2 } from 'lucide-react';
 
 interface AudioRecorderProps {
-  onRecordingComplete: (audioBlob: Blob, duration: number) => void;
+  onRecordingComplete: (audioBlob: Blob, duration: number, mimeType: string) => void;
   onCancel: () => void;
   isUploading?: boolean;
   autoStart?: boolean; // Auto-start recording when component mounts
@@ -30,9 +30,18 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4',
-      });
+      // Prefer mp4 for maximum compatibility (Safari/iOS can't play webm)
+      // Use webm only as fallback on browsers that don't support mp4
+      let mimeType = 'audio/mp4';
+      if (!MediaRecorder.isTypeSupported('audio/mp4')) {
+        if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mpeg')) {
+          mimeType = 'audio/mpeg';
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
 
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -127,7 +136,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
 
   const handleSend = useCallback(() => {
     if (audioBlob) {
-      onRecordingComplete(audioBlob, recordingTime);
+      onRecordingComplete(audioBlob, recordingTime, audioBlob.type);
     }
   }, [audioBlob, recordingTime, onRecordingComplete]);
 
