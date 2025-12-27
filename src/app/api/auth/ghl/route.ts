@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { validateGhlSsoParams } from '@/lib/ghl';
-import { generateSessionToken, getSessionExpiry } from '@/lib/auth';
+import { generateSessionToken, getSessionExpiry, hashPassword } from '@/lib/auth';
+import { randomBytes } from 'crypto';
 import type { User, GhlLocation } from '@/types/database';
 
 /**
@@ -204,13 +205,17 @@ async function findOrCreateUser(
     return updatedUser;
   }
 
-  // Create new user (no password - SSO only)
+  // Create new user with random password hash (SSO only - they can't login with password)
+  // We generate a random password hash to satisfy NOT NULL constraint
+  const randomPassword = randomBytes(32).toString('hex');
+  const passwordHash = hashPassword(randomPassword);
+
   const { data: newUser, error: createError } = await supabase
     .from('User')
     .insert({
       email,
       name,
-      passwordHash: '', // Empty - user can only login via GHL SSO
+      passwordHash, // Random hash - user can only login via GHL SSO
       role: 'user',
       isActive: true,
       ghlUserId: ghlUserId,
@@ -222,6 +227,7 @@ async function findOrCreateUser(
 
   if (createError) {
     console.error('Failed to create GHL user:', createError);
+    console.error('Error details:', JSON.stringify(createError));
     return null;
   }
 
