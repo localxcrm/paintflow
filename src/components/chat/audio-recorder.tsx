@@ -57,34 +57,64 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
   // Web recording using MediaRecorder API (defined first so it can be used as fallback)
   const startWebRecording = useCallback(async () => {
     try {
+      console.log('[AudioRecorder] Starting web recording...');
+      console.log('[AudioRecorder] Requesting microphone access...');
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      console.log('[AudioRecorder] Got microphone stream');
 
-      // Determine best mime type for the browser
-      let selectedMimeType = 'audio/webm'; // Default to webm for better compatibility
-      if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        selectedMimeType = 'audio/mp4';
-      } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        selectedMimeType = 'audio/webm;codecs=opus';
-      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-        selectedMimeType = 'audio/webm';
+      // Determine best mime type for the browser - try without specifying mime type first
+      let selectedMimeType = '';
+      const supportedTypes = [
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/wav',
+      ];
+
+      for (const type of supportedTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          selectedMimeType = type;
+          console.log('[AudioRecorder] Using mime type:', type);
+          break;
+        }
       }
-      setMimeType(selectedMimeType);
+
+      if (!selectedMimeType) {
+        console.log('[AudioRecorder] No specific mime type supported, using default');
+      }
+
+      setMimeType(selectedMimeType || 'audio/webm');
       setUseNativeRecording(false);
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+      // Create MediaRecorder - without mime type if none supported
+      const mediaRecorder = selectedMimeType
+        ? new MediaRecorder(stream, { mimeType: selectedMimeType })
+        : new MediaRecorder(stream);
+
+      console.log('[AudioRecorder] MediaRecorder created with mimeType:', mediaRecorder.mimeType);
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       startTimeRef.current = Date.now();
 
       mediaRecorder.ondataavailable = (event) => {
+        console.log('[AudioRecorder] Data available, size:', event.data.size);
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
+      mediaRecorder.onerror = (event) => {
+        console.error('[AudioRecorder] MediaRecorder error:', event);
+      };
+
       mediaRecorder.onstop = () => {
+        console.log('[AudioRecorder] Recording stopped, chunks:', audioChunksRef.current.length);
         const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+        console.log('[AudioRecorder] Created blob, size:', blob.size, 'type:', blob.type);
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
@@ -92,6 +122,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
       };
 
       mediaRecorder.start(100);
+      console.log('[AudioRecorder] Recording started');
       setIsRecording(true);
       setHasStarted(true);
 
@@ -99,7 +130,8 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
         setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('[AudioRecorder] Error accessing microphone:', error);
+      alert('Erro ao acessar microfone: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
       throw error;
     }
   }, []);
@@ -118,31 +150,40 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
   // Native iOS recording using VoiceRecorder plugin
   const startNativeRecording = useCallback(async () => {
     try {
+      console.log('[AudioRecorder] Checking VoiceRecorder availability...');
+      console.log('[AudioRecorder] VoiceRecorder:', VoiceRecorder);
+      console.log('[AudioRecorder] isNative:', isNative, 'isIOS:', isIOS);
+
       // Check if VoiceRecorder is available
       if (!VoiceRecorder) {
-        console.log('VoiceRecorder not available, falling back to web recording');
+        console.log('[AudioRecorder] VoiceRecorder not available, falling back to web recording');
         await startWebRecording();
         return;
       }
 
       // Check if plugin has the method
       if (typeof VoiceRecorder.requestAudioRecordingPermission !== 'function') {
-        console.log('VoiceRecorder methods not available, falling back to web recording');
+        console.log('[AudioRecorder] VoiceRecorder methods not available, falling back to web recording');
         await startWebRecording();
         return;
       }
 
       // Request permission first
+      console.log('[AudioRecorder] Requesting native audio permission...');
       const permission = await VoiceRecorder.requestAudioRecordingPermission();
+      console.log('[AudioRecorder] Permission result:', permission);
+
       if (!permission.value) {
         // Permission denied, try web recording as fallback
-        console.log('Native permission denied, trying web recording');
+        console.log('[AudioRecorder] Native permission denied, trying web recording');
         await startWebRecording();
         return;
       }
 
       // Start recording
+      console.log('[AudioRecorder] Starting native recording...');
       await VoiceRecorder.startRecording();
+      console.log('[AudioRecorder] Native recording started');
       setIsRecording(true);
       setHasStarted(true);
       setUseNativeRecording(true);
@@ -153,18 +194,18 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
         setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
     } catch (error) {
-      console.error('Error starting native recording:', error);
+      console.error('[AudioRecorder] Error starting native recording:', error);
       // Fall back to web recording
-      console.log('Falling back to web recording due to native error');
+      console.log('[AudioRecorder] Falling back to web recording due to native error');
       try {
         await startWebRecording();
       } catch (webError) {
-        console.error('Web recording also failed:', webError);
+        console.error('[AudioRecorder] Web recording also failed:', webError);
         alert('Erro ao iniciar gravação. Verifique as permissões do microfone.');
         onCancel();
       }
     }
-  }, [onCancel, startWebRecording]);
+  }, [onCancel, startWebRecording, isNative, isIOS]);
 
   const stopNativeRecording = useCallback(async () => {
     try {

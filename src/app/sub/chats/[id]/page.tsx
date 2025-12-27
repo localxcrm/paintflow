@@ -166,6 +166,10 @@ export default function SubChatViewPage({ params }: PageProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('[Chat] handleFileUpload called');
+    console.log('[Chat] File:', file.name, 'size:', file.size, 'type:', file.type);
+    console.log('[Chat] Media type:', mediaType);
+
     setIsUploadingMedia(true);
     try {
       const formData = new FormData();
@@ -173,18 +177,27 @@ export default function SubChatViewPage({ params }: PageProps) {
       formData.append('context', 'chat');
       formData.append('workOrderId', chat?.workOrderId || '');
 
+      console.log('[Chat] Uploading file...');
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Upload failed');
+      console.log('[Chat] Upload response status:', res.status);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[Chat] Upload failed:', errorText);
+        throw new Error('Upload failed: ' + errorText);
+      }
 
       const data = await res.json();
+      console.log('[Chat] Upload success, url:', data.url);
+
       await sendMessage(undefined, mediaType, data.url, data.path);
     } catch (error) {
-      console.error('Error uploading:', error);
-      toast.error('Erro ao enviar mídia');
+      console.error('[Chat] Error uploading:', error);
+      toast.error('Erro ao enviar mídia: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     } finally {
       setIsUploadingMedia(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -192,28 +205,52 @@ export default function SubChatViewPage({ params }: PageProps) {
   };
 
   const handleAudioComplete = async (audioBlob: Blob, duration: number, mimeType: string) => {
+    console.log('[Chat] handleAudioComplete called');
+    console.log('[Chat] Blob size:', audioBlob.size, 'type:', audioBlob.type);
+    console.log('[Chat] Duration:', duration, 'mimeType:', mimeType);
+
     setIsUploadingMedia(true);
     try {
       // Get correct file extension based on mime type
-      const ext = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('mpeg') ? 'mp3' : 'webm';
+      let ext = 'webm';
+      if (mimeType.includes('mp4') || mimeType.includes('m4a')) {
+        ext = 'm4a';
+      } else if (mimeType.includes('mpeg') || mimeType.includes('mp3')) {
+        ext = 'mp3';
+      } else if (mimeType.includes('ogg')) {
+        ext = 'ogg';
+      } else if (mimeType.includes('wav')) {
+        ext = 'wav';
+      }
+      console.log('[Chat] Using extension:', ext);
+
       const formData = new FormData();
       formData.append('file', audioBlob, `audio.${ext}`);
       formData.append('context', 'chat');
       formData.append('workOrderId', chat?.workOrderId || '');
 
+      console.log('[Chat] Uploading audio...');
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Upload failed');
+      console.log('[Chat] Upload response status:', res.status);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[Chat] Upload failed:', errorText);
+        throw new Error('Upload failed: ' + errorText);
+      }
 
       const data = await res.json();
+      console.log('[Chat] Upload success, url:', data.url);
+
       await sendMessage(undefined, 'audio', data.url, data.path, duration);
       setIsRecordingAudio(false);
     } catch (error) {
-      console.error('Error uploading audio:', error);
-      toast.error('Erro ao enviar áudio');
+      console.error('[Chat] Error uploading audio:', error);
+      toast.error('Erro ao enviar áudio: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     } finally {
       setIsUploadingMedia(false);
     }
