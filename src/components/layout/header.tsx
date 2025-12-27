@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { LogOut, User, Settings, Users, LayoutDashboard, Target, Briefcase, Megaphone, TrendingUp, BookOpen } from 'lucide-react';
+import { LogOut, User, Settings, Users, LayoutDashboard, Target, Briefcase, Megaphone, TrendingUp, BookOpen, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -32,6 +32,7 @@ const navItems = [
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/vendas', label: 'Vendas', icon: TrendingUp },
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
+  { href: '/chats', label: 'Chats', icon: MessageSquare },
   { href: '/conhecimento', label: 'Conhecimento', icon: BookOpen },
 ];
 
@@ -40,6 +41,7 @@ export function Header() {
   const pathname = usePathname();
   const [user, setUser] = useState<UserData | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const { organization } = useOrganization();
 
   useEffect(() => {
@@ -52,6 +54,30 @@ export function Header() {
         localStorage.removeItem('paintpro_user');
       }
     }
+  }, []);
+
+  // Fetch unread chats count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await fetch('/api/chats');
+        if (res.ok) {
+          const data = await res.json();
+          const total = (data.chats || []).reduce(
+            (sum: number, chat: { unreadCountCompany: number }) => sum + (chat.unreadCountCompany || 0),
+            0
+          );
+          setUnreadChatsCount(total);
+        }
+      } catch {
+        // Silently fail
+      }
+    };
+
+    fetchUnreadCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = async () => {
@@ -96,18 +122,26 @@ export function Header() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
+              const showBadge = item.href === '/chats' && unreadChatsCount > 0;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-2.5 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200',
+                    'flex items-center gap-2.5 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 relative',
                     active
                       ? 'bg-brand-teal text-white shadow-lg shadow-brand-teal/20 scale-105'
                       : 'text-slate-600 hover:bg-white hover:text-brand-teal hover:shadow-sm'
                   )}
                 >
-                  <Icon className={cn("w-4 h-4", active ? "animate-pulse" : "")} />
+                  <div className="relative">
+                    <Icon className={cn("w-4 h-4", active ? "animate-pulse" : "")} />
+                    {showBadge && (
+                      <div className="absolute -top-2 -right-2 min-w-[16px] h-[16px] bg-red-500 rounded-full flex items-center justify-center text-white text-[9px] font-bold px-1">
+                        {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
+                      </div>
+                    )}
+                  </div>
                   <span>{item.label}</span>
                 </Link>
               );

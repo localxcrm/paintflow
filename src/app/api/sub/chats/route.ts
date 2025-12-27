@@ -42,7 +42,9 @@ async function getSubcontractorFromSession() {
 export async function GET() {
   try {
     const sub = await getSubcontractorFromSession();
+    console.log('[API sub/chats] Subcontractor:', sub?.id, sub?.user?.name);
     if (!sub) {
+      console.log('[API sub/chats] No subcontractor session found');
       return NextResponse.json(
         { error: 'Não autenticado' },
         { status: 401, headers: corsHeaders }
@@ -72,6 +74,9 @@ export async function GET() {
       `)
       .eq('subcontractorId', sub.id)
       .order('lastMessageAt', { ascending: false, nullsFirst: false });
+
+    console.log('[API sub/chats] Query for subcontractorId:', sub.id);
+    console.log('[API sub/chats] Found chats:', chats?.length || 0);
 
     if (error) {
       console.error('Error fetching chats:', error);

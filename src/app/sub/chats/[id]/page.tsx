@@ -80,9 +80,12 @@ export default function SubChatViewPage({ params }: PageProps) {
 
   const loadChat = async () => {
     try {
+      console.log('[Chat] Loading chat:', id);
       const res = await fetch(`/api/sub/chats/${id}`);
       if (!res.ok) throw new Error('Failed to fetch chat');
       const data = await res.json();
+      console.log('[Chat] Received data:', JSON.stringify(data, null, 2));
+      console.log('[Chat] Messages count:', data.messages?.length || 0);
       setChat(data);
     } catch (error) {
       console.error('Error loading chat:', error);

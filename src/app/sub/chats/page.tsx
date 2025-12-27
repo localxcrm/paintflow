@@ -21,9 +21,13 @@ export default function SubChatsPage() {
 
   const loadChats = async () => {
     try {
+      console.log('[ChatList] Loading chats...');
       const res = await fetch('/api/sub/chats');
+      console.log('[ChatList] Response status:', res.status);
       if (!res.ok) throw new Error('Failed to fetch chats');
       const data = await res.json();
+      console.log('[ChatList] Received data:', JSON.stringify(data, null, 2));
+      console.log('[ChatList] Chats count:', data.chats?.length || 0);
       setChats(data.chats || []);
     } catch (error) {
       console.error('Error loading chats:', error);

@@ -19,5 +19,10 @@
       "Bash(npx:*)",
       "Bash(echo:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase",
+    "vercel"
+  ],
+  "enableAllProjectMcpServers": true
 }
