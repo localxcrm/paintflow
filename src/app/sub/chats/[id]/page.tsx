@@ -32,8 +32,10 @@ export default function SubChatViewPage({ params }: PageProps) {
   const [newMessage, setNewMessage] = useState('');
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadChat();
@@ -77,6 +79,36 @@ export default function SubChatViewPage({ params }: PageProps) {
   useEffect(() => {
     scrollToBottom();
   }, [chat?.messages]);
+
+  // Handle iOS keyboard - use visualViewport API
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const keyboardH = windowHeight - viewportHeight;
+        const newKeyboardHeight = keyboardH > 0 ? keyboardH : 0;
+        setKeyboardHeight(newKeyboardHeight);
+
+        // Scroll to bottom when keyboard appears
+        if (newKeyboardHeight > 0) {
+          setTimeout(() => scrollToBottom(), 100);
+        }
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('scroll', handleResize);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
+      }
+    };
+  }, []);
 
   const loadChat = async () => {
     try {
@@ -332,7 +364,7 @@ export default function SubChatViewPage({ params }: PageProps) {
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-white overflow-hidden">
+    <div className="fixed inset-0 flex flex-col bg-white">
       {/* Header */}
       <div className="bg-white border-b p-4 safe-area-top shrink-0 z-10">
         <div className="flex items-center gap-3 mb-3">
@@ -419,7 +451,11 @@ export default function SubChatViewPage({ params }: PageProps) {
       </div>
 
       {/* Input Area */}
-      <div className="border-t p-4 bg-white safe-area-bottom shrink-0 z-10">
+      <div
+        ref={inputAreaRef}
+        className="border-t p-4 bg-white shrink-0 z-20"
+        style={{ paddingBottom: keyboardHeight > 0 ? 16 : 'max(16px, env(safe-area-inset-bottom))' }}
+      >
         {isRecordingAudio ? (
           <AudioRecorder
             onRecordingComplete={handleAudioComplete}
