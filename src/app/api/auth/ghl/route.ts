@@ -131,9 +131,13 @@ export async function GET(request: NextRequest) {
 
     console.log('GHL SSO success - redirecting to dashboard');
 
-    // Step 6: Redirect to dashboard
-    const dashboardUrl = new URL('/painel', request.nextUrl.origin);
-    return NextResponse.redirect(dashboardUrl);
+    // Step 6: Redirect to a page that will store the token in localStorage
+    // This is needed because third-party cookies are blocked in iframes
+    const callbackUrl = new URL('/auth/callback', request.nextUrl.origin);
+    callbackUrl.searchParams.set('token', token);
+    callbackUrl.searchParams.set('org', organization.id);
+    callbackUrl.searchParams.set('redirect', '/painel');
+    return NextResponse.redirect(callbackUrl);
   } catch (error) {
     console.error('GHL SSO error:', error);
     return createErrorRedirect(request, 'SSO authentication failed');

@@ -57,12 +57,18 @@ function LoginContent() {
         loggedInAt: new Date().toISOString(),
       }));
 
+      // Store session token for iframe compatibility
+      if (data.sessionToken) {
+        localStorage.setItem('paintpro_session_token', data.sessionToken);
+      }
+
       // Check if user needs to select organization
       if (data.needsOrgSelection || !data.currentOrganization) {
         router.push(`/select-org?redirect=${encodeURIComponent(redirectPath)}`);
       } else {
         // Store current organization
         localStorage.setItem('paintpro_org', JSON.stringify(data.currentOrganization));
+        localStorage.setItem('paintpro_org_id', data.currentOrganization.id);
         router.push(redirectPath);
       }
     } catch (err) {

@@ -123,6 +123,8 @@ export async function POST(request: NextRequest) {
         name: user.name,
         role: user.role,
       },
+      // Include session token for localStorage (iframe compatibility)
+      sessionToken: session.token,
       organizations,
       currentOrganization: defaultOrg || null,
       needsOrgSelection: organizations.length > 1 || organizations.length === 0,

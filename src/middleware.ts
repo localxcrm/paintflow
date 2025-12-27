@@ -20,6 +20,7 @@ const publicRoutes = [
   '/register',
   '/forgot-password',
   '/reset-password',
+  '/auth/callback', // SSO callback for iframe auth
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/logout',
@@ -122,8 +123,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Regular admin routes - check for session cookie
-  const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
+  // Regular admin routes - check for session cookie OR Authorization header
+  // Authorization header is used for iframe compatibility (third-party cookies blocked)
+  const authHeader = request.headers.get('authorization');
+  const sessionToken = authHeader?.startsWith('Bearer ')
+    ? authHeader.substring(7)
+    : request.cookies.get(SESSION_COOKIE)?.value;
+
+  // Also check X-Organization-Id header for iframe compatibility
+  const organizationIdHeader = request.headers.get('x-organization-id');
+
   const subSessionToken = request.cookies.get(SUB_SESSION_COOKIE)?.value;
 
   // Check if it's a shared API route (accessible by both admins and subcontractors)
@@ -173,8 +182,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for organization cookie
-  const organizationId = request.cookies.get(ORG_COOKIE)?.value;
+  // Check for organization cookie OR header
+  const organizationId = organizationIdHeader || request.cookies.get(ORG_COOKIE)?.value;
 
   // If no organization selected and trying to access org-scoped route
   if (!organizationId) {
