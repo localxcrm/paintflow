@@ -640,28 +640,6 @@ export default function PainelPage() {
         </Card>
       </div>
 
-      {/* Floating Formula Reference */}
-      <div className="fixed bottom-6 right-6 z-50 group">
-        <Card variant="glass" className="p-1 pr-6 shadow-2xl border-white/60 flex items-center gap-4 max-w-xs md:max-w-none transition-all duration-500 hover:max-w-xl">
-          <div className="h-10 w-10 bg-slate-800 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
-            <div className="text-white font-black text-lg font-mono">F</div>
-          </div>
-          <div className="flex items-center gap-6 overflow-hidden">
-            <div className="whitespace-nowrap">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Alvo Semanal</p>
-              <p className="text-sm font-bold text-slate-800">{formatCurrency(goals.weekly.revenue, true)}/venda</p>
-            </div>
-            <div className="whitespace-nowrap hidden md:block border-l border-slate-200 pl-6">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cota Leads</p>
-              <p className="text-sm font-bold text-slate-800">{goals.weekly.leads} leads/sem</p>
-            </div>
-            <div className="whitespace-nowrap border-l border-slate-200 pl-6">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fechamento</p>
-              <p className="text-sm font-bold text-slate-800">{settings.formulaParams.closingRate}%</p>
-            </div>
-          </div>
-        </Card>
-      </div>
     </div>
   );
 }
