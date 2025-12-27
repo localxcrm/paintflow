@@ -122,7 +122,7 @@ function LoginContent() {
                   <button
                     type="button"
                     className="text-sm text-[#0D5C75] hover:text-[#094A5E] font-medium"
-                    onClick={() => alert('Recuperação de senha em breve!')}
+                    onClick={() => router.push('/forgot-password')}
                   >
                     Esqueceu a senha?
                   </button>

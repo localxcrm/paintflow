@@ -18,9 +18,13 @@ const publicRoutes = [
   '/',
   '/login',
   '/register',
+  '/forgot-password',
+  '/reset-password',
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/logout',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
   // GHL SSO routes
   '/api/ghl/generate-sso-url',
   '/api/auth/ghl',
