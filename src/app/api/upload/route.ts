@@ -57,31 +57,44 @@ function getExtensionFromMimeType(mimeType: string): string {
 // POST /api/upload - Upload file to Supabase Storage
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Upload API] Starting upload...');
     const supabase = createServerSupabaseClient();
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const context = formData.get('context') as string || 'general'; // 'chat', 'work-order', 'photo'
     const workOrderId = formData.get('workOrderId') as string | null;
 
+    console.log('[Upload API] Context:', context, 'WorkOrderId:', workOrderId);
+
     // Try to get organization ID from cookie first
     let organizationId = getOrganizationIdFromRequest(request);
+    console.log('[Upload API] Org ID from cookie:', organizationId);
 
     // If no org ID and we have a workOrderId, get it from the work order (for subcontractors)
     if (!organizationId && workOrderId) {
-      const { data: workOrder } = await supabase
+      console.log('[Upload API] No org ID, trying to get from work order...');
+      const { data: workOrder, error: woError } = await supabase
         .from('WorkOrder')
         .select('organizationId')
         .eq('id', workOrderId)
         .single();
 
+      if (woError) {
+        console.log('[Upload API] Error getting work order:', woError);
+      }
+
       if (workOrder?.organizationId) {
         organizationId = workOrder.organizationId;
+        console.log('[Upload API] Got org ID from work order:', organizationId);
       }
     }
 
     if (!organizationId) {
+      console.log('[Upload API] No organization ID found, returning error');
       return NextResponse.json({ error: 'Organization required' }, { status: 400 });
     }
+
+    console.log('[Upload API] Using org ID:', organizationId);
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
