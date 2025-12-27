@@ -95,6 +95,7 @@ export interface WorkOrderMaterial {
 export interface WorkOrderPhoto {
   id: string;
   url: string;
+  path?: string;             // Path no Storage para deletar
   type: 'before' | 'progress' | 'after';
   roomId?: string;           // Foto de qual cômodo?
   caption?: string;

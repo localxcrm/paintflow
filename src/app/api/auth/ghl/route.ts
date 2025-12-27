@@ -40,6 +40,16 @@ export async function GET(request: NextRequest) {
       signature: searchParams.get('signature') || undefined,
     };
 
+    // Log incoming parameters for debugging
+    console.log('GHL SSO Request:', {
+      location_id: params.location_id,
+      user_id: params.user_id,
+      user_email: params.user_email,
+      user_name: params.user_name,
+      timestamp: params.timestamp,
+      hasSignature: !!params.signature,
+    });
+
     // Validate parameters and signature
     const validation = validateGhlSsoParams(params);
 
@@ -47,6 +57,8 @@ export async function GET(request: NextRequest) {
       console.error('GHL SSO validation failed:', validation.error);
       return createErrorRedirect(request, validation.error || 'Invalid SSO parameters');
     }
+
+    console.log('GHL SSO validation passed');
 
     const { location_id, user_id, user_email, user_name } = validation.parsed;
 
@@ -116,6 +128,8 @@ export async function GET(request: NextRequest) {
       expires: expiresAt,
       path: '/',
     });
+
+    console.log('GHL SSO success - redirecting to dashboard');
 
     // Step 6: Redirect to dashboard
     const dashboardUrl = new URL('/painel', request.nextUrl.origin);

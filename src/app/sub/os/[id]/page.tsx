@@ -6,10 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import {
   ArrowLeft,
   MapPin,
@@ -19,16 +17,9 @@ import {
   Home,
   CheckSquare,
   Package,
-  MessageSquare,
-  Send,
   Loader2,
   AlertCircle,
   Check,
-  Image as ImageIcon,
-  Mic,
-  Video,
-  Plus,
-  Camera,
 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -36,15 +27,14 @@ import {
   WorkOrder,
   WorkOrderRoom,
   WorkOrderTask,
-  WorkOrderComment,
   WORK_ORDER_STATUS_LABELS,
   WORK_ORDER_STATUS_COLORS,
 } from '@/types/work-order';
-import { MediaMessage } from '@/components/chat/media-message';
-import { AudioRecorder } from '@/components/chat/audio-recorder';
 import { CelebrationOverlay } from '@/components/sub/confetti';
 import { PhotoReminder } from '@/components/sub/photo-reminder';
+import { MediaGallery, MediaItem } from '@/components/work-order/media-gallery';
 import { isNativeApp, pickPhoto, photoToFile } from '@/lib/capacitor-camera';
+import { uploadFileDirect } from '@/lib/supabase';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -57,23 +47,17 @@ export default function SubOSDetailPage({ params }: PageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [newComment, setNewComment] = useState('');
-  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
-  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showPhotoReminder, setShowPhotoReminder] = useState<'before' | 'after' | null>(null);
   const [hasShownBeforeReminder, setHasShownBeforeReminder] = useState(false);
   const [previousProgress, setPreviousProgress] = useState<number | null>(null);
-  const [showMediaSheet, setShowMediaSheet] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const commentsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadWorkOrder();
   }, [id]);
 
-  // Poll for new comments
+  // Poll for updates (photos)
   useEffect(() => {
     if (!workOrder) return;
 
@@ -82,15 +66,15 @@ export default function SubOSDetailPage({ params }: PageProps) {
         const res = await fetch(`/api/sub/os/${id}`);
         if (res.ok) {
           const data = await res.json();
-          // Only update if comments changed
-          if (JSON.stringify(data.comments) !== JSON.stringify(workOrder.comments)) {
+          // Only update if photos changed
+          if (JSON.stringify(data.photos) !== JSON.stringify(workOrder.photos)) {
             setWorkOrder(data);
           }
         }
       } catch (error) {
         console.error('Error polling:', error);
       }
-    }, 10000);
+    }, 15000);
 
     return () => clearInterval(pollInterval);
   }, [id, workOrder]);
@@ -199,149 +183,57 @@ export default function SubOSDetailPage({ params }: PageProps) {
     saveWorkOrder({ rooms: updatedRooms });
   };
 
-  const addComment = () => {
-    if (!workOrder || !newComment.trim()) return;
+  // Add photo to gallery
+  const handleAddMedia = async (media: MediaItem) => {
+    if (!workOrder) return;
 
-    const comment: WorkOrderComment = {
-      id: `comment-${Date.now()}`,
-      type: 'text',
-      text: newComment.trim(),
-      author: 'Subcontratado',
-      authorType: 'subcontractor',
-      createdAt: new Date().toISOString(),
+    const newPhoto = {
+      id: media.id,
+      url: media.url,
+      path: media.path,
+      type: 'progress' as const,
+      caption: media.caption || '',
+      uploadedAt: media.uploadedAt,
+      uploadedBy: 'subcontractor' as const,
     };
 
-    const updatedComments = [...workOrder.comments, comment];
-    setWorkOrder({ ...workOrder, comments: updatedComments });
-    saveWorkOrder({ comments: updatedComments });
-    setNewComment('');
+    const updatedPhotos = [...(workOrder.photos || []), newPhoto];
 
-    // Scroll to bottom
-    setTimeout(() => {
-      commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+    setWorkOrder({ ...workOrder, photos: updatedPhotos });
+    await saveWorkOrder({ photos: updatedPhotos });
   };
 
-  const addMediaComment = async (
-    mediaData: { type: 'audio' | 'image' | 'video'; url: string; path: string; duration?: number }
-  ) => {
-    if (!workOrder) return;
-
-    const comment: WorkOrderComment = {
-      id: `comment-${Date.now()}`,
-      type: mediaData.type,
-      mediaUrl: mediaData.url,
-      mediaPath: mediaData.path,
-      mediaDuration: mediaData.duration,
-      author: 'Subcontratado',
-      authorType: 'subcontractor',
-      createdAt: new Date().toISOString(),
-    };
-
-    const updatedComments = [...workOrder.comments, comment];
-    setWorkOrder({ ...workOrder, comments: updatedComments });
-    await saveWorkOrder({ comments: updatedComments });
-  };
-
-  const handleAudioRecordingComplete = async (audioBlob: Blob, duration: number, mimeType: string) => {
-    if (!workOrder) return;
-    setIsUploadingMedia(true);
-    try {
-      // Get correct file extension based on mime type
-      const ext = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('mpeg') ? 'mp3' : 'webm';
-      const formData = new FormData();
-      formData.append('file', audioBlob, `audio.${ext}`);
-      formData.append('context', 'chat');
-      formData.append('workOrderId', workOrder.id);
-
-      const res = await fetch('/api/sub/os/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Upload failed');
-      }
-
-      await addMediaComment({
-        type: 'audio',
-        url: data.url,
-        path: data.path,
-        duration,
-      });
-      setIsRecordingAudio(false);
-      toast.success('Áudio enviado!');
-    } catch (error) {
-      console.error('Error uploading audio:', error);
-      toast.error('Erro ao enviar áudio');
-    } finally {
-      setIsUploadingMedia(false);
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, mediaType: 'image' | 'video') => {
-    if (!workOrder) return;
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    await uploadFile(file, mediaType);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    if (videoInputRef.current) videoInputRef.current.value = '';
-  };
-
-  // Handle native camera capture
+  // Handle native camera capture for photo reminder
   const handleNativeCamera = async () => {
     if (!workOrder) return;
 
     try {
       const photo = await pickPhoto();
-      if (!photo) return; // User cancelled
+      if (!photo) return;
 
       const file = await photoToFile(photo);
       if (file) {
-        await uploadFile(file, 'image');
+        const data = await uploadFileDirect(
+          file,
+          workOrder.organizationId,
+          'work-order',
+          workOrder.id,
+          file.name
+        );
+
+        await handleAddMedia({
+          id: crypto.randomUUID(),
+          url: data.url,
+          path: data.path,
+          type: 'photo',
+          uploadedAt: new Date().toISOString(),
+          uploadedBy: 'Subcontratado',
+        });
+        toast.success('Foto adicionada!');
       }
     } catch (error) {
       console.error('Error capturing photo:', error);
       toast.error('Erro ao capturar foto');
-    }
-  };
-
-  // Unified upload function
-  const uploadFile = async (file: File, mediaType: 'image' | 'video') => {
-    if (!workOrder) return;
-
-    setIsUploadingMedia(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('context', 'chat');
-      formData.append('workOrderId', workOrder.id);
-
-      const res = await fetch('/api/sub/os/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Upload failed');
-      }
-
-      await addMediaComment({
-        type: mediaType,
-        url: data.url,
-        path: data.path,
-      });
-      toast.success(`${mediaType === 'image' ? 'Foto' : 'Vídeo'} enviado!`);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      toast.error('Erro ao enviar arquivo');
-    } finally {
-      setIsUploadingMedia(false);
     }
   };
 
@@ -386,13 +278,6 @@ export default function SubOSDetailPage({ params }: PageProps) {
   const formatCurrency = (value: number | null) => {
     if (!value) return '-';
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
-
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const job = workOrder.job;
@@ -606,176 +491,29 @@ export default function SubOSDetailPage({ params }: PageProps) {
           </Card>
         )}
 
-        {/* Chat */}
+        {/* Galeria de Fotos */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-blue-600" />
-              Chat
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {workOrder.comments.length > 0 && (
-              <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
-                {workOrder.comments.map((comment: WorkOrderComment) => (
-                  <div
-                    key={comment.id}
-                    className={`p-3 rounded-lg ${
-                      comment.authorType === 'company'
-                        ? 'bg-blue-50 border border-blue-100'
-                        : 'bg-slate-50 border border-slate-100 ml-8'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium">
-                        {comment.authorType === 'company' ? 'Empresa' : 'Você'}
-                      </span>
-                      <span className="text-xs text-slate-400">
-                        {formatTime(comment.createdAt)}
-                      </span>
-                    </div>
-                    {comment.type === 'text' ? (
-                      <p className="text-sm text-slate-700">{comment.text}</p>
-                    ) : (
-                      <MediaMessage comment={comment} />
-                    )}
-                  </div>
-                ))}
-                <div ref={commentsEndRef} />
-              </div>
-            )}
-
-            {/* Hidden file inputs */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handleFileUpload(e, 'image')}
+          <CardContent className="pt-6">
+            <MediaGallery
+              items={(workOrder.photos || []).map((photo) => {
+                // Check if URL indicates it's a video
+                const isVideo = photo.url?.includes('.mp4') || photo.url?.includes('.mov') || photo.url?.includes('.webm');
+                return {
+                  id: photo.id,
+                  url: photo.url,
+                  path: photo.path,
+                  type: isVideo ? 'video' as const : photo.type,
+                  caption: photo.caption,
+                  uploadedAt: photo.uploadedAt,
+                  uploadedBy: photo.uploadedBy === 'subcontractor' ? 'Subcontratado' : 'Empresa',
+                };
+              })}
+              onAddMedia={handleAddMedia}
+              organizationId={workOrder.organizationId}
+              workOrderId={workOrder.id}
+              canAdd={true}
+              title="Fotos do Trabalho"
             />
-            <input
-              ref={videoInputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => handleFileUpload(e, 'video')}
-            />
-
-            {/* Audio Recorder */}
-            {isRecordingAudio && (
-              <div className="mb-4">
-                <AudioRecorder
-                  onRecordingComplete={handleAudioRecordingComplete}
-                  onCancel={() => setIsRecordingAudio(false)}
-                  isUploading={isUploadingMedia}
-                />
-              </div>
-            )}
-
-            {/* Chat Input Bar - WhatsApp Style */}
-            {!isRecordingAudio && (
-              <div className="flex items-end gap-2 pt-3 border-t">
-                {/* Botão + com Sheet */}
-                <Sheet open={showMediaSheet} onOpenChange={setShowMediaSheet}>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="shrink-0 h-10 w-10">
-                      <Plus className="h-5 w-5 text-slate-600" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="bottom" className="h-auto rounded-t-2xl">
-                    <div className="grid grid-cols-3 gap-4 p-4 pt-6">
-                      {/* Câmera */}
-                      <button
-                        className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-slate-50 transition-colors"
-                        onClick={() => {
-                          setShowMediaSheet(false);
-                          if (isNativeApp()) {
-                            handleNativeCamera();
-                          } else {
-                            fileInputRef.current?.click();
-                          }
-                        }}
-                      >
-                        <div className="bg-blue-100 rounded-full p-4">
-                          <Camera className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <span className="text-sm font-medium text-slate-700">Câmera</span>
-                      </button>
-                      {/* Galeria */}
-                      <button
-                        className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-slate-50 transition-colors"
-                        onClick={() => {
-                          setShowMediaSheet(false);
-                          fileInputRef.current?.click();
-                        }}
-                      >
-                        <div className="bg-purple-100 rounded-full p-4">
-                          <ImageIcon className="h-6 w-6 text-purple-600" />
-                        </div>
-                        <span className="text-sm font-medium text-slate-700">Galeria</span>
-                      </button>
-                      {/* Vídeo */}
-                      <button
-                        className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-slate-50 transition-colors"
-                        onClick={() => {
-                          setShowMediaSheet(false);
-                          videoInputRef.current?.click();
-                        }}
-                      >
-                        <div className="bg-green-100 rounded-full p-4">
-                          <Video className="h-6 w-6 text-green-600" />
-                        </div>
-                        <span className="text-sm font-medium text-slate-700">Vídeo</span>
-                      </button>
-                    </div>
-                  </SheetContent>
-                </Sheet>
-
-                {/* Input de texto */}
-                <Textarea
-                  placeholder="Mensagem..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  className="flex-1 min-h-[40px] max-h-[100px] resize-none py-2 text-base rounded-2xl bg-slate-100 border-0 focus-visible:ring-1"
-                  rows={1}
-                  disabled={isUploadingMedia}
-                />
-
-                {/* Mic ou Send (dinâmico) */}
-                {newComment.trim() ? (
-                  <Button
-                    size="icon"
-                    onClick={addComment}
-                    disabled={isSaving || isUploadingMedia}
-                    className="shrink-0 h-10 w-10 rounded-full bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsRecordingAudio(true)}
-                    disabled={isUploadingMedia}
-                    className="shrink-0 h-10 w-10"
-                  >
-                    <Mic className="h-5 w-5 text-slate-600" />
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* Loading indicator */}
-            {isUploadingMedia && (
-              <div className="flex items-center justify-center gap-2 py-2 text-sm text-slate-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Enviando...
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
