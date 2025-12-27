@@ -3,46 +3,121 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Play, Pause, Trash2, Send, Loader2 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { VoiceRecorder } from 'capacitor-voice-recorder';
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number, mimeType: string) => void;
   onCancel: () => void;
   isUploading?: boolean;
-  autoStart?: boolean; // Auto-start recording when component mounts
+  autoStart?: boolean;
 }
+
+// Helper to convert base64 to Blob
+const base64ToBlob = (base64: string, mimeType: string): Blob => {
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+};
 
 export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, autoStart = true }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [mimeType, setMimeType] = useState('audio/mp4');
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const startTimeRef = useRef<number>(0);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const startRecording = useCallback(async () => {
+  // Check if running on native iOS
+  const isNative = Capacitor.isNativePlatform();
+  const isIOS = Capacitor.getPlatform() === 'ios';
+
+  // Native iOS recording using VoiceRecorder plugin
+  const startNativeRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // Prefer mp4 for maximum compatibility (Safari/iOS can't play webm)
-      // Use webm only as fallback on browsers that don't support mp4
-      let mimeType = 'audio/mp4';
-      if (!MediaRecorder.isTypeSupported('audio/mp4')) {
-        if (MediaRecorder.isTypeSupported('audio/webm')) {
-          mimeType = 'audio/webm';
-        } else if (MediaRecorder.isTypeSupported('audio/mpeg')) {
-          mimeType = 'audio/mpeg';
-        }
+      // Request permission first
+      const permission = await VoiceRecorder.requestAudioRecordingPermission();
+      if (!permission.value) {
+        alert('Permissão para microfone negada');
+        onCancel();
+        return;
       }
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      // Start recording
+      await VoiceRecorder.startRecording();
+      setIsRecording(true);
+      setHasStarted(true);
+      startTimeRef.current = Date.now();
 
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }, 1000);
+    } catch (error) {
+      console.error('Error starting native recording:', error);
+      alert('Erro ao iniciar gravação');
+      onCancel();
+    }
+  }, [onCancel]);
+
+  const stopNativeRecording = useCallback(async () => {
+    try {
+      const result = await VoiceRecorder.stopRecording();
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      setIsRecording(false);
+
+      if (result.value && result.value.recordDataBase64) {
+        // iOS records as AAC in m4a container - widely compatible
+        const audioMimeType = 'audio/mp4';
+        setMimeType(audioMimeType);
+
+        // Convert base64 to blob
+        const blob = base64ToBlob(result.value.recordDataBase64, audioMimeType);
+        setAudioBlob(blob);
+
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+      }
+    } catch (error) {
+      console.error('Error stopping native recording:', error);
+    }
+  }, []);
+
+  // Web recording using MediaRecorder API
+  const startWebRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      // Determine best mime type for the browser
+      let selectedMimeType = 'audio/mp4';
+      if (!MediaRecorder.isTypeSupported('audio/mp4')) {
+        if (MediaRecorder.isTypeSupported('audio/webm')) {
+          selectedMimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mpeg')) {
+          selectedMimeType = 'audio/mpeg';
+        }
+      }
+      setMimeType(selectedMimeType);
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       startTimeRef.current = Date.now();
@@ -58,26 +133,50 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
-
-        // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorder.start(100); // Collect data every 100ms
+      mediaRecorder.start(100);
       setIsRecording(true);
-      setIsPaused(false);
       setHasStarted(true);
 
-      // Start timer
       timerRef.current = setInterval(() => {
         setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
     } catch (error) {
       console.error('Error accessing microphone:', error);
       alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
-      onCancel(); // Cancel if we can't get microphone access
+      onCancel();
     }
   }, [onCancel]);
+
+  const stopWebRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, []);
+
+  // Unified start/stop functions
+  const startRecording = useCallback(async () => {
+    if (isNative && isIOS) {
+      await startNativeRecording();
+    } else {
+      await startWebRecording();
+    }
+  }, [isNative, isIOS, startNativeRecording, startWebRecording]);
+
+  const stopRecording = useCallback(async () => {
+    if (isNative && isIOS) {
+      await stopNativeRecording();
+    } else {
+      stopWebRecording();
+    }
+  }, [isNative, isIOS, stopNativeRecording, stopWebRecording]);
 
   // Auto-start recording when component mounts
   useEffect(() => {
@@ -94,19 +193,11 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
   }, [audioUrl]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-  }, []);
 
   const togglePlayback = useCallback(() => {
     if (!audioRef.current || !audioUrl) return;
@@ -136,9 +227,9 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
 
   const handleSend = useCallback(() => {
     if (audioBlob) {
-      onRecordingComplete(audioBlob, recordingTime, audioBlob.type);
+      onRecordingComplete(audioBlob, recordingTime, mimeType);
     }
-  }, [audioBlob, recordingTime, onRecordingComplete]);
+  }, [audioBlob, recordingTime, mimeType, onRecordingComplete]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -236,8 +327,8 @@ export function AudioRecorder({ onRecordingComplete, onCancel, isUploading, auto
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => {
-              stopRecording();
+            onClick={async () => {
+              await stopRecording();
               onCancel();
             }}
             className="h-8 w-8"
