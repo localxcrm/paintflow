@@ -13,12 +13,12 @@ export default function DashboardLayout({
   return (
     <AuthProvider>
       <OrganizationProvider>
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen h-screen flex flex-col bg-slate-50 overflow-hidden">
           {/* Header with Logo and Navigation */}
           <Header />
 
-          {/* Page content */}
-          <main className="p-4 lg:p-6">{children}</main>
+          {/* Page content - scrollable */}
+          <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
 
           {/* Global AI Assistant */}
           <AIAssistantWidget />
