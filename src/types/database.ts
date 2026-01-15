@@ -26,7 +26,7 @@ export type GoalDirection = 'above' | 'below';
 export type MetricCategory = 'leading' | 'lagging';
 export type PersonStatus = 'right_person_right_seat' | 'needs_work' | 'wrong_fit';
 export type AIRole = 'user' | 'assistant';
-export type LeadEventType = 'lead_created' | 'appointment_booked' | 'estimate_sent' | 'contract_signed' | 'job_won' | 'job_lost';
+export type LeadEventType = 'lead_created' | 'appointment_booked' | 'estimate_sent' | 'contract_sent' | 'job_won' | 'job_lost';
 export type MarketingChannel = 'google' | 'facebook' | 'referral' | 'yard_sign' | 'door_knock' | 'repeat' | 'site' | 'other';
 
 // ============================================

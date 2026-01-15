@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { geocodeAddress } from '@/lib/geocoding';
-import { calculateJobFinancials } from '@/lib/job-calculations';
 import {
   extractAttribution,
   extractClientInfo,
@@ -14,13 +12,14 @@ import {
 /**
  * POST /api/webhooks/ghl/contracts
  *
- * Webhook endpoint to track signed contracts from GoHighLevel.
- * Called when a client signs a contract/proposal.
+ * Webhook endpoint to track contracts SENT from GoHighLevel.
+ * Called when a contract/proposal is sent to a client.
  *
  * This will:
  * 1. Log the event to LeadEvent table
- * 2. Auto-increment the sales count + revenue in WeeklySales
- * 3. Create a Job record if one doesn't exist
+ * 2. Auto-increment the contracts count in WeeklySales
+ *
+ * NOTE: Job creation happens in /api/webhooks/ghl/jobs when the client ACCEPTS.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +31,7 @@ export async function POST(request: NextRequest) {
       payload = { ...payload.body, ...payload };
     }
 
-    const eventType = 'contract_signed';
+    const eventType = 'contract_sent';
 
     console.log('GHL Contracts Webhook received:', {
       contactId: extractContactId(payload),
@@ -125,118 +124,24 @@ export async function POST(request: NextRequest) {
       throw eventError;
     }
 
-    // 6. Auto-increment WeeklySales sales count + revenue
+    // 6. Auto-increment WeeklySales contracts count
     const weekStart = getWeekStart(new Date());
     const { error: salesError } = await supabase.rpc('increment_weekly_sales', {
       p_org_id: organizationId,
       p_week_start: weekStart,
       p_channel: channel,
-      p_field: 'sales',
+      p_field: 'contracts',
       p_amount: 1,
-      p_revenue: clientInfo.jobValue,
+      p_revenue: 0,
     });
 
     if (salesError) {
       console.error('GHL Contracts Webhook: Failed to increment WeeklySales:', salesError);
     }
 
-    // 7. Check if job already exists for this contact
-    let jobId: string | null = null;
-    let jobNumber: string | null = null;
-
-    const { data: existingJob } = await supabase
-      .from('Job')
-      .select('id, jobNumber')
-      .eq('organizationId', organizationId)
-      .eq('ghlContactId', contactId)
-      .single();
-
-    if (existingJob) {
-      jobId = existingJob.id;
-      jobNumber = existingJob.jobNumber;
-      console.log('GHL Contracts Webhook: Job already exists:', jobNumber);
-    } else if (clientInfo.jobValue > 0) {
-      // 8. Create new job if we have a job value
-      // Generate job number
-      const { data: lastJob } = await supabase
-        .from('Job')
-        .select('jobNumber')
-        .eq('organizationId', organizationId)
-        .order('createdAt', { ascending: false })
-        .limit(1)
-        .single();
-
-      let nextNumber = 1001;
-      if (lastJob?.jobNumber) {
-        const match = lastJob.jobNumber.match(/JOB-(\d+)/);
-        if (match) {
-          nextNumber = parseInt(match[1]) + 1;
-        }
-      }
-      jobNumber = `JOB-${nextNumber}`;
-
-      // Calculate financials
-      const financials = await calculateJobFinancials(clientInfo.jobValue, organizationId);
-
-      // Geocode address
-      let latitude: number | null = null;
-      let longitude: number | null = null;
-      if (clientInfo.address && clientInfo.city) {
-        const coords = await geocodeAddress(clientInfo.address, clientInfo.city, clientInfo.state || '');
-        if (coords) {
-          latitude = coords.lat;
-          longitude = coords.lng;
-        }
-      }
-
-      // Build notes
-      const noteParts = [
-        clientInfo.phone ? `📞 ${clientInfo.phone}` : '',
-        clientInfo.email ? `📧 ${clientInfo.email}` : '',
-        attribution.sessionSource ? `Fonte: ${attribution.sessionSource}` : '',
-        attribution.utmMedium ? `Meio: ${attribution.utmMedium}` : '',
-        channel ? `Canal: ${channel}` : '',
-      ];
-      const notes = noteParts.filter(Boolean).join('\n');
-
-      // Create job
-      const { data: newJob, error: jobError } = await supabase
-        .from('Job')
-        .insert({
-          organizationId,
-          jobNumber,
-          ghlContactId: contactId,
-          leadSource: channel,
-          clientName: clientInfo.clientName,
-          address: clientInfo.address || '',
-          city: clientInfo.city || '',
-          state: clientInfo.state || '',
-          latitude,
-          longitude,
-          projectType: clientInfo.projectType,
-          status: 'got_the_job',
-          jobDate: new Date().toISOString(),
-          jobValue: clientInfo.jobValue,
-          ...financials,
-          notes,
-        })
-        .select('id, jobNumber')
-        .single();
-
-      if (jobError) {
-        console.error('GHL Contracts Webhook: Failed to create job:', jobError);
-      } else {
-        jobId = newJob?.id;
-        jobNumber = newJob?.jobNumber;
-        console.log('GHL Contracts Webhook: Job created:', jobNumber);
-      }
-    }
-
     console.log('GHL Contracts Webhook: Success', {
       eventId: leadEvent?.id,
       channel,
-      jobId,
-      jobNumber,
       weekStart,
     });
 
@@ -244,10 +149,8 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         eventId: leadEvent?.id,
-        jobId,
-        jobNumber,
         channel,
-        message: `Contract signed tracked. Job: ${jobNumber || 'Not created (no value)'}`,
+        message: `Contract sent tracked for channel: ${channel}`,
       },
       { status: 201 }
     );
