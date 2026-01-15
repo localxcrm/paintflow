@@ -26,6 +26,8 @@ export type GoalDirection = 'above' | 'below';
 export type MetricCategory = 'leading' | 'lagging';
 export type PersonStatus = 'right_person_right_seat' | 'needs_work' | 'wrong_fit';
 export type AIRole = 'user' | 'assistant';
+export type LeadEventType = 'lead_created' | 'appointment_booked' | 'estimate_sent' | 'contract_signed' | 'job_won' | 'job_lost';
+export type MarketingChannel = 'google' | 'facebook' | 'referral' | 'yard_sign' | 'door_knock' | 'repeat' | 'site' | 'other';
 
 // ============================================
 // DATABASE MODELS
@@ -211,6 +213,10 @@ export interface Job {
   salesRepId: string | null;
   projectManagerId: string | null;
   subcontractorId: string | null;
+  // GHL Integration fields
+  ghlContactId: string | null;
+  ghlOpportunityId: string | null;
+  leadSource: string | null;
 }
 
 export interface RoomPrice {
@@ -417,6 +423,38 @@ export interface GhlLocation {
   organizationId: string;
   locationName: string | null;
   createdAt: string;
+}
+
+export interface LeadEvent {
+  id: string;
+  organizationId: string;
+  ghlContactId: string;
+  eventType: LeadEventType;
+  channel: MarketingChannel | string | null;
+  eventData: Record<string, unknown> | null;
+  // Attribution
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmContent: string | null;
+  utmTerm: string | null;
+  referrer: string | null;
+  landingPage: string | null;
+  sessionSource: string | null;
+  gclid: string | null;
+  fbclid: string | null;
+  gaClientId: string | null;
+  // Client info
+  clientName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  jobValue: number | null;
+  projectType: ProjectType | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ============================================

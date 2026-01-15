@@ -1,42 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { geocodeAddress } from '@/lib/geocoding';
+import { calculateJobFinancials } from '@/lib/job-calculations';
+import {
+  extractAttribution,
+  extractClientInfo,
+  extractLocationId,
+  extractContactId,
+  mapSourceToChannel,
+  getWeekStart,
+} from '@/lib/ghl-attribution';
 
 /**
  * POST /api/webhooks/ghl/jobs
  *
- * Webhook endpoint to create a Job from GoHighLevel.
+ * Webhook endpoint to create a Job from GoHighLevel (via n8n or direct).
  * Called when an opportunity is marked as "Won" in GHL.
  *
- * Payload fields used:
- * - full_name: Client name
- * - address1: Street address
- * - city: City
- * - country: Country (used as state since GHL doesn't send state)
- * - phone: Phone number (saved in notes)
- * - email: Email (saved in notes)
- * - location.id: GHL location ID to identify organization
- * - [Estimate] Total Price: Job value (optional)
+ * This will:
+ * 1. Create a Job with full attribution tracking
+ * 2. Log the event to LeadEvent table
+ * 3. Auto-increment sales + revenue in WeeklySales
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
     // Handle array payload (GHL sometimes sends array)
-    const payload = Array.isArray(body) ? body[0]?.body || body[0] : body;
+    // Also handle nested body object (from n8n)
+    let payload = Array.isArray(body) ? body[0]?.body || body[0] : body;
+    if (payload.body && typeof payload.body === 'object') {
+      payload = { ...payload.body, ...payload };
+    }
+
+    // Extract using helpers
+    const attribution = extractAttribution(payload);
+    const clientInfo = extractClientInfo(payload);
+    const contactId = extractContactId(payload) || `temp:${Date.now()}`;
 
     console.log('GHL Jobs Webhook received:', {
-      full_name: payload.full_name,
-      location_id: payload.location?.id,
-      hasBody: !!payload,
+      clientName: clientInfo.clientName,
+      locationId: extractLocationId(payload),
+      jobValue: clientInfo.jobValue,
+      contactId,
     });
 
     // 1. Extract location_id
-    const locationId = payload.location?.id;
+    const locationId = extractLocationId(payload);
     if (!locationId) {
-      console.error('GHL Jobs Webhook: Missing location.id');
+      console.error('GHL Jobs Webhook: Missing location ID', {
+        keys: Object.keys(payload).slice(0, 20)
+      });
       return NextResponse.json(
-        { error: 'Missing location.id in payload' },
+        { error: 'Missing location ID in payload (expected: id, location.id, or locationId)' },
         { status: 400 }
       );
     }
@@ -78,57 +94,106 @@ export async function POST(request: NextRequest) {
     }
     const jobNumber = `JOB-${nextNumber}`;
 
-    // 4. Extract job value from various possible fields
-    const jobValueRaw =
-      payload['[Estimate] Total Price'] ||
-      payload['[Estimate] Sub-total'] ||
-      payload['Services Sold - Enter the value below:'] ||
-      '0';
-    const jobValue = parseFloat(String(jobValueRaw).replace(/[^0-9.-]/g, '')) || 0;
+    // 4. Calculate financials using extracted job value
+    const financials = await calculateJobFinancials(clientInfo.jobValue, organizationId);
 
-    // 5. Calculate financials
-    const financials = await calculateJobFinancials(jobValue, organizationId, supabase);
+    // 5. Map source to channel
+    let channel = 'other';
+    const { data: previousEvent } = await supabase
+      .from('LeadEvent')
+      .select('channel')
+      .eq('organizationId', organizationId)
+      .eq('ghlContactId', contactId)
+      .in('eventType', ['lead_created', 'estimate_sent', 'contract_signed'])
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .single();
 
-    // 6. Extract client info
-    const clientName = payload.full_name || payload.first_name || 'Cliente GHL';
-    const address = payload.address1 || payload.full_address || '';
-    const city = payload.city || '';
-    const state = payload.state || payload.country || '';
+    if (previousEvent?.channel) {
+      channel = previousEvent.channel;
+    } else {
+      channel = mapSourceToChannel(
+        attribution.sessionSource,
+        attribution.utmMedium,
+        attribution.referrer,
+        attribution.utmSource
+      );
+    }
 
-    // 7. Geocode address
+    // 6. Geocode address
     let latitude: number | null = null;
     let longitude: number | null = null;
-    if (address && city) {
-      const coords = await geocodeAddress(address, city, state);
+    if (clientInfo.address && clientInfo.city) {
+      const coords = await geocodeAddress(clientInfo.address, clientInfo.city, clientInfo.state || '');
       if (coords) {
         latitude = coords.lat;
         longitude = coords.lng;
       }
     }
 
-    // 8. Build notes with contact info
-    const notes = [
-      payload.phone ? `Tel: ${payload.phone}` : '',
-      payload.email ? `Email: ${payload.email}` : '',
-      payload.contact_source ? `Fonte: ${payload.contact_source}` : '',
-    ].filter(Boolean).join('\n');
+    // 7. Build notes with contact info and attribution
+    const noteParts = [
+      clientInfo.phone ? `📞 ${clientInfo.phone}` : '',
+      clientInfo.email ? `📧 ${clientInfo.email}` : '',
+      attribution.sessionSource ? `Fonte: ${attribution.sessionSource}` : '',
+      attribution.utmMedium ? `Meio: ${attribution.utmMedium}` : '',
+      attribution.referrer ? `Referência: ${attribution.referrer}` : '',
+      attribution.landingPage ? `Página: ${attribution.landingPage}` : '',
+      channel ? `Canal: ${channel}` : '',
+    ];
+    const notes = noteParts.filter(Boolean).join('\n');
 
-    // 9. Create the job
+    // 8. Log event to LeadEvent table
+    const { data: leadEvent } = await supabase
+      .from('LeadEvent')
+      .insert({
+        organizationId,
+        ghlContactId: contactId,
+        eventType: 'job_won',
+        channel,
+        eventData: payload,
+        ...attribution,
+        clientName: clientInfo.clientName,
+        email: clientInfo.email,
+        phone: clientInfo.phone,
+        address: clientInfo.address,
+        city: clientInfo.city,
+        state: clientInfo.state,
+        jobValue: clientInfo.jobValue,
+        projectType: clientInfo.projectType,
+      })
+      .select('id')
+      .single();
+
+    // 9. Auto-increment WeeklySales
+    const weekStart = getWeekStart(new Date());
+    await supabase.rpc('increment_weekly_sales', {
+      p_org_id: organizationId,
+      p_week_start: weekStart,
+      p_channel: channel,
+      p_field: 'sales',
+      p_amount: 1,
+      p_revenue: clientInfo.jobValue,
+    });
+
+    // 10. Create the job
     const { data: job, error: jobError } = await supabase
       .from('Job')
       .insert({
         organizationId,
         jobNumber,
-        clientName,
-        address,
-        city,
-        state,
+        ghlContactId: contactId,
+        leadSource: channel,
+        clientName: clientInfo.clientName,
+        address: clientInfo.address || '',
+        city: clientInfo.city || '',
+        state: clientInfo.state || '',
         latitude,
         longitude,
-        projectType: 'interior', // Default
-        status: 'got_the_job', // Marked as won
+        projectType: clientInfo.projectType,
+        status: 'got_the_job',
         jobDate: new Date().toISOString(),
-        jobValue,
+        jobValue: clientInfo.jobValue,
         ...financials,
         notes,
       })
@@ -140,12 +205,17 @@ export async function POST(request: NextRequest) {
       throw jobError;
     }
 
-    console.log('GHL Jobs Webhook: Job created successfully:', job);
+    console.log('GHL Jobs Webhook: Job created successfully:', {
+      job,
+      channel,
+      eventId: leadEvent?.id,
+    });
 
     return NextResponse.json({
       success: true,
       jobId: job.id,
       jobNumber: job.jobNumber,
+      channel,
       message: `Job ${job.jobNumber} created successfully`,
     }, { status: 201 });
 
@@ -158,56 +228,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Calculate job financials based on business settings
- */
-async function calculateJobFinancials(
-  jobValue: number,
-  organizationId: string,
-  supabase: ReturnType<typeof createServerSupabaseClient>
-) {
-  const { data: settings } = await supabase
-    .from('BusinessSettings')
-    .select('*')
-    .eq('organizationId', organizationId)
-    .limit(1)
-    .single();
-
-  const subPayoutPct = settings?.subPayoutPct || 60;
-  const subMaterialsPct = settings?.subMaterialsPct || 15;
-  const subLaborPct = settings?.subLaborPct || 45;
-  const minGrossProfit = settings?.minGrossProfitPerJob || 900;
-  const targetGrossMargin = settings?.targetGrossMarginPct || 40;
-  const defaultDepositPct = settings?.defaultDepositPct || 30;
-
-  const subMaterials = jobValue * (subMaterialsPct / 100);
-  const subLabor = jobValue * (subLaborPct / 100);
-  const subTotal = subMaterials + subLabor;
-  const grossProfit = jobValue - subTotal;
-  const grossMarginPct = jobValue > 0 ? (grossProfit / jobValue) * 100 : 0;
-  const depositRequired = jobValue * (defaultDepositPct / 100);
-  const subcontractorPrice = jobValue * (subPayoutPct / 100);
-
-  let profitFlag: 'OK' | 'RAISE_PRICE' | 'FIX_SCOPE' = 'OK';
-  if (jobValue > 0) {
-    if (grossProfit < minGrossProfit) {
-      profitFlag = 'RAISE_PRICE';
-    } else if (grossMarginPct < targetGrossMargin) {
-      profitFlag = 'FIX_SCOPE';
-    }
-  }
-
-  return {
-    subMaterials,
-    subLabor,
-    subTotal,
-    grossProfit,
-    grossMarginPct,
-    depositRequired,
-    balanceDue: jobValue - depositRequired,
-    subcontractorPrice,
-    meetsMinGp: grossProfit >= minGrossProfit,
-    meetsTargetGm: grossMarginPct >= targetGrossMargin,
-    profitFlag,
-  };
-}
