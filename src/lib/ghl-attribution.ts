@@ -19,6 +19,8 @@ export interface Attribution {
   gaClientId: string | null;
 }
 
+export type ServiceType = 'interior' | 'exterior' | 'cabinet' | 'liquid_wallpaper' | 'both';
+
 export interface ClientInfo {
   clientName: string;
   email: string | null;
@@ -29,6 +31,7 @@ export interface ClientInfo {
   fullAddress: string | null;
   jobValue: number;
   projectType: 'interior' | 'exterior' | 'both';
+  serviceType: ServiceType;
 }
 
 /**
@@ -81,12 +84,36 @@ export function extractClientInfo(payload: Record<string, unknown>): ClientInfo 
     '0';
   const jobValue = parseFloat(String(jobValueRaw).replace(/[^0-9.-]/g, '')) || 0;
 
-  // Extract project type
-  const serviceType = (payload['Form | Which Service'] as string)?.toLowerCase() || '';
+  // Extract service type from form
+  const formService = (
+    payload['Form | Which Service'] ||
+    payload['which_service'] ||
+    payload['service_type'] ||
+    payload['serviceType'] ||
+    (payload.customData as Record<string, unknown>)?.serviceType ||
+    ''
+  ) as string;
+  const serviceLower = formService.toLowerCase();
+
+  // Map to specific service type
+  let serviceType: ServiceType = 'interior';
+  if (serviceLower.includes('cabinet') || serviceLower.includes('armario') || serviceLower.includes('gabinete')) {
+    serviceType = 'cabinet';
+  } else if (serviceLower.includes('liquid') || serviceLower.includes('wallpaper') || serviceLower.includes('papel')) {
+    serviceType = 'liquid_wallpaper';
+  } else if (serviceLower.includes('exterior') && serviceLower.includes('interior')) {
+    serviceType = 'both';
+  } else if (serviceLower.includes('exterior')) {
+    serviceType = 'exterior';
+  } else if (serviceLower.includes('interior')) {
+    serviceType = 'interior';
+  }
+
+  // Map to projectType for Job table (simpler categories)
   let projectType: 'interior' | 'exterior' | 'both' = 'interior';
-  if (serviceType.includes('exterior')) {
-    projectType = serviceType.includes('interior') ? 'both' : 'exterior';
-  } else if (serviceType.includes('both')) {
+  if (serviceType === 'exterior') {
+    projectType = 'exterior';
+  } else if (serviceType === 'both') {
     projectType = 'both';
   }
 
@@ -100,6 +127,7 @@ export function extractClientInfo(payload: Record<string, unknown>): ClientInfo 
     fullAddress,
     jobValue,
     projectType,
+    serviceType,
   };
 }
 

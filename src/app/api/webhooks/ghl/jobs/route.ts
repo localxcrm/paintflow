@@ -161,6 +161,7 @@ export async function POST(request: NextRequest) {
         state: clientInfo.state,
         jobValue: clientInfo.jobValue,
         projectType: clientInfo.projectType,
+        serviceType: clientInfo.serviceType,
       })
       .select('id')
       .single();
@@ -191,6 +192,7 @@ export async function POST(request: NextRequest) {
         latitude,
         longitude,
         projectType: clientInfo.projectType,
+        serviceType: clientInfo.serviceType,
         status: 'got_the_job',
         jobDate: new Date().toISOString(),
         jobValue: clientInfo.jobValue,

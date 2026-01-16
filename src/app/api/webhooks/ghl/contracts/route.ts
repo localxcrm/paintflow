@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
         state: clientInfo.state,
         jobValue: clientInfo.jobValue,
         projectType: clientInfo.projectType,
+        serviceType: clientInfo.serviceType,
       })
       .select('id')
       .single();
