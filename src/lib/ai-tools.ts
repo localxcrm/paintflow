@@ -147,7 +147,7 @@ export async function getBusinessStats() {
 
     const activeJobs = jobsRes.count || 0;
     const newLeads = leadsRes.count || 0;
-    const completedRevenue = revenueRes.data?.reduce((sum, job) => sum + (job.jobValue || 0), 0) || 0;
+    const completedRevenue = revenueRes.data?.reduce((sum: any, job: any) => sum + (job.jobValue || 0), 0) || 0;
 
     return {
         activeJobs,

@@ -101,7 +101,7 @@ export async function sendPushToUser(params: SendPushParams): Promise<{
 
     // Send notifications to all subscriptions
     const results = await Promise.allSettled(
-      subscriptions.map(async (sub) => {
+      subscriptions.map(async (sub: any) => {
         const pushSubscription = {
           endpoint: sub.endpoint,
           keys: sub.keys,

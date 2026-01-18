@@ -91,7 +91,7 @@ export async function getCurrentUser(): Promise<User | null> {
       .from('Session')
       .select('*, User(*)')
       .eq('token', sessionToken)
-      .single<SessionWithUser>();
+      .single();
 
     if (error || !session) {
       return null;
@@ -123,7 +123,7 @@ export async function createSession(userId: string, organizationId?: string): Pr
       expiresAt: expiresAt.toISOString(),
     })
     .select()
-    .single<Session>();
+    .single();
 
   if (error || !session) {
     throw new Error('Failed to create session');

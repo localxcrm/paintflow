@@ -42,7 +42,7 @@ export async function GET(
     }
 
     // Get work orders for these jobs
-    const jobIds = (jobs || []).map(j => j.id);
+    const jobIds = (jobs || []).map((j: any) => j.id);
     const { data: workOrders } = await supabase
       .from('WorkOrder')
       .select('id, jobId, publicToken, osNumber')
@@ -187,7 +187,7 @@ function generateICalFeed(
 
   ical.push('END:VCALENDAR');
 
-  return ical.filter(line => line !== '').join('\r\n');
+  return ical.filter((line: any) => line !== '').join('\r\n');
 }
 
 function formatICalDate(date: Date): string {

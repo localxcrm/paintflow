@@ -1,54 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 import { geocodeAddress } from '@/lib/geocoding';
-
-// Helper function to calculate job financials
-async function calculateJobFinancials(jobValue: number, organizationId: string) {
-  const supabase = createServerSupabaseClient();
-
-  const { data: settings } = await supabase
-    .from('BusinessSettings')
-    .select('*')
-    .eq('organizationId', organizationId)
-    .limit(1)
-    .single();
-
-  const subPayoutPct = settings?.subPayoutPct || 60;
-  const subMaterialsPct = settings?.subMaterialsPct || 15;
-  const subLaborPct = settings?.subLaborPct || 45;
-  const minGrossProfit = settings?.minGrossProfitPerJob || 900;
-  const targetGrossMargin = settings?.targetGrossMarginPct || 40;
-  const defaultDepositPct = settings?.defaultDepositPct || 30;
-
-  const subMaterials = jobValue * (subMaterialsPct / 100);
-  const subLabor = jobValue * (subLaborPct / 100);
-  const subTotal = subMaterials + subLabor;
-  const grossProfit = jobValue - subTotal;
-  const grossMarginPct = jobValue > 0 ? (grossProfit / jobValue) * 100 : 0;
-  const depositRequired = jobValue * (defaultDepositPct / 100);
-  const subcontractorPrice = jobValue * (subPayoutPct / 100);
-
-  let profitFlag: 'OK' | 'RAISE_PRICE' | 'FIX_SCOPE' = 'OK';
-  if (grossProfit < minGrossProfit) {
-    profitFlag = 'RAISE_PRICE';
-  } else if (grossMarginPct < targetGrossMargin) {
-    profitFlag = 'FIX_SCOPE';
-  }
-
-  return {
-    subMaterials,
-    subLabor,
-    subTotal,
-    grossProfit,
-    grossMarginPct,
-    depositRequired,
-    balanceDue: jobValue - depositRequired,
-    subcontractorPrice,
-    meetsMinGp: grossProfit >= minGrossProfit,
-    meetsTargetGm: grossMarginPct >= targetGrossMargin,
-    profitFlag,
-  };
-}
+import { calculateJobFinancials } from '@/lib/job-calculations';
 
 // GET /api/jobs - Get all jobs with optional filtering
 export async function GET(request: NextRequest) {

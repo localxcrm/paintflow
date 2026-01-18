@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { uploadFile } from '@/lib/storage';
 import { cookies } from 'next/headers';
 
 const SUB_SESSION_COOKIE = 'paintpro_sub_session';
@@ -148,38 +149,23 @@ export async function POST(request: NextRequest) {
     const extension = file.name.split('.').pop() || getExtensionFromMimeType(file.type);
     const filename = `${timestamp}-${randomString}.${extension}`;
 
-    // Build path
-    const path = `${workOrder.organizationId}/${context}/${workOrderId}/${config.folder}/${filename}`;
-
     // Convert File to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
+    const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('uploads')
-      .upload(path, buffer, {
-        contentType: file.type,
-        cacheControl: '3600',
-        upsert: false,
-      });
-
-    if (error) {
-      console.error('Upload error:', error);
-      return NextResponse.json(
-        { error: `Erro ao fazer upload: ${error.message}` },
-        { status: 500 }
-      );
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('uploads')
-      .getPublicUrl(data.path);
+    // Upload to S3/MinIO storage
+    const result = await uploadFile(
+      buffer,
+      file.type,
+      workOrder.organizationId,
+      context,
+      workOrderId,
+      filename
+    );
 
     return NextResponse.json({
-      url: urlData.publicUrl,
-      path: data.path,
+      url: result.url,
+      path: result.path,
       filename: file.name,
       type: fileType,
       mimeType: file.type,

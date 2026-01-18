@@ -5,17 +5,36 @@ import { cookies } from 'next/headers';
 
 const SUB_SESSION_COOKIE = 'paintpro_sub_session';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+// Restrict CORS to allowed origins
+const getAllowedOrigin = (requestOrigin: string | null) => {
+  const allowedOrigins = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    'capacitor://localhost', // iOS app
+    'http://localhost',      // iOS app alternate
+    'http://localhost:3000', // Development
+  ].filter(Boolean);
+
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+  // Default to app URL or first allowed origin
+  return process.env.NEXT_PUBLIC_APP_URL || allowedOrigins[0] || '';
 };
 
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+const getCorsHeaders = (request: NextRequest) => ({
+  'Access-Control-Allow-Origin': getAllowedOrigin(request.headers.get('origin')),
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Credentials': 'true',
+});
+
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json({}, { headers: getCorsHeaders(request) });
 }
 
 export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
+
   try {
     const body = await request.json();
     const { email, password } = body;

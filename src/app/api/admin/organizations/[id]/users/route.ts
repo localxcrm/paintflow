@@ -37,7 +37,8 @@ export async function GET(
         if (error) throw error;
 
         // Flatten structure
-        const users = members.map((member: any) => ({
+        const membersList = (members as unknown as any[]) || [];
+        const users = membersList.map((member: any) => ({
             id: member.User.id,
             name: member.User.name,
             email: member.User.email,

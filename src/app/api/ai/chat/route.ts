@@ -107,7 +107,7 @@ ${rocks?.map((r: any) => `- [${r.status}] ${r.title} (Owner: ${r.owner}, Progres
     } catch (error) {
         console.error('Chat API Error:', error);
         return NextResponse.json(
-            { error: 'Internal Server Error', details: error instanceof Error ? error.message : 'Unknown' },
+            { error: 'Failed to process chat request' },
             { status: 500 }
         );
     }

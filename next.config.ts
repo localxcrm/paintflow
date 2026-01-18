@@ -1,12 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '*.supabase.co',
         pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.sslip.io',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '147.224.176.93',
+        pathname: '/**',
       },
     ],
   },

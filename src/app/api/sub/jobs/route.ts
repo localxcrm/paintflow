@@ -88,13 +88,13 @@ export async function GET() {
     }
 
     // Calculate progress for each job
-    const jobsWithProgress = (jobs || []).map(job => {
+    const jobsWithProgress = (jobs || []).map((job: any) => {
       const workOrder = job.WorkOrder?.[0];
       let progress = 0;
 
       if (workOrder?.tasks) {
         const tasks = workOrder.tasks as { completed?: boolean }[];
-        const completedTasks = tasks.filter(t => t.completed).length;
+        const completedTasks = tasks.filter((t: any) => t.completed).length;
         progress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
       }
 

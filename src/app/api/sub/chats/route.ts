@@ -87,7 +87,7 @@ export async function GET() {
     }
 
     // Transform data to match ChatListItem interface
-    const chatList: ChatListItem[] = (chats || []).map((chat) => ({
+    const chatList: ChatListItem[] = (chats || []).map((chat: any) => ({
       ...chat,
       workOrder: chat.workOrder ? {
         id: chat.workOrder.id,
@@ -108,7 +108,7 @@ export async function GET() {
     }));
 
     // Calculate total unread count (for subcontractor)
-    const totalUnread = chatList.reduce((sum, chat) => sum + (chat.unreadCountSubcontractor || 0), 0);
+    const totalUnread = chatList.reduce((sum: any, chat: any) => sum + (chat.unreadCountSubcontractor || 0), 0);
 
     const response: ChatListResponse = {
       chats: chatList,

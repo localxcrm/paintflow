@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       .from('User')
       .select('*')
       .eq('email', email.toLowerCase())
-      .single<User>();
+      .single();
 
     if (userError || !user) {
       return NextResponse.json(
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       });
 
     // Find default organization
-    const defaultOrg = organizations.find(o => o.isDefault) || organizations[0];
+    const defaultOrg = organizations.find((o: { isDefault: boolean; id?: string }) => o.isDefault) || organizations[0];
 
     // Create session with organization if available
     const session = await createSession(user.id, defaultOrg?.id);

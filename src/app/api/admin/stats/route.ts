@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
 
         if (proError) throw proError;
 
-        const activeSubscriptions = proOrgs?.length || 0;
+        const proOrgsList = (proOrgs as unknown as any[]) || [];
+        const activeSubscriptions = proOrgsList.length;
         // Assuming $49/mo for pro plan
         const mrr = activeSubscriptions * 49;
 

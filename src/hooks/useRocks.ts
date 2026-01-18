@@ -68,7 +68,7 @@ function getQuarterEndDate(quarter: number, year: number): string {
 // Calculate progress based on milestones
 function calculateProgress(milestones: Milestone[]): number {
   if (!milestones || milestones.length === 0) return 0;
-  const completed = milestones.filter(m => m.completed).length;
+  const completed = milestones.filter((m: any) => m.completed).length;
   return Math.round((completed / milestones.length) * 100);
 }
 
@@ -151,7 +151,7 @@ export function useRocks(): UseRocksReturn {
   // Update a rock
   const updateRock = useCallback(async (id: string, updates: Partial<Rock>) => {
     try {
-      const rock = rocks.find(r => r.id === id);
+      const rock = rocks.find((r: any) => r.id === id);
       if (!rock) return;
 
       const res = await fetch('/api/rocks', {
@@ -185,7 +185,7 @@ export function useRocks(): UseRocksReturn {
 
   // Update status with history tracking
   const updateStatus = useCallback(async (id: string, newStatus: RockStatus, note?: string) => {
-    const rock = rocks.find(r => r.id === id);
+    const rock = rocks.find((r: any) => r.id === id);
     if (!rock) return;
 
     const statusChange: StatusChange = {
@@ -203,7 +203,7 @@ export function useRocks(): UseRocksReturn {
 
   // Toggle milestone completion
   const toggleMilestone = useCallback(async (rockId: string, milestoneId: string) => {
-    const rock = rocks.find(r => r.id === rockId);
+    const rock = rocks.find((r: any) => r.id === rockId);
     if (!rock) return;
 
     const newMilestones = (rock.milestones || []).map(m =>
@@ -215,7 +215,7 @@ export function useRocks(): UseRocksReturn {
 
   // Add milestone
   const addMilestone = useCallback(async (rockId: string, title: string) => {
-    const rock = rocks.find(r => r.id === rockId);
+    const rock = rocks.find((r: any) => r.id === rockId);
     if (!rock) return;
 
     const newMilestone: Milestone = {
@@ -231,33 +231,33 @@ export function useRocks(): UseRocksReturn {
 
   // Delete milestone
   const deleteMilestone = useCallback(async (rockId: string, milestoneId: string) => {
-    const rock = rocks.find(r => r.id === rockId);
+    const rock = rocks.find((r: any) => r.id === rockId);
     if (!rock) return;
 
     await updateRock(rockId, {
-      milestones: (rock.milestones || []).filter(m => m.id !== milestoneId),
+      milestones: (rock.milestones || []).filter((m: any) => m.id !== milestoneId),
     });
   }, [rocks, updateRock]);
 
   // Filter functions
   const getRocksByQuarter = useCallback((q: number, y: number) => {
-    return rocks.filter(r => r.quarter === q && r.year === y);
+    return rocks.filter((r: any) => r.quarter === q && r.year === y);
   }, [rocks]);
 
   const getRocksByOwner = useCallback((owner: string) => {
-    return rocks.filter(r => r.owner === owner);
+    return rocks.filter((r: any) => r.owner === owner);
   }, [rocks]);
 
   const getCompanyRocks = useCallback(() => {
-    return rocks.filter(r => r.rockType === 'company');
+    return rocks.filter((r: any) => r.rockType === 'company');
   }, [rocks]);
 
   const getIndividualRocks = useCallback(() => {
-    return rocks.filter(r => r.rockType === 'individual');
+    return rocks.filter((r: any) => r.rockType === 'individual');
   }, [rocks]);
 
   const getCurrentQuarterRocks = useCallback(() => {
-    return rocks.filter(r => r.quarter === getCurrentQuarter() && r.year === getCurrentYear());
+    return rocks.filter((r: any) => r.quarter === getCurrentQuarter() && r.year === getCurrentYear());
   }, [rocks]);
 
   return {

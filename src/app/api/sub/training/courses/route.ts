@@ -75,7 +75,7 @@ export async function GET(request: Request) {
 
     // Get module counts for each course (only published modules)
     const coursesWithCounts = await Promise.all(
-      (courses || []).map(async (course) => {
+      (courses || []).map(async (course: any) => {
         const { count } = await supabase
           .from('SubcontractorTraining')
           .select('*', { count: 'exact', head: true })

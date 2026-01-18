@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 
 // GET /api/team/[id] - Get a single team member
 export async function GET(
@@ -7,6 +7,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: 'Organization required' },
+        { status: 400 }
+      );
+    }
+
     const { id } = await params;
     const supabase = createServerSupabaseClient();
 
@@ -14,6 +22,7 @@ export async function GET(
       .from('TeamMember')
       .select('*')
       .eq('id', id)
+      .eq('organizationId', organizationId)
       .single();
 
     if (error || !teamMember) {
@@ -28,6 +37,7 @@ export async function GET(
       .from('Job')
       .select('*')
       .eq('salespersonId', id)
+      .eq('organizationId', organizationId)
       .order('jobDate', { ascending: false })
       .limit(10);
 
@@ -36,6 +46,7 @@ export async function GET(
       .from('Job')
       .select('*')
       .eq('projectManagerId', id)
+      .eq('organizationId', organizationId)
       .order('jobDate', { ascending: false })
       .limit(10);
 
@@ -44,6 +55,7 @@ export async function GET(
       .from('Lead')
       .select('*')
       .eq('assignedTo', id)
+      .eq('organizationId', organizationId)
       .order('leadDate', { ascending: false })
       .limit(10);
 
@@ -68,6 +80,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: 'Organization required' },
+        { status: 400 }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
     const supabase = createServerSupabaseClient();
@@ -84,6 +104,7 @@ export async function PATCH(
       .from('TeamMember')
       .update(updateData)
       .eq('id', id)
+      .eq('organizationId', organizationId)
       .select()
       .single();
 
@@ -111,13 +132,22 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: 'Organization required' },
+        { status: 400 }
+      );
+    }
+
     const { id } = await params;
     const supabase = createServerSupabaseClient();
 
     const { error } = await supabase
       .from('TeamMember')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organizationId', organizationId);
 
     if (error) {
       console.error('Error deleting team member:', error);

@@ -164,16 +164,16 @@ async function findOrCreateUser(
     .from('User')
     .select('*')
     .eq('ghlUserId', ghlUserId)
-    .single<User>();
+    .single();
 
   if (existingByGhl) {
     // Update last login
     await supabase
       .from('User')
       .update({ lastLoginAt: new Date().toISOString() })
-      .eq('id', existingByGhl.id);
+      .eq('id', (existingByGhl as any).id);
 
-    return existingByGhl;
+    return existingByGhl as unknown as User;
   }
 
   // Second, try to find by email
@@ -181,7 +181,7 @@ async function findOrCreateUser(
     .from('User')
     .select('*')
     .eq('email', email)
-    .single<User>();
+    .single();
 
   if (existingByEmail) {
     // Link GHL IDs to existing user (auto-link by email)
@@ -193,16 +193,16 @@ async function findOrCreateUser(
         ghlLinkedAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
       })
-      .eq('id', existingByEmail.id)
+      .eq('id', (existingByEmail as any).id)
       .select()
-      .single<User>();
+      .single();
 
     if (updateError) {
       console.error('Failed to link GHL to existing user:', updateError);
-      return existingByEmail; // Return existing user even if update failed
+      return existingByEmail as unknown as User; // Return existing user even if update failed
     }
 
-    return updatedUser;
+    return updatedUser as unknown as User;
   }
 
   // Create new user with random password hash (SSO only - they can't login with password)
@@ -223,7 +223,7 @@ async function findOrCreateUser(
       ghlLinkedAt: new Date().toISOString(),
     })
     .select()
-    .single<User>();
+    .single();
 
   if (createError) {
     console.error('Failed to create GHL user:', createError);
@@ -231,7 +231,7 @@ async function findOrCreateUser(
     return null;
   }
 
-  return newUser;
+  return newUser as unknown as User;
 }
 
 /**
@@ -252,12 +252,13 @@ async function findOrCreateOrganization(
     .from('GhlLocation')
     .select('organizationId, Organization:organizationId(id, name)')
     .eq('ghlLocationId', ghlLocationId)
-    .single<GhlLocation & { Organization: { id: string; name: string } }>();
+    .single();
 
-  if (existingLocation?.Organization) {
+  if ((existingLocation as any)?.Organization) {
+    const loc = existingLocation as any;
     return {
-      id: existingLocation.Organization.id,
-      name: existingLocation.Organization.name,
+      id: loc.Organization.id,
+      name: loc.Organization.name,
     };
   }
 
@@ -281,12 +282,14 @@ async function findOrCreateOrganization(
     return null;
   }
 
+  const org = newOrg as any;
+
   // Create GhlLocation mapping
   const { error: locationError } = await supabase
     .from('GhlLocation')
     .insert({
       ghlLocationId,
-      organizationId: newOrg.id,
+      organizationId: org.id,
       locationName,
     });
 
@@ -297,7 +300,7 @@ async function findOrCreateOrganization(
 
   // Create default VTO
   await supabase.from('VTO').insert({
-    organizationId: newOrg.id,
+    organizationId: org.id,
     annualTarget: 1000000,
     formulaParams: {
       avgTicket: 3500,
@@ -309,7 +312,7 @@ async function findOrCreateOrganization(
 
   // Create default business settings
   await supabase.from('BusinessSettings').insert({
-    organizationId: newOrg.id,
+    organizationId: org.id,
     companyName: locationName,
     email: userEmail,
     marketingChannels: [
@@ -320,7 +323,7 @@ async function findOrCreateOrganization(
     ],
   });
 
-  return newOrg;
+  return { id: org.id, name: org.name };
 }
 
 /**

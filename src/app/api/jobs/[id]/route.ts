@@ -1,53 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 import { geocodeAddress } from '@/lib/geocoding';
-
-// Helper function to calculate job financials
-async function calculateJobFinancials(jobValue: number) {
-  const supabase = createServerSupabaseClient();
-
-  const { data: settings } = await supabase
-    .from('BusinessSettings')
-    .select('*')
-    .limit(1)
-    .single();
-
-  const subPayoutPct = settings?.subPayoutPct || 60;
-  const subMaterialsPct = settings?.subMaterialsPct || 15;
-  const subLaborPct = settings?.subLaborPct || 45;
-  const minGrossProfit = settings?.minGrossProfitPerJob || 900;
-  const targetGrossMargin = settings?.targetGrossMarginPct || 40;
-  const defaultDepositPct = settings?.defaultDepositPct || 30;
-
-  const subMaterials = jobValue * (subMaterialsPct / 100);
-  const subLabor = jobValue * (subLaborPct / 100);
-  const subTotal = subMaterials + subLabor;
-  const grossProfit = jobValue - subTotal;
-  const grossMarginPct = jobValue > 0 ? (grossProfit / jobValue) * 100 : 0;
-  const depositRequired = jobValue * (defaultDepositPct / 100);
-  const subcontractorPrice = jobValue * (subPayoutPct / 100);
-
-  let profitFlag: 'OK' | 'RAISE_PRICE' | 'FIX_SCOPE' = 'OK';
-  if (grossProfit < minGrossProfit) {
-    profitFlag = 'RAISE_PRICE';
-  } else if (grossMarginPct < targetGrossMargin) {
-    profitFlag = 'FIX_SCOPE';
-  }
-
-  return {
-    subMaterials,
-    subLabor,
-    subTotal,
-    grossProfit,
-    grossMarginPct,
-    depositRequired,
-    balanceDue: jobValue - depositRequired,
-    subcontractorPrice,
-    meetsMinGp: grossProfit >= minGrossProfit,
-    meetsTargetGm: grossMarginPct >= targetGrossMargin,
-    profitFlag,
-  };
-}
+import { calculateJobFinancials } from '@/lib/job-calculations';
 
 // GET /api/jobs/[id] - Get a single job
 export async function GET(
@@ -55,6 +9,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: 'Organization required' },
+        { status: 400 }
+      );
+    }
+
     const supabase = createServerSupabaseClient();
     const { id } = await params;
 
@@ -62,6 +24,7 @@ export async function GET(
       .from('Job')
       .select('*, Lead(*), Estimate(*, EstimateLineItem(*)), salesRep:TeamMember!salesRepId(*), projectManager:TeamMember!projectManagerId(*), Subcontractor(*)')
       .eq('id', id)
+      .eq('organizationId', organizationId)
       .single();
 
     if (error) {
@@ -90,6 +53,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: 'Organization required' },
+        { status: 400 }
+      );
+    }
+
     const supabase = createServerSupabaseClient();
     const { id } = await params;
     const body = await request.json();
@@ -99,6 +70,7 @@ export async function PATCH(
       .from('Job')
       .select('*')
       .eq('id', id)
+      .eq('organizationId', organizationId)
       .single();
 
     if (fetchError || !currentJob) {
@@ -113,7 +85,7 @@ export async function PATCH(
     const jobValue = body.jobValue ?? currentJob.jobValue;
 
     if (body.jobValue !== undefined) {
-      financials = await calculateJobFinancials(jobValue);
+      financials = await calculateJobFinancials(jobValue, organizationId);
     }
 
     // Recalculate commissions if needed
@@ -224,6 +196,7 @@ export async function PATCH(
       .from('Job')
       .update(updateData)
       .eq('id', id)
+      .eq('organizationId', organizationId)
       .select('*, Lead(*), Estimate(*), salesRep:TeamMember!salesRepId(*), projectManager:TeamMember!projectManagerId(*), Subcontractor(*)')
       .single();
 
@@ -247,13 +220,22 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const organizationId = getOrganizationIdFromRequest(request);
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: 'Organization required' },
+        { status: 400 }
+      );
+    }
+
     const supabase = createServerSupabaseClient();
     const { id } = await params;
 
     const { error } = await supabase
       .from('Job')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organizationId', organizationId);
 
     if (error) {
       throw error;

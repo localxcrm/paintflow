@@ -5,22 +5,12 @@
       "command": "npx",
       "args": [
         "-y",
-        "@supabase/mcp-server-supabase@latest"
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref",
+        "accbcdxiuaheynxzorzq"
       ],
       "env": {
-        "SUPABASE_URL": "https://accbcdxiuaheynxzorzq.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjY2JjZHhpdWFoZXlueHpvcnpxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjI0MTc3MSwiZXhwIjoyMDgxODE3NzcxfQ.E8j8b4n9Bbr6K779p-2nWoOEGlzQFRy6O3Y1jfsDzKk"
-      }
-    },
-    "vercel": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "vercel-mcp-server"
-      ],
-      "env": {
-        "VERCEL_ACCESS_TOKEN": "RHa83nqkMOOCc5nnJzCTBoux"
+        "SUPABASE_ACCESS_TOKEN": "sbp_8b1bb4bd2a50c9c8621a6a4d218147f83edb47a5"
       }
     }
   }

@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate Lead KPIs
     const totalLeads = leads.length;
-    const leadsByStatus = leads.reduce((acc, lead) => {
+    const leadsByStatus = leads.reduce((acc: any, lead: any) => {
       acc[lead.status] = (acc[lead.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -112,18 +112,18 @@ export async function GET(request: NextRequest) {
 
     // Calculate Estimate KPIs
     const totalEstimates = estimates.length;
-    const estimatesByStatus = estimates.reduce((acc, est) => {
+    const estimatesByStatus = estimates.reduce((acc: any, est: any) => {
       acc[est.status] = (acc[est.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     const acceptedEstimates = estimatesByStatus['accepted'] || 0;
-    const totalEstimateValue = estimates.reduce((sum, est) => sum + est.totalPrice, 0);
+    const totalEstimateValue = estimates.reduce((sum: any, est: any) => sum + est.totalPrice, 0);
     const avgEstimateValue = totalEstimates > 0 ? totalEstimateValue / totalEstimates : 0;
     const estimateCloseRate = totalEstimates > 0 ? (acceptedEstimates / totalEstimates) * 100 : 0;
 
     // Calculate Job KPIs
     const totalJobs = jobs.length;
-    const jobsByStatus = jobs.reduce((acc, job) => {
+    const jobsByStatus = jobs.reduce((acc: any, job: any) => {
       acc[job.status] = (acc[job.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -131,33 +131,33 @@ export async function GET(request: NextRequest) {
     const scheduledJobs = jobsByStatus['scheduled'] || 0;
 
     // Financial KPIs
-    const totalRevenue = jobs.reduce((sum, job) => sum + job.jobValue, 0);
-    const totalGrossProfit = jobs.reduce((sum, job) => sum + job.grossProfit, 0);
+    const totalRevenue = jobs.reduce((sum: any, job: any) => sum + job.jobValue, 0);
+    const totalGrossProfit = jobs.reduce((sum: any, job: any) => sum + job.grossProfit, 0);
     const avgGrossMargin = totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : 0;
 
     // Payment tracking
-    const paidJobs = jobs.filter(job => job.jobPaid);
-    const unpaidJobs = jobs.filter(job => !job.jobPaid);
-    const totalCollected = paidJobs.reduce((sum, job) => sum + job.jobValue, 0);
-    const totalOutstanding = unpaidJobs.reduce((sum, job) => sum + job.balanceDue, 0);
+    const paidJobs = jobs.filter((job: any) => job.jobPaid);
+    const unpaidJobs = jobs.filter((job: any) => !job.jobPaid);
+    const totalCollected = paidJobs.reduce((sum: any, job: any) => sum + job.jobValue, 0);
+    const totalOutstanding = unpaidJobs.reduce((sum: any, job: any) => sum + job.balanceDue, 0);
     const avgDaysToCollect = paidJobs.length > 0
-      ? paidJobs.reduce((sum, job) => sum + (job.daysToCollect || 0), 0) / paidJobs.length
+      ? paidJobs.reduce((sum: any, job: any) => sum + (job.daysToCollect || 0), 0) / paidJobs.length
       : 0;
 
     // Commission tracking
     const unpaidSalesCommissions = jobs
-      .filter(job => !job.salesCommissionPaid && job.salesCommissionAmount > 0)
-      .reduce((sum, job) => sum + job.salesCommissionAmount, 0);
+      .filter((job: any) => !job.salesCommissionPaid && job.salesCommissionAmount > 0)
+      .reduce((sum: any, job: any) => sum + job.salesCommissionAmount, 0);
     const unpaidPmCommissions = jobs
-      .filter(job => !job.pmCommissionPaid && job.pmCommissionAmount > 0)
-      .reduce((sum, job) => sum + job.pmCommissionAmount, 0);
+      .filter((job: any) => !job.pmCommissionPaid && job.pmCommissionAmount > 0)
+      .reduce((sum: any, job: any) => sum + job.pmCommissionAmount, 0);
     const unpaidSubcontractors = jobs
-      .filter(job => !job.subcontractorPaid && job.subcontractorPrice > 0)
-      .reduce((sum, job) => sum + job.subcontractorPrice, 0);
+      .filter((job: any) => !job.subcontractorPaid && job.subcontractorPrice > 0)
+      .reduce((sum: any, job: any) => sum + job.subcontractorPrice, 0);
 
     // Profit flags summary
-    const jobsWithProfitIssues = jobs.filter(job => job.profitFlag !== 'OK');
-    const profitFlagSummary = jobsWithProfitIssues.reduce((acc, job) => {
+    const jobsWithProfitIssues = jobs.filter((job: any) => job.profitFlag !== 'OK');
+    const profitFlagSummary = jobsWithProfitIssues.reduce((acc: any, job: any) => {
       acc[job.profitFlag] = (acc[job.profitFlag] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -168,8 +168,8 @@ export async function GET(request: NextRequest) {
     const minGrossProfit = businessSettings?.minGrossProfitPerJob || 900;
 
     // NEW: Marketing & Efficiency KPIs
-    const totalMarketingSpend = marketingSpend.reduce((sum, spend) => sum + spend.amount, 0);
-    const marketingBySource = marketingSpend.reduce((acc, spend) => {
+    const totalMarketingSpend = marketingSpend.reduce((sum: any, spend: any) => sum + spend.amount, 0);
+    const marketingBySource = marketingSpend.reduce((acc: any, spend: any) => {
       acc[spend.source] = (acc[spend.source] || 0) + spend.amount;
       return acc;
     }, {} as Record<string, number>);
@@ -198,28 +198,28 @@ export async function GET(request: NextRequest) {
 
     // Average Sale
     const avgSale = acceptedEstimates > 0
-      ? estimates.filter(e => e.status === 'accepted').reduce((sum, e) => sum + e.totalPrice, 0) / acceptedEstimates
+      ? estimates.filter((e: any) => e.status === 'accepted').reduce((sum: any, e: any) => sum + e.totalPrice, 0) / acceptedEstimates
       : 0;
 
     // NEW: Review KPIs
     const totalReviews = reviews.length;
-    const fiveStarReviews = reviews.filter(r => r.rating === 5).length;
+    const fiveStarReviews = reviews.filter((r: any) => r.rating === 5).length;
     const avgRating = totalReviews > 0
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews
+      ? reviews.reduce((sum: any, r: any) => sum + r.rating, 0) / totalReviews
       : 0;
     const reviewRate = completedJobs > 0 ? (totalReviews / completedJobs) * 100 : 0;
     const pria = appointmentsRun > 0 ? totalReviews / appointmentsRun : 0; // Reviews per appointment
 
     // NEW: Overhead & Net Profit
-    const totalOverhead = overhead.reduce((sum, exp) => sum + exp.amount, 0);
-    const overheadByCategory = overhead.reduce((acc, exp) => {
+    const totalOverhead = overhead.reduce((sum: any, exp: any) => sum + exp.amount, 0);
+    const overheadByCategory = overhead.reduce((acc: any, exp: any) => {
       acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
       return acc;
     }, {} as Record<string, number>);
 
     // Total Commissions
-    const totalSalesCommissions = jobs.reduce((sum, job) => sum + job.salesCommissionAmount, 0);
-    const totalPmCommissions = jobs.reduce((sum, job) => sum + job.pmCommissionAmount, 0);
+    const totalSalesCommissions = jobs.reduce((sum: any, job: any) => sum + job.salesCommissionAmount, 0);
+    const totalPmCommissions = jobs.reduce((sum: any, job: any) => sum + job.pmCommissionAmount, 0);
     const totalCommissions = totalSalesCommissions + totalPmCommissions;
 
     // Contribution Profit (Gross Profit - Commissions)

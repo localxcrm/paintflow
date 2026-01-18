@@ -44,32 +44,32 @@ export function calculateJobFinancials(
 
 // Calculate KPIs from jobs array
 export function calculateKPIs(jobs: Job[]): JobKPIs {
-  const totalJobValue = jobs.reduce((sum, job) => sum + job.jobValue, 0);
-  const totalGrossProfit = jobs.reduce((sum, job) => sum + job.grossProfit, 0);
+  const totalJobValue = jobs.reduce((sum: any, job: any) => sum + job.jobValue, 0);
+  const totalGrossProfit = jobs.reduce((sum: any, job: any) => sum + job.grossProfit, 0);
 
   const salesCommissionsPending = jobs
-    .filter(job => !job.salesCommissionPaid)
-    .reduce((sum, job) => sum + job.salesCommissionAmount, 0);
+    .filter((job: any) => !job.salesCommissionPaid)
+    .reduce((sum: any, job: any) => sum + job.salesCommissionAmount, 0);
 
   const salesCommissionsPaid = jobs
-    .filter(job => job.salesCommissionPaid)
-    .reduce((sum, job) => sum + job.salesCommissionAmount, 0);
+    .filter((job: any) => job.salesCommissionPaid)
+    .reduce((sum: any, job: any) => sum + job.salesCommissionAmount, 0);
 
   const pmCommissionsPending = jobs
-    .filter(job => !job.pmCommissionPaid)
-    .reduce((sum, job) => sum + job.pmCommissionAmount, 0);
+    .filter((job: any) => !job.pmCommissionPaid)
+    .reduce((sum: any, job: any) => sum + job.pmCommissionAmount, 0);
 
   const pmCommissionsPaid = jobs
-    .filter(job => job.pmCommissionPaid)
-    .reduce((sum, job) => sum + job.pmCommissionAmount, 0);
+    .filter((job: any) => job.pmCommissionPaid)
+    .reduce((sum: any, job: any) => sum + job.pmCommissionAmount, 0);
 
   const subcontractorPending = jobs
-    .filter(job => !job.subcontractorPaid)
-    .reduce((sum, job) => sum + job.subcontractorPrice, 0);
+    .filter((job: any) => !job.subcontractorPaid)
+    .reduce((sum: any, job: any) => sum + job.subcontractorPrice, 0);
 
   const subcontractorPaid = jobs
-    .filter(job => job.subcontractorPaid)
-    .reduce((sum, job) => sum + job.subcontractorPrice, 0);
+    .filter((job: any) => job.subcontractorPaid)
+    .reduce((sum: any, job: any) => sum + job.subcontractorPrice, 0);
 
   return {
     totalJobValue,
@@ -88,18 +88,18 @@ export function calculateKPIs(jobs: Job[]): JobKPIs {
 // Filter jobs by status
 export function filterJobsByStatus(jobs: Job[], status: JobStatus | 'all'): Job[] {
   if (status === 'all') return jobs;
-  return jobs.filter(job => job.status === status);
+  return jobs.filter((job: any) => job.status === status);
 }
 
 // Filter jobs by payment status
 export function filterJobsByPaymentStatus(jobs: Job[], paymentStatus: PaymentStatus): Job[] {
   switch (paymentStatus) {
     case 'deposit_pending':
-      return jobs.filter(job => !job.depositPaid);
+      return jobs.filter((job: any) => !job.depositPaid);
     case 'job_unpaid':
-      return jobs.filter(job => job.depositPaid && !job.jobPaid);
+      return jobs.filter((job: any) => job.depositPaid && !job.jobPaid);
     case 'fully_paid':
-      return jobs.filter(job => job.depositPaid && job.jobPaid);
+      return jobs.filter((job: any) => job.depositPaid && job.jobPaid);
     default:
       return jobs;
   }
@@ -108,19 +108,19 @@ export function filterJobsByPaymentStatus(jobs: Job[], paymentStatus: PaymentSta
 // Filter jobs by sales rep
 export function filterJobsBySalesRep(jobs: Job[], salesRepId: string | 'all'): Job[] {
   if (salesRepId === 'all') return jobs;
-  return jobs.filter(job => job.salesRepId === salesRepId);
+  return jobs.filter((job: any) => job.salesRepId === salesRepId);
 }
 
 // Filter jobs by project manager
 export function filterJobsByPM(jobs: Job[], pmId: string | 'all'): Job[] {
   if (pmId === 'all') return jobs;
-  return jobs.filter(job => job.projectManagerId === pmId);
+  return jobs.filter((job: any) => job.projectManagerId === pmId);
 }
 
 // Filter jobs by subcontractor
 export function filterJobsBySubcontractor(jobs: Job[], subId: string | 'all'): Job[] {
   if (subId === 'all') return jobs;
-  return jobs.filter(job => job.subcontractorId === subId);
+  return jobs.filter((job: any) => job.subcontractorId === subId);
 }
 
 // Get job value by status for chart
@@ -128,11 +128,11 @@ export function getJobValueByStatus(jobs: Job[]): { status: string; value: numbe
   const statusMap = new Map<JobStatus, { value: number; count: number }>();
 
   const statuses: JobStatus[] = ['lead', 'got_the_job', 'scheduled', 'completed'];
-  statuses.forEach(status => {
+  statuses.forEach((status: any) => {
     statusMap.set(status, { value: 0, count: 0 });
   });
 
-  jobs.forEach(job => {
+  jobs.forEach((job: any) => {
     const current = statusMap.get(job.status) || { value: 0, count: 0 };
     statusMap.set(job.status, {
       value: current.value + job.jobValue,
@@ -171,7 +171,7 @@ export function getJobsDistribution(jobs: Job[]): { name: string; value: number;
   };
 
   const counts = new Map<JobStatus, number>();
-  jobs.forEach(job => {
+  jobs.forEach((job: any) => {
     counts.set(job.status, (counts.get(job.status) || 0) + 1);
   });
 

@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to flat structure
-    const users = userOrgs?.map((uo) => ({
+    const users = userOrgs?.map((uo: any) => ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(uo.User as any),
       orgRole: uo.role,
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
         isActive: true,
       })
       .select()
-      .single<User>();
+      .single();
 
     if (createError || !newUser) {
       console.error('Error creating user:', createError);

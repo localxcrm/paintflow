@@ -88,7 +88,7 @@ export function setupPushListeners(
 
   // Return cleanup function
   return () => {
-    cleanupFunctions.forEach(fn => fn());
+    cleanupFunctions.forEach((fn: any) => fn());
   };
 }
 

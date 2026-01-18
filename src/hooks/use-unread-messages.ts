@@ -36,7 +36,7 @@ export function useUnreadMessages(
 
     // Filter messages from the OTHER party (not our own messages)
     const otherPartyType = userType === 'admin' ? 'subcontractor' : 'company';
-    const otherPartyMessages = comments.filter(c => c.authorType === otherPartyType);
+    const otherPartyMessages = comments.filter((c: any) => c.authorType === otherPartyType);
 
     if (otherPartyMessages.length === 0) {
       setUnreadCount(0);
@@ -91,7 +91,7 @@ export function getUnreadCount(
 
   const stored = localStorage.getItem(getStorageKey(workOrderId, userType));
   const otherPartyType = userType === 'admin' ? 'subcontractor' : 'company';
-  const otherPartyMessages = comments.filter(c => c.authorType === otherPartyType);
+  const otherPartyMessages = comments.filter((c: any) => c.authorType === otherPartyType);
 
   if (otherPartyMessages.length === 0) return 0;
   if (!stored) return otherPartyMessages.length;

@@ -36,12 +36,12 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     // Calculate totals by source
-    const totalBySource = (spends || []).reduce((acc, item) => {
+    const totalBySource = (spends || []).reduce((acc: any, item: any) => {
       acc[item.source] = (acc[item.source] || 0) + item.amount;
       return acc;
     }, {} as Record<string, number>);
 
-    const grandTotal = (Object.values(totalBySource) as number[]).reduce((sum, val) => sum + val, 0);
+    const grandTotal = (Object.values(totalBySource) as number[]).reduce((sum: any, val: any) => sum + val, 0);
 
     return NextResponse.json({
       spends: spends || [],

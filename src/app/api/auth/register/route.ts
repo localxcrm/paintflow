@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         name,
       })
       .select()
-      .single<User>();
+      .single();
 
     if (createError || !user) {
       console.error('Supabase create user error:', createError);

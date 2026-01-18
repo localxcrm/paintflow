@@ -624,32 +624,32 @@ export const mockJobs: Job[] = [
 
 // Calculate Job KPIs helper function
 export function calculateJobKPIs(jobs: Job[]): JobKPIs {
-  const totalJobValue = jobs.reduce((sum, job) => sum + job.jobValue, 0);
-  const totalGrossProfit = jobs.reduce((sum, job) => sum + job.grossProfit, 0);
+  const totalJobValue = jobs.reduce((sum: any, job: any) => sum + job.jobValue, 0);
+  const totalGrossProfit = jobs.reduce((sum: any, job: any) => sum + job.grossProfit, 0);
 
   const salesCommissionsPending = jobs
-    .filter(job => !job.salesCommissionPaid)
-    .reduce((sum, job) => sum + job.salesCommissionAmount, 0);
+    .filter((job: any) => !job.salesCommissionPaid)
+    .reduce((sum: any, job: any) => sum + job.salesCommissionAmount, 0);
 
   const salesCommissionsPaid = jobs
-    .filter(job => job.salesCommissionPaid)
-    .reduce((sum, job) => sum + job.salesCommissionAmount, 0);
+    .filter((job: any) => job.salesCommissionPaid)
+    .reduce((sum: any, job: any) => sum + job.salesCommissionAmount, 0);
 
   const pmCommissionsPending = jobs
-    .filter(job => !job.pmCommissionPaid)
-    .reduce((sum, job) => sum + job.pmCommissionAmount, 0);
+    .filter((job: any) => !job.pmCommissionPaid)
+    .reduce((sum: any, job: any) => sum + job.pmCommissionAmount, 0);
 
   const pmCommissionsPaid = jobs
-    .filter(job => job.pmCommissionPaid)
-    .reduce((sum, job) => sum + job.pmCommissionAmount, 0);
+    .filter((job: any) => job.pmCommissionPaid)
+    .reduce((sum: any, job: any) => sum + job.pmCommissionAmount, 0);
 
   const subcontractorPending = jobs
-    .filter(job => !job.subcontractorPaid)
-    .reduce((sum, job) => sum + job.subcontractorPrice, 0);
+    .filter((job: any) => !job.subcontractorPaid)
+    .reduce((sum: any, job: any) => sum + job.subcontractorPrice, 0);
 
   const subcontractorPaid = jobs
-    .filter(job => job.subcontractorPaid)
-    .reduce((sum, job) => sum + job.subcontractorPrice, 0);
+    .filter((job: any) => job.subcontractorPaid)
+    .reduce((sum: any, job: any) => sum + job.subcontractorPrice, 0);
 
   return {
     totalJobValue,
