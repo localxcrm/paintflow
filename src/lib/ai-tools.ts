@@ -1,10 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 
-// Initialize Supabase Admin Client for AI tools (bypasses RLS)
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Get database client for AI tools
+function getDb() {
+    return createServerSupabaseClient();
+}
 
 /**
  * Tool Definitions for OpenAI
@@ -90,7 +89,8 @@ export const aiTools: any[] = [
  * Tool Implementations
  */
 export async function searchLeads({ query, status, limit = 5 }: { query?: string; status?: string; limit?: number }) {
-    let dbQuery = supabaseAdmin.from('Lead').select('id, firstName, lastName, email, status, leadDate');
+    const db = getDb();
+    let dbQuery = db.from('Lead').select('id, firstName, lastName, email, status, leadDate');
 
     if (query) {
         dbQuery = dbQuery.or(`firstName.ilike.%${query}%,lastName.ilike.%${query}%,email.ilike.%${query}%`);
@@ -109,7 +109,8 @@ export async function searchLeads({ query, status, limit = 5 }: { query?: string
 }
 
 export async function getLeadDetails({ leadId }: { leadId: string }) {
-    const { data, error } = await supabaseAdmin
+    const db = getDb();
+    const { data, error } = await db
         .from('Lead')
         .select('*')
         .eq('id', leadId)
@@ -122,7 +123,8 @@ export async function getLeadDetails({ leadId }: { leadId: string }) {
 }
 
 export async function searchJobs({ status, limit = 5 }: { status?: string; limit?: number }) {
-    let dbQuery = supabaseAdmin.from('Job').select('id, jobNumber, clientName, status, jobValue, scheduledStartDate');
+    const db = getDb();
+    let dbQuery = db.from('Job').select('id, jobNumber, clientName, status, jobValue, scheduledStartDate');
 
     if (status) {
         dbQuery = dbQuery.eq('status', status);
@@ -137,12 +139,13 @@ export async function searchJobs({ status, limit = 5 }: { status?: string; limit
 }
 
 export async function getBusinessStats() {
+    const db = getDb();
     // Aggregate stats via separate queries for now (could be optimized with an RPC later)
     const [jobsRes, leadsRes, revenueRes] = await Promise.all([
-        supabaseAdmin.from('Job').select('id', { count: 'exact', head: true }).eq('status', 'scheduled'),
-        supabaseAdmin.from('Lead').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+        db.from('Job').select('id', { count: 'exact', head: true }).eq('status', 'scheduled'),
+        db.from('Lead').select('id', { count: 'exact', head: true }).eq('status', 'new'),
         // Summing revenue is tricky without RPC, so we'll just fetch completed jobs limit 100
-        supabaseAdmin.from('Job').select('jobValue').eq('status', 'completed').limit(100),
+        db.from('Job').select('jobValue').eq('status', 'completed').limit(100),
     ]);
 
     const activeJobs = jobsRes.count || 0;
