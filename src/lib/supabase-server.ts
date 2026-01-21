@@ -273,7 +273,10 @@ class QueryBuilder<T = AnyRecord> {
       if (this.insertData) {
         const data = { ...this.insertData, id: this.insertData.id || generateId() };
         const keys = Object.keys(data);
-        const values = Object.values(data);
+        // Serialize objects/arrays to JSON strings for JSONB columns
+        const values = Object.values(data).map(v =>
+          (v !== null && typeof v === 'object' && !(v instanceof Date)) ? JSON.stringify(v) : v
+        );
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
         const columns = keys.map(k => `"${k}"`).join(', ');
 
@@ -285,7 +288,10 @@ class QueryBuilder<T = AnyRecord> {
       // UPDATE operation
       if (this.updateData) {
         const keys = Object.keys(this.updateData);
-        const values = Object.values(this.updateData);
+        // Serialize objects/arrays to JSON strings for JSONB columns
+        const values = Object.values(this.updateData).map(v =>
+          (v !== null && typeof v === 'object' && !(v instanceof Date)) ? JSON.stringify(v) : v
+        );
         const setClause = keys.map((k, i) => `"${k}" = $${i + 1}`).join(', ');
 
         // Adjust where clause param indices
@@ -303,7 +309,10 @@ class QueryBuilder<T = AnyRecord> {
       if (this.upsertData) {
         const data = { ...this.upsertData, id: this.upsertData.id || generateId() };
         const keys = Object.keys(data);
-        const values = Object.values(data);
+        // Serialize objects/arrays to JSON strings for JSONB columns
+        const values = Object.values(data).map(v =>
+          (v !== null && typeof v === 'object' && !(v instanceof Date)) ? JSON.stringify(v) : v
+        );
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
         const columns = keys.map(k => `"${k}"`).join(', ');
         const updateSet = keys.filter((k: any) => k !== this.upsertConflict).map((k, i) => `"${k}" = EXCLUDED."${k}"`).join(', ');
