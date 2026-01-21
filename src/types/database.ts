@@ -616,6 +616,36 @@ export interface AIConversationWithMessages extends AIConversation {
   AIMessage: AIMessage[];
 }
 
+// Financial module relation types
+export interface SubcontractorEmployeeWithSubcontractor extends SubcontractorEmployee {
+  Subcontractor: Subcontractor;
+}
+
+export interface TimeEntryWithRelations extends TimeEntry {
+  SubcontractorEmployee: SubcontractorEmployee;
+  Job: Job;
+}
+
+export interface SubcontractorPayoutWithRelations extends SubcontractorPayout {
+  Job: Job;
+  Subcontractor: Subcontractor;
+  SubcontractorPayment: SubcontractorPayment[];
+}
+
+export interface SubcontractorPaymentWithPayout extends SubcontractorPayment {
+  SubcontractorPayout: SubcontractorPayout;
+}
+
+/**
+ * Subcontractor with financial summary for admin views
+ */
+export interface SubcontractorWithFinancials extends Subcontractor {
+  totalEarnings?: number;      // SUM of finalPayout across all jobs
+  totalPaid?: number;          // SUM of paid SubcontractorPayments
+  pendingAmount?: number;      // totalEarnings - totalPaid
+  jobsCompleted?: number;      // COUNT of jobs with payout
+}
+
 // ============================================
 // INSERT TYPES (for creating records - omit auto-generated fields)
 // ============================================
