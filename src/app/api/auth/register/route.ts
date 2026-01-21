@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase(),
         passwordHash: hashPassword(password),
         name,
+        role: 'owner',
       })
       .select()
       .single();
