@@ -29,6 +29,10 @@ export type AIRole = 'user' | 'assistant';
 export type LeadEventType = 'lead_created' | 'appointment_booked' | 'estimate_sent' | 'contract_sent' | 'job_won' | 'job_lost';
 export type MarketingChannel = 'google' | 'facebook' | 'referral' | 'yard_sign' | 'door_knock' | 'repeat' | 'site' | 'other';
 
+// Financial module enums
+export type PaymentType = 'deposit' | 'final' | 'extra';
+export type PaymentStatus = 'pending' | 'paid';
+
 // ============================================
 // DATABASE MODELS
 // ============================================
@@ -91,6 +95,7 @@ export interface Subcontractor {
   phone: string | null;
   specialty: SubcontractorType;
   defaultPayoutPct: number;
+  defaultDepositPct: number;
   isActive: boolean;
   color: string;
   createdAt: string;
@@ -453,6 +458,113 @@ export interface LeadEvent {
   state: string | null;
   jobValue: number | null;
   projectType: ProjectType | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// FINANCIAL MODULE MODELS
+// ============================================
+
+/**
+ * Employees (painters/workers) managed by subcontractors
+ * Each employee has a fixed hourly rate for labor cost calculation
+ */
+export interface SubcontractorEmployee {
+  id: string;
+  subcontractorId: string;
+  organizationId: string;
+  name: string;
+  hourlyRate: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Daily time entries tracking hours worked per employee per job
+ * Used for labor cost calculation: hoursWorked × employee.hourlyRate
+ */
+export interface TimeEntry {
+  id: string;
+  employeeId: string;
+  jobId: string;
+  organizationId: string;
+  workDate: string;  // DATE stored as ISO string
+  hoursWorked: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Material costs per job per subcontractor
+ * Single total amount (not itemized) - sub tracks their own material expenses
+ */
+export interface JobMaterialCost {
+  id: string;
+  jobId: string;
+  subcontractorId: string;
+  organizationId: string;
+  totalCost: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Payout header - created when job marked complete
+ * Contains calculated payout and cost breakdown
+ *
+ * PAYOUT CALCULATION FORMULA:
+ * =============================
+ * calculatedPayout = jobValue × payoutPct
+ * totalLaborCost = SUM(TimeEntry.hoursWorked × SubcontractorEmployee.hourlyRate) for job
+ * totalMaterialCost = JobMaterialCost.totalCost for job
+ * finalPayout = calculatedPayout - totalLaborCost - totalMaterialCost - deductions
+ *
+ * Example ($10,000 job at 50% payout):
+ * - calculatedPayout = $10,000 × 0.50 = $5,000
+ * - totalLaborCost = (40 hrs × $25/hr) + (30 hrs × $20/hr) = $1,600
+ * - totalMaterialCost = $800
+ * - deductions = $100 (admin entered)
+ * - finalPayout = $5,000 - $1,600 - $800 - $100 = $2,500
+ *
+ * This is the subcontractor's PROFIT on the job.
+ */
+export interface SubcontractorPayout {
+  id: string;
+  jobId: string;
+  subcontractorId: string;
+  organizationId: string;
+  payoutPct: number;       // Can override sub's defaultPayoutPct per job
+  jobValue: number;        // Snapshot of Job.jobValue at payout creation
+  calculatedPayout: number; // jobValue × payoutPct
+  totalLaborCost: number;   // SUM of employee hours × rates
+  totalMaterialCost: number; // From JobMaterialCost
+  deductions: number;       // Admin-entered deductions (damage, etc.)
+  deductionNotes: string | null;
+  finalPayout: number;      // calculatedPayout - labor - materials - deductions
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Individual payments against a payout
+ * Payment types:
+ * - deposit: Percentage of total payout (sub.defaultDepositPct), paid when job starts
+ * - final: Remaining balance, paid when job completes
+ * - extra: Additional payments (change orders, bonuses)
+ */
+export interface SubcontractorPayment {
+  id: string;
+  payoutId: string;
+  organizationId: string;
+  paymentType: PaymentType;
+  amount: number;
+  status: PaymentStatus;
+  paidDate: string | null;  // DATE stored as ISO string, null until paid
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
 }
