@@ -49,8 +49,15 @@ export default function KPIDashboardPage() {
     try {
       if (showRefresh) setRefreshing(true);
       const response = await fetchKPIs(period);
-      setData(response);
-      setLastUpdated(new Date());
+      if (response.error) {
+        console.error('Failed to load KPIs:', response.error);
+        toast.error('Erro ao carregar KPIs');
+        return;
+      }
+      if (response.data) {
+        setData(response.data);
+        setLastUpdated(new Date());
+      }
     } catch (error) {
       console.error('Failed to load KPIs:', error);
       toast.error('Erro ao carregar KPIs');
