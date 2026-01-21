@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, getSessionTokenFromRequest } from '@/lib/supabase-server';
+import { createServerSupabaseClient, getSessionTokenFromRequest, query } from '@/lib/supabase-server';
 import { createOrganization, updateSessionOrganization } from '@/lib/auth';
 import { cookies } from 'next/headers';
 
@@ -25,43 +25,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
-    // Get user's organizations
-    const { data: userOrgs, error } = await supabase
-      .from('UserOrganization')
-      .select(`
-        role,
-        isDefault,
-        Organization:organizationId (
-          id,
-          name,
-          slug,
-          email,
-          phone,
-          plan,
-          logo,
-          isActive,
-          createdAt
-        )
-      `)
-      .eq('userId', session.userId);
-
-    if (error) {
-      throw error;
-    }
-
-    const organizations = (userOrgs || [])
-      .filter((uo: Record<string, unknown>) => {
-        const org = uo.Organization as { isActive: boolean } | null;
-        return org && org.isActive;
-      })
-      .map((uo: Record<string, unknown>) => {
-        const org = uo.Organization as Record<string, unknown>;
-        return {
-          ...org,
-          role: uo.role,
-          isDefault: uo.isDefault,
-        };
-      });
+    // Get user's organizations with proper JOIN (QueryBuilder doesn't support nested select)
+    const organizations = await query<{
+      id: string;
+      name: string;
+      slug: string;
+      email: string | null;
+      phone: string | null;
+      plan: string;
+      logo: string | null;
+      isActive: boolean;
+      createdAt: string;
+      role: string;
+      isDefault: boolean;
+    }>(
+      `SELECT
+        o.id, o.name, o.slug, o.email, o.phone, o.plan, o.logo, o."isActive", o."createdAt",
+        uo.role, uo."isDefault"
+      FROM "UserOrganization" uo
+      JOIN "Organization" o ON uo."organizationId" = o.id
+      WHERE uo."userId" = $1 AND o."isActive" = true
+      ORDER BY uo."isDefault" DESC, o."createdAt" DESC`,
+      [session.userId]
+    );
 
     return NextResponse.json({ organizations });
   } catch (error) {
