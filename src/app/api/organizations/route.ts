@@ -177,9 +177,17 @@ export async function PUT(request: NextRequest) {
     // Update session with new organization
     await updateSessionOrganization(sessionToken, organizationId);
 
-    // Set organization cookie
-    const cookieStore = await cookies();
-    cookieStore.set('paintpro_org_id', organizationId, {
+    // Create response with organization data
+    const response = NextResponse.json({
+      organization: {
+        ...org,
+        role: userOrg.role,
+      },
+      message: 'Organization switched successfully',
+    });
+
+    // Set organization cookie on the response (cookies().set doesn't work in route handlers)
+    response.cookies.set('paintpro_org_id', organizationId, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -187,13 +195,7 @@ export async function PUT(request: NextRequest) {
       path: '/',
     });
 
-    return NextResponse.json({
-      organization: {
-        ...org,
-        role: userOrg.role,
-      },
-      message: 'Organization switched successfully',
-    });
+    return response;
   } catch (error) {
     console.error('Error switching organization:', error);
     return NextResponse.json(
