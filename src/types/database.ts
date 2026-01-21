@@ -665,6 +665,37 @@ export type SubcontractorInsert = Omit<Subcontractor, 'id' | 'createdAt' | 'upda
   updatedAt?: string;
 };
 
+// Financial module Insert types
+export type SubcontractorEmployeeInsert = Omit<SubcontractorEmployee, 'id' | 'createdAt' | 'updatedAt'> & {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TimeEntryInsert = Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'> & {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type JobMaterialCostInsert = Omit<JobMaterialCost, 'id' | 'createdAt' | 'updatedAt'> & {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SubcontractorPayoutInsert = Omit<SubcontractorPayout, 'id' | 'createdAt' | 'updatedAt'> & {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SubcontractorPaymentInsert = Omit<SubcontractorPayment, 'id' | 'createdAt' | 'updatedAt'> & {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 // ============================================
 // UPDATE TYPES (all fields optional)
 // ============================================
@@ -675,3 +706,10 @@ export type EstimateUpdate = Partial<Omit<Estimate, 'id' | 'createdAt'>>;
 export type JobUpdate = Partial<Omit<Job, 'id' | 'createdAt'>>;
 export type TeamMemberUpdate = Partial<Omit<TeamMember, 'id' | 'createdAt'>>;
 export type SubcontractorUpdate = Partial<Omit<Subcontractor, 'id' | 'createdAt'>>;
+
+// Financial module Update types
+export type SubcontractorEmployeeUpdate = Partial<Omit<SubcontractorEmployee, 'id' | 'createdAt'>>;
+export type TimeEntryUpdate = Partial<Omit<TimeEntry, 'id' | 'createdAt'>>;
+export type JobMaterialCostUpdate = Partial<Omit<JobMaterialCost, 'id' | 'createdAt'>>;
+export type SubcontractorPayoutUpdate = Partial<Omit<SubcontractorPayout, 'id' | 'createdAt'>>;
+export type SubcontractorPaymentUpdate = Partial<Omit<SubcontractorPayment, 'id' | 'createdAt'>>;
