@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, FileText, BookOpen, MessageCircle, User } from 'lucide-react';
+import { Home, FileText, Users, BookOpen, MessageCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -16,6 +16,11 @@ const navItems = [
     href: '/sub/os',
     label: 'OS',
     icon: FileText,
+  },
+  {
+    href: '/sub/equipe',
+    label: 'Equipe',
+    icon: Users,
   },
   {
     href: '/sub/treinamento',
