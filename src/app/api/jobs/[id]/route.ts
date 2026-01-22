@@ -2,6 +2,89 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 import { geocodeAddress } from '@/lib/geocoding';
 import { calculateJobFinancials } from '@/lib/job-calculations';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { Job, SubcontractorPayoutInsert } from '@/types/database';
+
+// Helper function to create SubcontractorPayout when job completes
+async function createSubcontractorPayout(
+  job: Job,
+  organizationId: string,
+  supabase: SupabaseClient
+): Promise<void> {
+  // Get subcontractor's defaultPayoutPct
+  const { data: subcontractor, error: subError } = await supabase
+    .from('Subcontractor')
+    .select('defaultPayoutPct')
+    .eq('id', job.subcontractorId!)
+    .eq('organizationId', organizationId)
+    .single();
+
+  if (subError || !subcontractor) {
+    throw new Error('Subcontractor not found');
+  }
+
+  // Calculate total labor cost from TimeEntry with SubcontractorEmployee
+  const { data: timeEntries, error: timeError } = await supabase
+    .from('TimeEntry')
+    .select('hoursWorked, SubcontractorEmployee!inner(hourlyRate)')
+    .eq('jobId', job.id)
+    .eq('organizationId', organizationId);
+
+  if (timeError) {
+    throw new Error(`Failed to fetch time entries: ${timeError.message}`);
+  }
+
+  const totalLaborCost = (timeEntries ?? []).reduce((sum, entry) => {
+    const employee = entry.SubcontractorEmployee;
+    if (employee && typeof employee === 'object' && 'hourlyRate' in employee) {
+      return sum + (entry.hoursWorked * (employee.hourlyRate as number));
+    }
+    return sum;
+  }, 0);
+
+  // Get material cost from JobMaterialCost (optional, may not exist)
+  const { data: materialCost, error: materialError } = await supabase
+    .from('JobMaterialCost')
+    .select('totalCost')
+    .eq('jobId', job.id)
+    .eq('subcontractorId', job.subcontractorId!)
+    .eq('organizationId', organizationId)
+    .maybeSingle();
+
+  if (materialError) {
+    throw new Error(`Failed to fetch material cost: ${materialError.message}`);
+  }
+
+  const totalMaterialCost = materialCost?.totalCost ?? 0;
+
+  // Calculate payout using formula
+  const payoutPct = subcontractor.defaultPayoutPct;
+  const calculatedPayout = job.jobValue * (payoutPct / 100);
+  const finalPayout = calculatedPayout - totalLaborCost - totalMaterialCost;
+
+  // Insert SubcontractorPayout record
+  const payoutData: SubcontractorPayoutInsert = {
+    jobId: job.id,
+    subcontractorId: job.subcontractorId!,
+    organizationId,
+    payoutPct,
+    jobValue: job.jobValue,
+    calculatedPayout,
+    totalLaborCost,
+    totalMaterialCost,
+    deductions: 0,
+    deductionNotes: null,
+    finalPayout,
+  };
+
+  const { error: insertError } = await supabase
+    .from('SubcontractorPayout')
+    .insert(payoutData);
+
+  if (insertError) {
+    throw new Error(`Failed to create payout: ${insertError.message}`);
+  }
+}
 
 // GET /api/jobs/[id] - Get a single job
 export async function GET(
