@@ -150,10 +150,10 @@ function calculateDelta(current: number, previous: number): { delta: number; dir
  * Generate trend data points by grouping data by date
  */
 function generateTrendData(
-  jobs: Job[],
+  jobs: (Job & { SubcontractorPayout?: { finalPayout: number } | null })[],
   startDate: Date,
   endDate: Date,
-  valueExtractor: (job: Job) => number,
+  valueExtractor: (job: Job & { SubcontractorPayout?: { finalPayout: number } | null }) => number,
   period: KPIPeriod
 ): TrendDataPoint[] {
   const trend: TrendDataPoint[] = [];
@@ -239,6 +239,13 @@ function generateLeadTrendData(
   }
 
   return trend;
+}
+
+/**
+ * Get actual profit from payout if available, otherwise fall back to estimated grossProfit
+ */
+function getActualProfit(job: Job & { SubcontractorPayout?: { finalPayout: number } | null }): number {
+  return job.SubcontractorPayout?.finalPayout ?? job.grossProfit ?? 0;
 }
 
 // GET /api/kpis - Get KPI dashboard data with period comparison
@@ -351,15 +358,15 @@ export async function GET(request: NextRequest) {
     };
 
     // Gross Profit
-    const currentProfit = currentJobs.reduce((sum, job) => sum + (job.grossProfit || 0), 0);
-    const previousProfit = previousJobs.reduce((sum, job) => sum + (job.grossProfit || 0), 0);
+    const currentProfit = currentJobs.reduce((sum, job) => sum + getActualProfit(job), 0);
+    const previousProfit = previousJobs.reduce((sum, job) => sum + getActualProfit(job), 0);
     const profitDelta = calculateDelta(currentProfit, previousProfit);
     const grossProfitMetric: KPIMetric = {
       current: Math.round(currentProfit * 100) / 100,
       previous: Math.round(previousProfit * 100) / 100,
       delta: profitDelta.delta,
       deltaDirection: profitDelta.direction,
-      trend: generateTrendData(currentJobs, dateRanges.current.start, dateRanges.current.end, (j) => j.grossProfit || 0, period),
+      trend: generateTrendData(currentJobs, dateRanges.current.start, dateRanges.current.end, getActualProfit, period),
     };
 
     // Gross Margin (percentage)
