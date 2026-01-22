@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, FileText, Users, BookOpen, MessageCircle, User } from 'lucide-react';
+import { Home, FileText, Clock, Users, MessageCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -18,14 +18,14 @@ const navItems = [
     icon: FileText,
   },
   {
+    href: '/sub/horas',
+    label: 'Horas',
+    icon: Clock,
+  },
+  {
     href: '/sub/equipe',
     label: 'Equipe',
     icon: Users,
-  },
-  {
-    href: '/sub/treinamento',
-    label: 'Treino',
-    icon: BookOpen,
   },
   {
     href: '/sub/chats',
