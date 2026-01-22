@@ -273,12 +273,28 @@ export async function GET(request: NextRequest) {
       reviewsResult,
     ] = await Promise.all([
       // Current period jobs
-      buildOrgQuery(supabase.from<Job>('Job').select('*'))
+      buildOrgQuery(supabase.from<Job>('Job').select(`
+        *,
+        SubcontractorPayout!left(
+          id,
+          finalPayout,
+          totalLaborCost,
+          totalMaterialCost
+        )
+      `))
         .gte('jobDate', dateRanges.current.start.toISOString())
         .lte('jobDate', dateRanges.current.end.toISOString()),
 
       // Previous period jobs
-      buildOrgQuery(supabase.from<Job>('Job').select('*'))
+      buildOrgQuery(supabase.from<Job>('Job').select(`
+        *,
+        SubcontractorPayout!left(
+          id,
+          finalPayout,
+          totalLaborCost,
+          totalMaterialCost
+        )
+      `))
         .gte('jobDate', dateRanges.previous.start.toISOString())
         .lte('jobDate', dateRanges.previous.end.toISOString()),
 
