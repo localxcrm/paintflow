@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getOrganizationIdFromRequest } from '@/lib/supabase-server';
 import { geocodeAddress } from '@/lib/geocoding';
 import { calculateJobFinancials } from '@/lib/job-calculations';
-import { SupabaseClient } from '@supabase/supabase-js';
 import { Job, SubcontractorPayoutInsert } from '@/types/database';
 
 // Helper function to create SubcontractorPayout when job completes
 async function createSubcontractorPayout(
   job: Job,
   organizationId: string,
-  supabase: SupabaseClient
+  supabase: ReturnType<typeof createServerSupabaseClient>
 ): Promise<void> {
   // Get subcontractor's defaultPayoutPct
   const { data: subcontractor, error: subError } = await supabase
@@ -34,7 +33,7 @@ async function createSubcontractorPayout(
     throw new Error(`Failed to fetch time entries: ${timeError.message}`);
   }
 
-  const totalLaborCost = (timeEntries ?? []).reduce((sum, entry) => {
+  const totalLaborCost = (timeEntries ?? []).reduce((sum: number, entry: any) => {
     const employee = entry.SubcontractorEmployee;
     if (employee && typeof employee === 'object' && 'hourlyRate' in employee) {
       return sum + (entry.hoursWorked * (employee.hourlyRate as number));
@@ -163,6 +162,9 @@ export async function PATCH(
       );
     }
 
+    // Detect job completion (actualEndDate transition from null to date)
+    const isJobCompleting = body.actualEndDate && !currentJob.actualEndDate;
+
     // Recalculate financials if job value changes
     let financials: Partial<typeof currentJob> = {};
     const jobValue = body.jobValue ?? currentJob.jobValue;
@@ -285,6 +287,26 @@ export async function PATCH(
 
     if (updateError) {
       throw updateError;
+    }
+
+    // Auto-create payout if job is completing
+    if (isJobCompleting && job.subcontractorId) {
+      // Check if payout already exists (prevent duplicates)
+      const { data: existingPayout } = await supabase
+        .from('SubcontractorPayout')
+        .select('id')
+        .eq('jobId', job.id)
+        .maybeSingle();
+
+      if (!existingPayout) {
+        try {
+          await createSubcontractorPayout(job, organizationId, supabase);
+          console.log(`Auto-created payout for job ${job.jobNumber}`);
+        } catch (payoutError) {
+          // Log but don't fail job update
+          console.error('Failed to auto-create payout:', payoutError);
+        }
+      }
     }
 
     return NextResponse.json(job);
