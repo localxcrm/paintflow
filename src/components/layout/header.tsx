@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { LogOut, User, Settings, Users, LayoutDashboard, Target, Briefcase, Megaphone, TrendingUp, BookOpen, MessageSquare, Menu, X } from 'lucide-react';
+import { LogOut, User, Settings, Users, LayoutDashboard, Target, Briefcase, Megaphone, TrendingUp, BookOpen, MessageSquare, Menu, X, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -33,6 +33,7 @@ const navItems = [
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
   { href: '/vendas', label: 'Vendas', icon: TrendingUp },
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
+  { href: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { href: '/chats', label: 'Chats', icon: MessageSquare },
   { href: '/conhecimento', label: 'Conhecimento', icon: BookOpen },
 ];
