@@ -363,6 +363,16 @@ export default function SubContaPage() {
   const handleSaveProfile = async () => {
     try {
       setIsSaving(true);
+
+      // Detect if compliance fields changed (before API call)
+      const complianceChanged =
+        editForm.licenseNumber !== (profile?.subcontractor.licenseNumber || '') ||
+        editForm.licenseExpirationDate !== (profile?.subcontractor.licenseExpirationDate || '') ||
+        editForm.licenseImageUrl !== (profile?.subcontractor.licenseImageUrl || '') ||
+        editForm.insuranceNumber !== (profile?.subcontractor.insuranceNumber || '') ||
+        editForm.insuranceExpirationDate !== (profile?.subcontractor.insuranceExpirationDate || '') ||
+        editForm.insuranceImageUrl !== (profile?.subcontractor.insuranceImageUrl || '');
+
       const res = await fetch('/api/sub/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -373,6 +383,14 @@ export default function SubContaPage() {
         await loadProfile();
         setIsEditing(false);
         toast.success('Perfil atualizado!');
+
+        // Notify admin if compliance changed
+        if (complianceChanged) {
+          // Simple notification - Phase 10 will formalize the notification system
+          console.log('[Compliance Update] Sub updated compliance info:', profile?.user.name);
+          // Could call a notification API here if one exists
+          // For now, admin will see updated data in their dashboard
+        }
       } else {
         const data = await res.json();
         toast.error(data.error || 'Erro ao salvar');
