@@ -34,10 +34,15 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
     Users, Plus, Trash2, Mail, Phone, Percent, Wrench,
-    Shield, FileText, Pencil, Loader2, Calendar, Copy, Check,
-    Key, Eye, EyeOff, Smartphone
+    Shield, FileText, Pencil, Loader2, Calendar as CalendarIcon, Copy, Check,
+    Key, Eye, EyeOff, Smartphone, X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ImageUpload } from '@/components/ui/image-upload';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface TeamMember {
     id: string;
@@ -62,6 +67,13 @@ interface Subcontractor {
     calendarToken?: string;
     userId?: string; // Link to User for app login
     hasAppAccess?: boolean;
+    // Compliance fields
+    licenseNumber?: string;
+    licenseExpirationDate?: string;
+    licenseImageUrl?: string;
+    insuranceNumber?: string;
+    insuranceExpirationDate?: string;
+    insuranceImageUrl?: string;
 }
 
 const roleLabels: Record<string, string> = {
@@ -119,6 +131,13 @@ export default function EquipePage() {
         color: '#10B981',
         password: '',
         enableAppAccess: false,
+        // Compliance fields
+        licenseNumber: '',
+        licenseExpirationDate: null as Date | null,
+        licenseImageUrl: null as string | null,
+        insuranceNumber: '',
+        insuranceExpirationDate: null as Date | null,
+        insuranceImageUrl: null as string | null,
     });
     const [copiedToken, setCopiedToken] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
@@ -250,6 +269,13 @@ export default function EquipePage() {
                 color: sub.color || '#10B981',
                 password: '',
                 enableAppAccess: !!sub.userId,
+                // Compliance fields
+                licenseNumber: sub.licenseNumber || '',
+                licenseExpirationDate: sub.licenseExpirationDate ? new Date(sub.licenseExpirationDate) : null,
+                licenseImageUrl: sub.licenseImageUrl || null,
+                insuranceNumber: sub.insuranceNumber || '',
+                insuranceExpirationDate: sub.insuranceExpirationDate ? new Date(sub.insuranceExpirationDate) : null,
+                insuranceImageUrl: sub.insuranceImageUrl || null,
             });
         } else {
             setEditingSub(null);
@@ -262,6 +288,12 @@ export default function EquipePage() {
                 color: '#10B981',
                 password: '',
                 enableAppAccess: false,
+                licenseNumber: '',
+                licenseExpirationDate: null,
+                licenseImageUrl: null,
+                insuranceNumber: '',
+                insuranceExpirationDate: null,
+                insuranceImageUrl: null,
             });
         }
         setShowPassword(false);
@@ -299,6 +331,13 @@ export default function EquipePage() {
                         ...subForm,
                         // Only send password if it was changed
                         password: subForm.password || undefined,
+                        // Format dates as ISO strings for database
+                        licenseExpirationDate: subForm.licenseExpirationDate
+                            ? subForm.licenseExpirationDate.toISOString().split('T')[0]
+                            : null,
+                        insuranceExpirationDate: subForm.insuranceExpirationDate
+                            ? subForm.insuranceExpirationDate.toISOString().split('T')[0]
+                            : null,
                     }),
                 });
                 if (res.ok) {
@@ -315,7 +354,16 @@ export default function EquipePage() {
                 const res = await fetch('/api/subcontractors', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(subForm),
+                    body: JSON.stringify({
+                        ...subForm,
+                        // Format dates as ISO strings for database
+                        licenseExpirationDate: subForm.licenseExpirationDate
+                            ? subForm.licenseExpirationDate.toISOString().split('T')[0]
+                            : null,
+                        insuranceExpirationDate: subForm.insuranceExpirationDate
+                            ? subForm.insuranceExpirationDate.toISOString().split('T')[0]
+                            : null,
+                    }),
                 });
                 if (res.ok) {
                     const created = await res.json();
@@ -564,7 +612,7 @@ export default function EquipePage() {
                                             </>
                                         ) : (
                                             <>
-                                                <Calendar className="h-3 w-3" />
+                                                <CalendarIcon className="h-3 w-3" />
                                                 <span className="truncate">Copiar link do calendário</span>
                                                 <Copy className="h-3 w-3 ml-auto" />
                                             </>
