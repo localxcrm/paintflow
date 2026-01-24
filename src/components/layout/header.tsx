@@ -19,6 +19,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { authApi } from '@/lib/api';
 import { useOrganization } from '@/contexts/organization-context';
 import { cn } from '@/lib/utils';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 
 interface UserData {
   email: string;
@@ -207,6 +208,9 @@ export function Header() {
         {/* User menu */}
         {mounted ? (
           <div className="flex items-center gap-4">
+            {/* Notification Bell */}
+            <NotificationBell userType="admin" />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-3 px-3 h-12 rounded-2xl hover:bg-slate-50 border border-transparent hover:border-slate-200/50 transition-all">
