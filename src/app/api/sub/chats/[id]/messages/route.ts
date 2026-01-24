@@ -24,22 +24,31 @@ async function getSubcontractorFromSession() {
 
   const supabase = createServerSupabaseClient();
 
+  // Get session first
   const { data: session } = await supabase
     .from('Session')
-    .select('*, User(*)')
+    .select('*')
     .eq('token', sessionToken)
     .single();
 
   if (!session || new Date(session.expiresAt) < new Date()) return null;
-  if (session.User.role !== 'subcontractor') return null;
+
+  // Get user separately
+  const { data: user } = await supabase
+    .from('User')
+    .select('*')
+    .eq('id', session.userId)
+    .single();
+
+  if (!user || user.role !== 'subcontractor') return null;
 
   const { data: subcontractor } = await supabase
     .from('Subcontractor')
     .select('*')
-    .eq('userId', session.User.id)
+    .eq('userId', user.id)
     .single();
 
-  return subcontractor ? { ...subcontractor, user: session.User } : null;
+  return subcontractor ? { ...subcontractor, user } : null;
 }
 
 // GET /api/sub/chats/[id]/messages - Get messages with pagination

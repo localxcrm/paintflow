@@ -35,7 +35,7 @@ export async function GET(
       .eq('token', sessionToken)
       .single();
 
-    if (!session || session.User.role !== 'subcontractor') {
+    if (!session || !session.User || session.User.role !== 'subcontractor') {
       return NextResponse.json(
         { error: 'Não autorizado' },
         { status: 403, headers: corsHeaders }
@@ -116,7 +116,7 @@ export async function PATCH(
       .eq('token', sessionToken)
       .single();
 
-    if (!session || session.User.role !== 'subcontractor') {
+    if (!session || !session.User || session.User.role !== 'subcontractor') {
       return NextResponse.json(
         { error: 'Não autorizado' },
         { status: 403, headers: corsHeaders }

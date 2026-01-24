@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { getSubSessionToken } from '@/lib/auth';
+import { getAuthenticatedSubcontractor } from '@/lib/auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,43 +13,16 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    const sessionToken = await getSubSessionToken();
+    const auth = await getAuthenticatedSubcontractor();
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Não autenticado' },
-        { status: 401, headers: corsHeaders }
-      );
-    }
-
-    const supabase = createServerSupabaseClient();
-
-    // Get session and verify subcontractor
-    const { data: session } = await supabase
-      .from('Session')
-      .select('*, User(*)')
-      .eq('token', sessionToken)
-      .single();
-
-    if (!session || session.User.role !== 'subcontractor') {
+    if (!auth) {
       return NextResponse.json(
         { error: 'Não autorizado' },
         { status: 403, headers: corsHeaders }
       );
     }
 
-    const { data: subcontractor } = await supabase
-      .from('Subcontractor')
-      .select('id, organizationId')
-      .eq('userId', session.User.id)
-      .single();
-
-    if (!subcontractor) {
-      return NextResponse.json(
-        { error: 'Subempreiteiro não encontrado' },
-        { status: 404, headers: corsHeaders }
-      );
-    }
+    const { subcontractor, supabase } = auth;
 
     // Parse query params
     const { searchParams } = new URL(request.url);
@@ -179,43 +151,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const sessionToken = await getSubSessionToken();
+    const auth = await getAuthenticatedSubcontractor();
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Não autenticado' },
-        { status: 401, headers: corsHeaders }
-      );
-    }
-
-    const supabase = createServerSupabaseClient();
-
-    // Get session and verify subcontractor
-    const { data: session } = await supabase
-      .from('Session')
-      .select('*, User(*)')
-      .eq('token', sessionToken)
-      .single();
-
-    if (!session || session.User.role !== 'subcontractor') {
+    if (!auth) {
       return NextResponse.json(
         { error: 'Não autorizado' },
         { status: 403, headers: corsHeaders }
       );
     }
 
-    const { data: subcontractor } = await supabase
-      .from('Subcontractor')
-      .select('id, organizationId')
-      .eq('userId', session.User.id)
-      .single();
-
-    if (!subcontractor) {
-      return NextResponse.json(
-        { error: 'Subempreiteiro não encontrado' },
-        { status: 404, headers: corsHeaders }
-      );
-    }
+    const { subcontractor, supabase } = auth;
 
     // Parse request body
     const body = await request.json();

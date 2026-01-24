@@ -21,6 +21,44 @@ export async function getSubSessionToken(): Promise<string | null> {
   return cookieStore.get(SUB_SESSION_COOKIE)?.value || null;
 }
 
+// Get authenticated subcontractor with user data
+// Uses separate queries to avoid join issues with Supabase
+export async function getAuthenticatedSubcontractor() {
+  const sessionToken = await getSubSessionToken();
+  if (!sessionToken) return null;
+
+  const supabase = createServerSupabaseClient();
+
+  // Get session first (separate query)
+  const { data: session } = await supabase
+    .from('Session')
+    .select('*')
+    .eq('token', sessionToken)
+    .single();
+
+  if (!session || new Date(session.expiresAt) < new Date()) return null;
+
+  // Get user separately (avoids join issues)
+  const { data: user } = await supabase
+    .from('User')
+    .select('*')
+    .eq('id', session.userId)
+    .single();
+
+  if (!user || user.role !== 'subcontractor') return null;
+
+  // Get subcontractor data
+  const { data: subcontractor } = await supabase
+    .from('Subcontractor')
+    .select('*')
+    .eq('userId', user.id)
+    .single();
+
+  if (!subcontractor) return null;
+
+  return { user, subcontractor, supabase };
+}
+
 // Simple hash function for demo purposes
 // In production, use bcrypt or argon2
 export function hashPassword(password: string): string {

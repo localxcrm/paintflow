@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, FileText, Clock, Users, DollarSign, User } from 'lucide-react';
+import { Home, FileText, Clock, MessageCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -17,23 +17,18 @@ const navItems = [
     icon: FileText,
   },
   {
-    href: '/sub/financeiro',
-    label: 'Financeiro',
-    icon: DollarSign,
-  },
-  {
     href: '/sub/horas',
     label: 'Horas',
     icon: Clock,
   },
   {
-    href: '/sub/equipe',
-    label: 'Equipe',
-    icon: Users,
+    href: '/sub/chats',
+    label: 'Chat',
+    icon: MessageCircle,
   },
   {
     href: '/sub/perfil',
-    label: 'Perfil',
+    label: 'Conta',
     icon: User,
   },
 ];
