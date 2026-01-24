@@ -591,6 +591,40 @@ export default function EquipePage() {
                                     <Percent className="h-4 w-4" />
                                     Payout: {sub.defaultPayoutPct || 60}%
                                 </div>
+
+                                {/* Compliance Status - License */}
+                                {sub.licenseExpirationDate && (
+                                    <div className="flex items-center gap-2">
+                                        <Shield className="h-4 w-4 text-green-600" />
+                                        <span>
+                                            Licenca: {format(new Date(sub.licenseExpirationDate), 'P', { locale: ptBR })}
+                                        </span>
+                                        {new Date(sub.licenseExpirationDate) < new Date() && (
+                                            <Badge variant="destructive" className="text-xs">Expirada</Badge>
+                                        )}
+                                        {new Date(sub.licenseExpirationDate) >= new Date() &&
+                                         new Date(sub.licenseExpirationDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
+                                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-600">Expira em breve</Badge>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Compliance Status - Insurance */}
+                                {sub.insuranceExpirationDate && (
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-blue-600" />
+                                        <span>
+                                            Seguro: {format(new Date(sub.insuranceExpirationDate), 'P', { locale: ptBR })}
+                                        </span>
+                                        {new Date(sub.insuranceExpirationDate) < new Date() && (
+                                            <Badge variant="destructive" className="text-xs">Expirado</Badge>
+                                        )}
+                                        {new Date(sub.insuranceExpirationDate) >= new Date() &&
+                                         new Date(sub.insuranceExpirationDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
+                                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-600">Expira em breve</Badge>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             {/* Calendar Link */}
                             {sub.calendarToken && (
