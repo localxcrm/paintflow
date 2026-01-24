@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   JobKPICards,
@@ -490,23 +491,30 @@ export default function JobsPage() {
           />
 
           {/* Data Table */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">
-                All Jobs ({filteredJobs.length})
-              </h2>
-            </div>
-            <JobTable
-              jobs={filteredJobs}
-              onToggleDepositPaid={handleToggleDepositPaid}
-              onToggleJobPaid={handleToggleJobPaid}
-              onToggleSalesCommissionPaid={handleToggleSalesCommissionPaid}
-              onTogglePMCommissionPaid={handleTogglePMCommissionPaid}
-              onToggleSubPaid={handleToggleSubPaid}
-              onJobClick={handleJobClick}
-              onDeleteJob={handleDeleteClick}
-            />
-          </div>
+          <Card className="w-full shadow-md border border-slate-300 min-h-[500px]">
+            <CardHeader>
+              <CardTitle className="text-lg">All Jobs ({filteredJobs.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div
+                className="overflow-x-auto"
+                role="region"
+                aria-label="Tabela de todos os trabalhos"
+                tabIndex={0}
+              >
+                <JobTable
+                  jobs={filteredJobs}
+                  onToggleDepositPaid={handleToggleDepositPaid}
+                  onToggleJobPaid={handleToggleJobPaid}
+                  onToggleSalesCommissionPaid={handleToggleSalesCommissionPaid}
+                  onTogglePMCommissionPaid={handleTogglePMCommissionPaid}
+                  onToggleSubPaid={handleToggleSubPaid}
+                  onJobClick={handleJobClick}
+                  onDeleteJob={handleDeleteClick}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Kanban View */}
