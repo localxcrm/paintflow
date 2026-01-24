@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Plus, Edit, Archive, DollarSign, User, Users } from 'lucide-react';
+import { Loader2, Plus, Edit, Archive, DollarSign, User, Users, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmployeeForm } from '@/components/sub/employee-form';
 import type { EmployeeFormData } from '@/lib/validations/employee';
@@ -129,6 +129,26 @@ export default function EquipePage() {
     }
   };
 
+  const handleRestoreEmployee = async (employee: Employee) => {
+    try {
+      const res = await fetch(`/api/sub/employees/${employee.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: true }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to restore employee');
+      }
+
+      toast.success('Funcionario restaurado!');
+      await loadEmployees();
+    } catch (error) {
+      console.error('Error restoring employee:', error);
+      toast.error('Erro ao restaurar funcionario');
+    }
+  };
+
   const activeEmployees = employees.filter(e => e.isActive);
   const inactiveEmployees = employees.filter(e => !e.isActive);
   const displayedEmployees = showInactive ? employees : activeEmployees;
@@ -245,7 +265,7 @@ export default function EquipePage() {
                       <div className="flex items-center gap-1 text-slate-600 mb-2">
                         <DollarSign className="h-4 w-4" />
                         <span className="font-medium">
-                          ${employee.hourlyRate.toFixed(2)}/hora
+                          ${Number(employee.hourlyRate).toFixed(2)}/hora
                         </span>
                       </div>
 
@@ -259,7 +279,7 @@ export default function EquipePage() {
                       )}
                     </div>
 
-                    {employee.isActive && (
+                    {employee.isActive ? (
                       <div className="flex items-center gap-2">
                         <Button
                           variant="ghost"
@@ -278,6 +298,16 @@ export default function EquipePage() {
                           <Archive className="h-4 w-4" />
                         </Button>
                       </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRestoreEmployee(employee)}
+                        className="text-green-600 hover:bg-green-50"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Restaurar
+                      </Button>
                     )}
                   </div>
                 </CardContent>

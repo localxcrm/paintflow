@@ -28,14 +28,15 @@ export async function GET() {
 
     const supabase = createServerSupabaseClient();
 
-    // Get session with user
+    // Get session first
     const { data: session, error: sessionError } = await supabase
       .from('Session')
-      .select('*, User(*)')
+      .select('*')
       .eq('token', sessionToken)
       .single();
 
     if (sessionError || !session) {
+      console.log('Session not found for token:', sessionToken?.substring(0, 10) + '...');
       return NextResponse.json(
         { error: 'Sessão inválida' },
         { status: 401, headers: corsHeaders }
@@ -50,9 +51,21 @@ export async function GET() {
       );
     }
 
-    const user = session.User;
+    // Get user separately (more reliable than join)
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', session.userId)
+      .single();
 
-    // Verify it's a subcontractor
+    if (userError || !user) {
+      console.error('User not found for session:', { sessionId: session.id, userId: session.userId, error: userError });
+      return NextResponse.json(
+        { error: 'Usuário não encontrado' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
     if (user.role !== 'subcontractor') {
       return NextResponse.json(
         { error: 'Acesso não autorizado' },

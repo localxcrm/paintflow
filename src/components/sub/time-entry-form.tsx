@@ -164,7 +164,7 @@ export function TimeEntryForm({
           <SelectContent>
             {employees.filter((e) => e.isActive).map((employee) => (
               <SelectItem key={employee.id} value={employee.id}>
-                {employee.name} - ${employee.hourlyRate.toFixed(2)}/h
+                {employee.name} - ${Number(employee.hourlyRate).toFixed(2)}/h
               </SelectItem>
             ))}
           </SelectContent>

@@ -37,11 +37,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Ignore cookie errors
       }
     } else {
-      // Check if we have cookies but not localStorage (direct login)
-      const hasCookieSession = document.cookie.includes('paintpro_session=');
+      // Check if we have org cookie (session cookie is httpOnly so we can't check it from JS)
+      // The middleware validates the session server-side, so we just need to check org exists
       const hasCookieOrg = document.cookie.includes('paintpro_org_id=');
 
-      if (hasCookieSession && hasCookieOrg) {
+      if (hasCookieOrg) {
         setIsAuthenticated(true);
       } else {
         // Not authenticated - redirect to login

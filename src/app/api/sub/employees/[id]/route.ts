@@ -15,9 +15,10 @@ export async function OPTIONS() {
 async function getSubcontractorFromSession(sessionToken: string) {
   const supabase = createServerSupabaseClient();
 
+  // Get session first
   const { data: session, error: sessionError } = await supabase
     .from('Session')
-    .select('*, User(*)')
+    .select('*')
     .eq('token', sessionToken)
     .single();
 
@@ -29,7 +30,16 @@ async function getSubcontractorFromSession(sessionToken: string) {
     return { error: 'Sessão expirada', status: 401 };
   }
 
-  const user = session.User;
+  // Get user separately
+  const { data: user, error: userError } = await supabase
+    .from('User')
+    .select('*')
+    .eq('id', session.userId)
+    .single();
+
+  if (userError || !user) {
+    return { error: 'Usuário não encontrado', status: 401 };
+  }
 
   if (user.role !== 'subcontractor') {
     return { error: 'Acesso não autorizado', status: 403 };
@@ -164,10 +174,15 @@ export async function PATCH(
 
     // Parse request body
     const body = await request.json();
-    const { name, hourlyRate, ssn, phone, address, dateOfBirth, emergencyContact } = body;
+    const { name, hourlyRate, ssn, phone, address, dateOfBirth, emergencyContact, isActive } = body;
 
     // Build update object with only fields that exist in schema
     const updateData: Record<string, unknown> = {};
+
+    // Handle isActive (for restore functionality)
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
 
     if (name !== undefined) {
       if (typeof name !== 'string' || name.trim().length < 2) {

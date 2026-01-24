@@ -25,10 +25,10 @@ export async function GET() {
 
     const supabase = createServerSupabaseClient();
 
-    // Get session with user
+    // Get session first
     const { data: session, error: sessionError } = await supabase
       .from('Session')
-      .select('*, User(*)')
+      .select('*')
       .eq('token', sessionToken)
       .single();
 
@@ -47,7 +47,19 @@ export async function GET() {
       );
     }
 
-    const user = session.User;
+    // Get user separately
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', session.userId)
+      .single();
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: 'Usuário não encontrado' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
 
     // Verify it's a subcontractor
     if (user.role !== 'subcontractor') {
@@ -120,10 +132,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
 
-    // Get session with user
+    // Get session first
     const { data: session, error: sessionError } = await supabase
       .from('Session')
-      .select('*, User(*)')
+      .select('*')
       .eq('token', sessionToken)
       .single();
 
@@ -134,7 +146,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = session.User;
+    // Get user separately
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', session.userId)
+      .single();
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: 'Usuário não encontrado' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
 
     // Verify it's a subcontractor
     if (user.role !== 'subcontractor') {

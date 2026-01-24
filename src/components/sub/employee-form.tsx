@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import InputMask from 'react-input-mask';
 import { employeeSchema, type EmployeeFormData } from '@/lib/validations/employee';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,21 +116,23 @@ export function EmployeeForm({ employee, onSave, onCancel, isLoading = false }: 
             <FormItem>
               <FormLabel>SSN/ITIN</FormLabel>
               <FormControl>
-                <InputMask
-                  mask="999-99-9999"
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                >
-                  {/* @ts-ignore - InputMask types are incorrect */}
-                  {(inputProps: any) => (
-                    <Input
-                      {...inputProps}
-                      placeholder="XXX-XX-XXXX"
-                      type="text"
-                    />
-                  )}
-                </InputMask>
+                <Input
+                  placeholder="XXX-XX-XXXX"
+                  type="text"
+                  maxLength={11}
+                  {...field}
+                  onChange={(e) => {
+                    // Auto-format SSN as user types
+                    let value = e.target.value.replace(/\D/g, '');
+                    if (value.length > 3) {
+                      value = value.slice(0, 3) + '-' + value.slice(3);
+                    }
+                    if (value.length > 6) {
+                      value = value.slice(0, 6) + '-' + value.slice(6);
+                    }
+                    field.onChange(value.slice(0, 11));
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

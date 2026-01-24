@@ -34,7 +34,8 @@ export default function SubLoginPage() {
       }
 
       toast.success('Login realizado!');
-      router.push('/sub/dashboard');
+      // Use window.location for full page navigation to ensure cookie is processed
+      window.location.href = '/sub/dashboard';
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erro ao fazer login');
     } finally {
