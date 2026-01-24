@@ -34,6 +34,8 @@ import {
   Shield,
   AlertTriangle,
   CheckCircle2,
+  Upload,
+  Calendar,
 } from 'lucide-react';
 import { format, parseISO, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -57,23 +59,29 @@ interface ProfileData {
     zipCode: string | null;
     profileImageUrl: string | null;
     phone: string | null;
-    // Compliance fields (read-only)
+    // Compliance fields
     licenseNumber: string | null;
     licenseExpirationDate: string | null;
+    licenseImageUrl: string | null;
     insuranceNumber: string | null;
     insuranceExpirationDate: string | null;
+    insuranceImageUrl: string | null;
   };
 }
 
 export default function SubContaPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const licenseInputRef = useRef<HTMLInputElement>(null);
+  const insuranceInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isUploadingLicense, setIsUploadingLicense] = useState(false);
+  const [isUploadingInsurance, setIsUploadingInsurance] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
@@ -86,6 +94,13 @@ export default function SubContaPage() {
     city: '',
     state: '',
     zipCode: '',
+    // Compliance fields
+    licenseNumber: '',
+    licenseExpirationDate: '',
+    licenseImageUrl: '',
+    insuranceNumber: '',
+    insuranceExpirationDate: '',
+    insuranceImageUrl: '',
   });
 
   // Password form state
@@ -114,6 +129,13 @@ export default function SubContaPage() {
           city: data.subcontractor.city || '',
           state: data.subcontractor.state || '',
           zipCode: data.subcontractor.zipCode || '',
+          // Compliance fields
+          licenseNumber: data.subcontractor.licenseNumber || '',
+          licenseExpirationDate: data.subcontractor.licenseExpirationDate || '',
+          licenseImageUrl: data.subcontractor.licenseImageUrl || '',
+          insuranceNumber: data.subcontractor.insuranceNumber || '',
+          insuranceExpirationDate: data.subcontractor.insuranceExpirationDate || '',
+          insuranceImageUrl: data.subcontractor.insuranceImageUrl || '',
         });
       }
     } catch (error) {
@@ -186,6 +208,90 @@ export default function SubContaPage() {
       toast.error('Erro ao enviar foto');
     } finally {
       setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleLicenseUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      toast.error('Por favor, selecione uma imagem ou PDF');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo deve ter no maximo 10MB');
+      return;
+    }
+
+    try {
+      setIsUploadingLicense(true);
+      const supabase = getSupabaseClient();
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `license-${profile.subcontractor.id}-${Date.now()}.${fileExt}`;
+      const filePath = `compliance-docs/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(filePath);
+
+      setEditForm(prev => ({ ...prev, licenseImageUrl: publicUrl }));
+      toast.success('Documento da licenca enviado!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Erro ao enviar documento');
+    } finally {
+      setIsUploadingLicense(false);
+    }
+  };
+
+  const handleInsuranceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      toast.error('Por favor, selecione uma imagem ou PDF');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo deve ter no maximo 10MB');
+      return;
+    }
+
+    try {
+      setIsUploadingInsurance(true);
+      const supabase = getSupabaseClient();
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `insurance-${profile.subcontractor.id}-${Date.now()}.${fileExt}`;
+      const filePath = `compliance-docs/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(filePath);
+
+      setEditForm(prev => ({ ...prev, insuranceImageUrl: publicUrl }));
+      toast.success('Documento do seguro enviado!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Erro ao enviar documento');
+    } finally {
+      setIsUploadingInsurance(false);
     }
   };
 
@@ -462,83 +568,209 @@ export default function SubContaPage() {
           </CardContent>
         </Card>
 
-        {/* Compliance Info Card (Read-Only) */}
-        {(profile?.subcontractor.licenseNumber || profile?.subcontractor.insuranceNumber) && (
-          <Card className="bg-white shadow-lg border-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">Documentos</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 space-y-3">
-              {/* License */}
-              {profile?.subcontractor.licenseNumber && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <FileCheck className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">Licenca</p>
-                      <p className="text-xs text-slate-500">{profile.subcontractor.licenseNumber}</p>
-                    </div>
+        {/* Compliance Info Card */}
+        <Card className="bg-white shadow-lg border-0">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500">Documentos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 space-y-4">
+            {isEditing ? (
+              <>
+                {/* License Edit */}
+                <div className="space-y-3 p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <FileCheck className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-slate-900">Licenca</span>
                   </div>
-                  {profile.subcontractor.licenseExpirationDate && (
-                    <div className="text-right">
-                      <p className="text-xs text-slate-500">Validade</p>
-                      <div className="flex items-center gap-1">
-                        {isBefore(parseISO(profile.subcontractor.licenseExpirationDate), new Date()) ? (
-                          <AlertTriangle className="h-3 w-3 text-red-500" />
+                  <div className="space-y-2">
+                    <Label className="text-xs">Numero da Licenca</Label>
+                    <Input
+                      value={editForm.licenseNumber}
+                      onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })}
+                      placeholder="Ex: LIC-2024-001234"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Validade</Label>
+                    <Input
+                      type="date"
+                      value={editForm.licenseExpirationDate}
+                      onChange={(e) => setEditForm({ ...editForm, licenseExpirationDate: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Documento</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => licenseInputRef.current?.click()}
+                        disabled={isUploadingLicense}
+                        className="flex-1"
+                      >
+                        {isUploadingLicense ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         ) : (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          <Upload className="h-4 w-4 mr-2" />
                         )}
-                        <span className={`text-sm font-medium ${
-                          isBefore(parseISO(profile.subcontractor.licenseExpirationDate), new Date())
-                            ? 'text-red-600'
-                            : 'text-green-600'
-                        }`}>
-                          {format(parseISO(profile.subcontractor.licenseExpirationDate), 'dd/MM/yyyy', { locale: ptBR })}
-                        </span>
-                      </div>
+                        {editForm.licenseImageUrl ? 'Trocar Arquivo' : 'Enviar Arquivo'}
+                      </Button>
+                      {editForm.licenseImageUrl && (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      )}
                     </div>
-                  )}
+                    <input
+                      ref={licenseInputRef}
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={handleLicenseUpload}
+                    />
+                  </div>
                 </div>
-              )}
 
-              {/* Insurance */}
-              {profile?.subcontractor.insuranceNumber && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                      <Shield className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">Seguro</p>
-                      <p className="text-xs text-slate-500">{profile.subcontractor.insuranceNumber}</p>
-                    </div>
+                {/* Insurance Edit */}
+                <div className="space-y-3 p-3 bg-emerald-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-emerald-600" />
+                    <span className="font-medium text-slate-900">Seguro</span>
                   </div>
-                  {profile.subcontractor.insuranceExpirationDate && (
-                    <div className="text-right">
-                      <p className="text-xs text-slate-500">Validade</p>
-                      <div className="flex items-center gap-1">
-                        {isBefore(parseISO(profile.subcontractor.insuranceExpirationDate), new Date()) ? (
-                          <AlertTriangle className="h-3 w-3 text-red-500" />
+                  <div className="space-y-2">
+                    <Label className="text-xs">Numero da Apolice</Label>
+                    <Input
+                      value={editForm.insuranceNumber}
+                      onChange={(e) => setEditForm({ ...editForm, insuranceNumber: e.target.value })}
+                      placeholder="Ex: INS-2024-567890"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Validade</Label>
+                    <Input
+                      type="date"
+                      value={editForm.insuranceExpirationDate}
+                      onChange={(e) => setEditForm({ ...editForm, insuranceExpirationDate: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Documento</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => insuranceInputRef.current?.click()}
+                        disabled={isUploadingInsurance}
+                        className="flex-1"
+                      >
+                        {isUploadingInsurance ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         ) : (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          <Upload className="h-4 w-4 mr-2" />
                         )}
-                        <span className={`text-sm font-medium ${
-                          isBefore(parseISO(profile.subcontractor.insuranceExpirationDate), new Date())
-                            ? 'text-red-600'
-                            : 'text-green-600'
-                        }`}>
-                          {format(parseISO(profile.subcontractor.insuranceExpirationDate), 'dd/MM/yyyy', { locale: ptBR })}
-                        </span>
+                        {editForm.insuranceImageUrl ? 'Trocar Arquivo' : 'Enviar Arquivo'}
+                      </Button>
+                      {editForm.insuranceImageUrl && (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      )}
+                    </div>
+                    <input
+                      ref={insuranceInputRef}
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={handleInsuranceUpload}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* License Display */}
+                {profile?.subcontractor.licenseNumber ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <FileCheck className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Licenca</p>
+                        <p className="text-xs text-slate-500">{profile.subcontractor.licenseNumber}</p>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                    {profile.subcontractor.licenseExpirationDate && (
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500">Validade</p>
+                        <div className="flex items-center gap-1">
+                          {isBefore(parseISO(profile.subcontractor.licenseExpirationDate), new Date()) ? (
+                            <AlertTriangle className="h-3 w-3 text-red-500" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          )}
+                          <span className={`text-sm font-medium ${
+                            isBefore(parseISO(profile.subcontractor.licenseExpirationDate), new Date())
+                              ? 'text-red-600'
+                              : 'text-green-600'
+                          }`}>
+                            {format(parseISO(profile.subcontractor.licenseExpirationDate), 'dd/MM/yyyy', { locale: ptBR })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 text-slate-400">
+                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
+                      <FileCheck className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm">Licenca nao cadastrada</p>
+                  </div>
+                )}
+
+                {/* Insurance Display */}
+                {profile?.subcontractor.insuranceNumber ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                        <Shield className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Seguro</p>
+                        <p className="text-xs text-slate-500">{profile.subcontractor.insuranceNumber}</p>
+                      </div>
+                    </div>
+                    {profile.subcontractor.insuranceExpirationDate && (
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500">Validade</p>
+                        <div className="flex items-center gap-1">
+                          {isBefore(parseISO(profile.subcontractor.insuranceExpirationDate), new Date()) ? (
+                            <AlertTriangle className="h-3 w-3 text-red-500" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          )}
+                          <span className={`text-sm font-medium ${
+                            isBefore(parseISO(profile.subcontractor.insuranceExpirationDate), new Date())
+                              ? 'text-red-600'
+                              : 'text-green-600'
+                          }`}>
+                            {format(parseISO(profile.subcontractor.insuranceExpirationDate), 'dd/MM/yyyy', { locale: ptBR })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 text-slate-400">
+                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
+                      <Shield className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm">Seguro nao cadastrado</p>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Change Password */}
         <Card

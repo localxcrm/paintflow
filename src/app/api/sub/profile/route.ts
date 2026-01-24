@@ -97,11 +97,13 @@ export async function GET() {
         zipCode: subcontractor.zipCode,
         profileImageUrl: subcontractor.profileImageUrl,
         phone: subcontractor.phone,
-        // Compliance fields (read-only for sub)
+        // Compliance fields
         licenseNumber: subcontractor.licenseNumber,
         licenseExpirationDate: subcontractor.licenseExpirationDate,
+        licenseImageUrl: subcontractor.licenseImageUrl,
         insuranceNumber: subcontractor.insuranceNumber,
         insuranceExpirationDate: subcontractor.insuranceExpirationDate,
+        insuranceImageUrl: subcontractor.insuranceImageUrl,
       },
     }, { headers: corsHeaders });
   } catch (error) {
@@ -151,6 +153,13 @@ export async function PATCH(request: NextRequest) {
     if (zipCode !== undefined) subUpdate.zipCode = zipCode;
     if (profileImageUrl !== undefined) subUpdate.profileImageUrl = profileImageUrl;
     if (phone !== undefined) subUpdate.phone = phone;
+    // Compliance fields (sub can update their own license/insurance)
+    if (body.licenseNumber !== undefined) subUpdate.licenseNumber = body.licenseNumber;
+    if (body.licenseExpirationDate !== undefined) subUpdate.licenseExpirationDate = body.licenseExpirationDate;
+    if (body.licenseImageUrl !== undefined) subUpdate.licenseImageUrl = body.licenseImageUrl;
+    if (body.insuranceNumber !== undefined) subUpdate.insuranceNumber = body.insuranceNumber;
+    if (body.insuranceExpirationDate !== undefined) subUpdate.insuranceExpirationDate = body.insuranceExpirationDate;
+    if (body.insuranceImageUrl !== undefined) subUpdate.insuranceImageUrl = body.insuranceImageUrl;
 
     if (Object.keys(subUpdate).length > 0) {
       await supabase
