@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { formatPhoneUS } from '@/lib/utils/phone';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -68,7 +70,7 @@ export default function PerfilPage() {
                     id: data.user.id,
                     name: data.user.name || '',
                     email: data.user.email || '',
-                    phone: data.user.phone || '',
+                    phone: formatPhoneUS(data.user.phone) || '',
                 });
             } else {
                 // Fallback to localStorage if API fails
@@ -80,7 +82,7 @@ export default function PerfilPage() {
                             id: user.id || '',
                             name: user.name || '',
                             email: user.email || '',
-                            phone: user.phone || '',
+                            phone: formatPhoneUS(user.phone) || '',
                         });
                     } catch {
                         // Invalid JSON in localStorage
@@ -323,11 +325,11 @@ export default function PerfilPage() {
                                 <Phone className="h-4 w-4" />
                                 Telefone
                             </Label>
-                            <Input
+                            <PhoneInput
                                 id="phone"
                                 value={profile.phone}
-                                onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
-                                placeholder="(11) 99999-9999"
+                                onChange={(value) => setProfile(prev => ({ ...prev, phone: value }))}
+                                placeholder="(555) 123-4567"
                             />
                         </div>
                     </div>
