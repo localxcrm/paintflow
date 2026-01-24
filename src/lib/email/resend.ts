@@ -1,0 +1,17 @@
+import { Resend } from 'resend';
+
+// Singleton pattern for Resend client
+let resendClient: Resend | null = null;
+
+export function getResendClient(): Resend {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY environment variable is not set');
+    }
+    resendClient = new Resend(apiKey);
+  }
+  return resendClient;
+}
+
+export const resend = getResendClient;
