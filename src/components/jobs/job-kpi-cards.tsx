@@ -87,7 +87,7 @@ export function JobKPICards({ kpis }: JobKPICardsProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {cards.map((card, index) => (
-        <Card key={index}>
+        <Card key={index} className="shadow-sm border border-slate-200">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
