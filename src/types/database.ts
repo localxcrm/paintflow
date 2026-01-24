@@ -33,6 +33,10 @@ export type MarketingChannel = 'google' | 'facebook' | 'referral' | 'yard_sign' 
 export type PaymentType = 'deposit' | 'final' | 'extra';
 export type PaymentStatus = 'pending' | 'paid';
 
+// Notification module enums
+export type NotificationType = 'compliance_license' | 'compliance_insurance';
+export type NotificationUserType = 'admin' | 'sub';
+
 // ============================================
 // DATABASE MODELS
 // ============================================
@@ -115,8 +119,25 @@ export interface Subcontractor {
   // Compliance tracking fields
   complianceUpdatedBy: 'admin' | 'sub' | null;
   complianceUpdatedAt: string | null;  // ISO timestamp
+  // Reminder tracking fields
+  lastLicenseReminderSentAt: string | null;  // ISO timestamp
+  lastInsuranceReminderSentAt: string | null;  // ISO timestamp
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;  // Can be User.id or Subcontractor.id depending on userType
+  userType: NotificationUserType;
+  organizationId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  data: Record<string, unknown>;  // Flexible metadata (subcontractor name, expiration date, etc.)
+  isRead: boolean;
+  createdAt: string;
+  readAt: string | null;
 }
 
 export interface Lead {
@@ -743,6 +764,11 @@ export type SubcontractorPaymentInsert = Omit<SubcontractorPayment, 'id' | 'crea
   updatedAt?: string;
 };
 
+export type NotificationInsert = Omit<Notification, 'id' | 'createdAt'> & {
+  id?: string;
+  createdAt?: string;
+};
+
 // ============================================
 // UPDATE TYPES (all fields optional)
 // ============================================
@@ -760,3 +786,6 @@ export type TimeEntryUpdate = Partial<Omit<TimeEntry, 'id' | 'createdAt'>>;
 export type JobMaterialCostUpdate = Partial<Omit<JobMaterialCost, 'id' | 'createdAt'>>;
 export type SubcontractorPayoutUpdate = Partial<Omit<SubcontractorPayout, 'id' | 'createdAt'>>;
 export type SubcontractorPaymentUpdate = Partial<Omit<SubcontractorPayment, 'id' | 'createdAt'>>;
+
+// Notification module Update types
+export type NotificationUpdate = Partial<Omit<Notification, 'id' | 'createdAt'>>;
