@@ -42,6 +42,7 @@ export interface User {
   email: string;
   passwordHash: string;
   name: string;
+  phone: string | null;
   role: UserRole;
   isActive: boolean;
   lastLoginAt: string | null;
@@ -98,6 +99,12 @@ export interface Subcontractor {
   defaultDepositPct: number;
   isActive: boolean;
   color: string;
+  // Profile fields
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  profileImageUrl: string | null;
   // Compliance fields
   licenseNumber: string | null;
   licenseExpirationDate: string | null;  // DATE stored as ISO string
@@ -105,6 +112,9 @@ export interface Subcontractor {
   insuranceNumber: string | null;
   insuranceExpirationDate: string | null;  // DATE stored as ISO string
   insuranceImageUrl: string | null;
+  // Compliance tracking fields
+  complianceUpdatedBy: 'admin' | 'sub' | null;
+  complianceUpdatedAt: string | null;  // ISO timestamp
   createdAt: string;
   updatedAt: string;
 }
