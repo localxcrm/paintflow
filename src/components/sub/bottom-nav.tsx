@@ -2,12 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, FileText, Clock, MessageCircle, User, Bell } from 'lucide-react';
+import { Home, FileText, Clock, MessageCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { NotificationCenter } from '@/components/notifications/notification-center';
-import { Badge } from '@/components/ui/badge';
 
 const navItems = [
   {
@@ -31,11 +28,6 @@ const navItems = [
     icon: MessageCircle,
   },
   {
-    href: 'notifications', // Special case - opens Sheet, not navigation
-    label: 'Alertas',
-    icon: Bell,
-  },
-  {
     href: '/sub/perfil',
     label: 'Conta',
     icon: User,
@@ -53,31 +45,9 @@ function triggerHaptic() {
 export function BottomNav() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  // Fetch unread count
-  const fetchUnreadCount = async () => {
-    try {
-      const res = await fetch('/api/sub/notifications');
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadCount(data.unreadCount || 0);
-      }
-    } catch (error) {
-      console.error('Error fetching unread count:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchUnreadCount();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -87,38 +57,6 @@ export function BottomNav() {
 
       <div className="relative flex items-center justify-around h-[52px]">
         {navItems.map((item) => {
-          // Special handling for notifications
-          if (item.href === 'notifications') {
-            return (
-              <Sheet key={item.href} open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-                <SheetTrigger asChild>
-                  <button
-                    onClick={() => triggerHaptic()}
-                    className="flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-all duration-200 active:scale-90 text-slate-400 active:text-slate-600"
-                  >
-                    <div className="relative transition-transform duration-200">
-                      <Bell className="h-[22px] w-[22px] stroke-[1.5px]" />
-                      {unreadCount > 0 && (
-                        <Badge className="absolute -top-1 -right-2 h-4 min-w-[16px] px-1 flex items-center justify-center bg-red-500 hover:bg-red-500 text-white text-[9px] font-bold">
-                          {unreadCount > 99 ? '99' : unreadCount}
-                        </Badge>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-medium">{item.label}</span>
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="h-[70vh] p-0">
-                  <NotificationCenter
-                    userType="sub"
-                    onClose={() => setNotificationsOpen(false)}
-                    onUpdate={fetchUnreadCount}
-                  />
-                </SheetContent>
-              </Sheet>
-            );
-          }
-
-          // Regular navigation items
           const isActive = pathname === item.href ||
             (item.href !== '/sub/dashboard' && pathname.startsWith(item.href + '/'));
           const Icon = item.icon;
