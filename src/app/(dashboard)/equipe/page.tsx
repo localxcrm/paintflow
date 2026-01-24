@@ -860,6 +860,148 @@ export default function EquipePage() {
                             )}
                         </div>
 
+                        {/* Compliance Section - License */}
+                        <Separator />
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <Shield className="h-4 w-4 text-green-600" />
+                                <Label className="font-medium">Licenca</Label>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="licenseNumber">Numero da Licenca</Label>
+                                <Input
+                                    id="licenseNumber"
+                                    value={subForm.licenseNumber}
+                                    onChange={(e) => setSubForm(prev => ({ ...prev, licenseNumber: e.target.value }))}
+                                    placeholder="Opcional"
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label>Data de Expiracao</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="justify-start text-left font-normal w-full">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {subForm.licenseExpirationDate ? (
+                                                format(subForm.licenseExpirationDate, 'P', { locale: ptBR })
+                                            ) : (
+                                                <span className="text-slate-400">Selecione a data</span>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="start" className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={subForm.licenseExpirationDate || undefined}
+                                            onSelect={(date) => setSubForm(prev => ({ ...prev, licenseExpirationDate: date || null }))}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label>Foto da Licenca (opcional)</Label>
+                                {subForm.licenseImageUrl ? (
+                                    <div className="relative">
+                                        <img
+                                            src={subForm.licenseImageUrl}
+                                            alt="Licenca"
+                                            className="h-24 w-full object-cover rounded border"
+                                        />
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="destructive"
+                                            className="absolute top-1 right-1"
+                                            onClick={() => setSubForm(prev => ({ ...prev, licenseImageUrl: null }))}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <ImageUpload
+                                        onUpload={(url) => setSubForm(prev => ({ ...prev, licenseImageUrl: url }))}
+                                        folder="compliance"
+                                        maxSize={5}
+                                    />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Compliance Section - Insurance */}
+                        <Separator />
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-blue-600" />
+                                <Label className="font-medium">Seguro</Label>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="insuranceNumber">Numero do Seguro</Label>
+                                <Input
+                                    id="insuranceNumber"
+                                    value={subForm.insuranceNumber}
+                                    onChange={(e) => setSubForm(prev => ({ ...prev, insuranceNumber: e.target.value }))}
+                                    placeholder="Opcional"
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label>Data de Expiracao</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="justify-start text-left font-normal w-full">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {subForm.insuranceExpirationDate ? (
+                                                format(subForm.insuranceExpirationDate, 'P', { locale: ptBR })
+                                            ) : (
+                                                <span className="text-slate-400">Selecione a data</span>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="start" className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={subForm.insuranceExpirationDate || undefined}
+                                            onSelect={(date) => setSubForm(prev => ({ ...prev, insuranceExpirationDate: date || null }))}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label>Foto do Seguro (opcional)</Label>
+                                {subForm.insuranceImageUrl ? (
+                                    <div className="relative">
+                                        <img
+                                            src={subForm.insuranceImageUrl}
+                                            alt="Seguro"
+                                            className="h-24 w-full object-cover rounded border"
+                                        />
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="destructive"
+                                            className="absolute top-1 right-1"
+                                            onClick={() => setSubForm(prev => ({ ...prev, insuranceImageUrl: null }))}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <ImageUpload
+                                        onUpload={(url) => setSubForm(prev => ({ ...prev, insuranceImageUrl: url }))}
+                                        folder="compliance"
+                                        maxSize={5}
+                                    />
+                                )}
+                            </div>
+                        </div>
+
                         <div className="flex justify-end gap-2 pt-4">
                             <Button variant="outline" onClick={() => setIsSubModalOpen(false)}>
                                 Cancelar
