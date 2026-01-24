@@ -122,6 +122,13 @@ export async function POST(request: NextRequest) {
         isActive: body.isActive !== false,
         calendarToken: generateCalendarToken(),
         userId: userId,
+        // Compliance fields
+        licenseNumber: body.licenseNumber || null,
+        licenseExpirationDate: body.licenseExpirationDate || null,
+        licenseImageUrl: body.licenseImageUrl || null,
+        insuranceNumber: body.insuranceNumber || null,
+        insuranceExpirationDate: body.insuranceExpirationDate || null,
+        insuranceImageUrl: body.insuranceImageUrl || null,
       })
       .select()
       .single();
@@ -244,6 +251,13 @@ export async function PUT(request: NextRequest) {
         color: body.color,
         isActive: body.isActive,
         userId: userId,
+        // Compliance fields
+        licenseNumber: body.licenseNumber || null,
+        licenseExpirationDate: body.licenseExpirationDate || null,
+        licenseImageUrl: body.licenseImageUrl || null,
+        insuranceNumber: body.insuranceNumber || null,
+        insuranceExpirationDate: body.insuranceExpirationDate || null,
+        insuranceImageUrl: body.insuranceImageUrl || null,
         updatedAt: new Date().toISOString(),
       })
       .eq('id', body.id)
