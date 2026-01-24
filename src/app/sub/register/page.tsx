@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, Paintbrush } from 'lucide-react';
@@ -107,13 +108,10 @@ export default function SubRegisterPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone (opcional)</Label>
-                <Input
+                <PhoneInput
                   id="phone"
-                  type="tel"
-                  placeholder="(11) 99999-9999"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  autoComplete="tel"
+                  onChange={setPhone}
                   className="h-12 text-base"
                 />
               </div>

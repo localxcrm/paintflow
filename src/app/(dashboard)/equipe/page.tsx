@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -619,11 +620,10 @@ export default function EquipePage() {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="memberPhone">Telefone</Label>
-                            <Input
+                            <PhoneInput
                                 id="memberPhone"
                                 value={memberForm.phone}
-                                onChange={(e) => setMemberForm(prev => ({ ...prev, phone: e.target.value }))}
-                                placeholder="(11) 99999-9999"
+                                onChange={(value) => setMemberForm(prev => ({ ...prev, phone: value }))}
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -700,11 +700,10 @@ export default function EquipePage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="subPhone">Telefone</Label>
-                                <Input
+                                <PhoneInput
                                     id="subPhone"
                                     value={subForm.phone}
-                                    onChange={(e) => setSubForm(prev => ({ ...prev, phone: e.target.value }))}
-                                    placeholder="(11) 99999-9999"
+                                    onChange={(value) => setSubForm(prev => ({ ...prev, phone: value }))}
                                 />
                             </div>
                         </div>
