@@ -98,6 +98,13 @@ export interface Subcontractor {
   defaultDepositPct: number;
   isActive: boolean;
   color: string;
+  // Compliance fields
+  licenseNumber: string | null;
+  licenseExpirationDate: string | null;  // DATE stored as ISO string
+  licenseImageUrl: string | null;
+  insuranceNumber: string | null;
+  insuranceExpirationDate: string | null;  // DATE stored as ISO string
+  insuranceImageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
