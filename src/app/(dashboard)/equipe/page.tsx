@@ -43,6 +43,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ExpiringComplianceList } from '@/components/equipe/expiring-compliance-list';
 
 interface TeamMember {
     id: string;
@@ -426,6 +427,9 @@ export default function EquipePage() {
 
     return (
         <div className="space-y-6">
+            {/* Expiring Compliance Overview */}
+            <ExpiringComplianceList subcontractors={subcontractors} />
+
             {/* Team Members Section */}
             <div className="flex items-center justify-between">
                 <div>
