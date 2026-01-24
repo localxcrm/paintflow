@@ -753,7 +753,7 @@ export default function EquipePage() {
 
             {/* Subcontractor Modal */}
             <Dialog open={isSubModalOpen} onOpenChange={setIsSubModalOpen}>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>
                             {editingSub ? 'Editar Subcontratado' : 'Novo Subcontratado'}
