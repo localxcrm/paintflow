@@ -20,6 +20,7 @@ import {
   Award,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatPhoneUS } from '@/lib/utils/phone';
 
 interface SubUser {
   id: string;
@@ -305,7 +306,7 @@ export default function SubPerfilPage() {
                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
                     <Phone className="h-5 w-5 text-slate-400" />
                   </div>
-                  <span className="text-sm">{user.phone}</span>
+                  <span className="text-sm">{formatPhoneUS(user.phone)}</span>
                 </div>
               )}
             </div>
