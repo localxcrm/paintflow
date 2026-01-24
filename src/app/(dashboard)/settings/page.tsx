@@ -14,7 +14,6 @@ import {
   Building,
   DollarSign,
   Percent,
-  Users,
   Bell,
   Shield,
   Palette,
@@ -41,10 +40,6 @@ export default function SettingsPage() {
           <TabsTrigger value="pricing" className="gap-2">
             <DollarSign className="h-4 w-4" />
             Pricing
-          </TabsTrigger>
-          <TabsTrigger value="team" className="gap-2">
-            <Users className="h-4 w-4" />
-            Team
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
@@ -282,74 +277,6 @@ export default function SettingsPage() {
                   Prices will round to nearest ${settings.priceRoundingIncrement}
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Team Settings */}
-        <TabsContent value="team" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Team Members</CardTitle>
-              <CardDescription>Manage who has access to the system</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { name: 'Rodrigo Campos', email: 'rodrigo@cmdpainting.com', role: 'Owner' },
-                { name: 'Maria Garcia', email: 'maria@cmdpainting.com', role: 'Office' },
-                { name: 'Carlos Rodriguez', email: 'carlos@cmdpainting.com', role: 'Crew Leader' },
-                { name: 'Miguel Santos', email: 'miguel@cmdpainting.com', role: 'Crew Leader' },
-                { name: 'Jose Martinez', email: 'jose@cmdpainting.com', role: 'Painter' },
-              ].map((member, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-medium">
-                      {member.name
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
-                    </div>
-                    <div>
-                      <p className="font-medium">{member.name}</p>
-                      <p className="text-sm text-slate-500">{member.email}</p>
-                    </div>
-                  </div>
-                  <Badge variant="outline">{member.role}</Badge>
-                </div>
-              ))}
-              <Button variant="outline" className="w-full gap-2">
-                <Users className="h-4 w-4" />
-                Invite Team Member
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Roles & Permissions</CardTitle>
-              <CardDescription>Define what each role can access</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { role: 'Owner', permissions: 'Full access to all features' },
-                { role: 'Admin', permissions: 'All features except billing' },
-                { role: 'Office', permissions: 'Leads, estimates, jobs, scheduling' },
-                { role: 'Crew Leader', permissions: 'View assigned jobs, update status' },
-                { role: 'Viewer', permissions: 'Read-only access' },
-              ].map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">{item.role}</p>
-                    <p className="text-sm text-slate-500">{item.permissions}</p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    Edit
-                  </Button>
-                </div>
-              ))}
             </CardContent>
           </Card>
         </TabsContent>
