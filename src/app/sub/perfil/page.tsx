@@ -36,12 +36,77 @@ import {
   CheckCircle2,
   Upload,
   Calendar,
+  GraduationCap,
 } from 'lucide-react';
-import { format, parseISO, isBefore } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { parseISO, isBefore } from 'date-fns';
 import { toast } from 'sonner';
 import { formatPhoneUS } from '@/lib/utils/phone';
 import { getSupabaseClient } from '@/lib/supabase';
+
+// Compliance status types and helpers
+type ComplianceStatus = 'valid' | 'expiring' | 'expired' | 'unknown';
+
+function getComplianceStatus(expirationDate: string | null): ComplianceStatus {
+  if (!expirationDate) return 'unknown';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expDate = parseISO(expirationDate);
+
+  if (isBefore(expDate, today)) return 'expired';
+
+  const thirtyDaysFromNow = new Date(today);
+  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+  if (isBefore(expDate, thirtyDaysFromNow)) return 'expiring';
+
+  return 'valid';
+}
+
+function getDaysRemaining(expirationDate: string | null): string {
+  if (!expirationDate) return '';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expDate = parseISO(expirationDate);
+
+  const diffTime = expDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return `Expirou ha ${Math.abs(diffDays)} dia${Math.abs(diffDays) !== 1 ? 's' : ''}`;
+  } else if (diffDays === 0) {
+    return 'Expira hoje';
+  } else {
+    return `Expira em ${diffDays} dia${diffDays !== 1 ? 's' : ''}`;
+  }
+}
+
+function getStatusColor(status: ComplianceStatus): { bg: string; text: string; icon: string } {
+  switch (status) {
+    case 'valid':
+      return { bg: 'bg-green-100', text: 'text-green-600', icon: 'text-green-500' };
+    case 'expiring':
+      return { bg: 'bg-yellow-100', text: 'text-yellow-600', icon: 'text-yellow-500' };
+    case 'expired':
+      return { bg: 'bg-red-100', text: 'text-red-600', icon: 'text-red-500' };
+    default:
+      return { bg: 'bg-slate-100', text: 'text-slate-600', icon: 'text-slate-500' };
+  }
+}
+
+function getStatusIcon(status: ComplianceStatus) {
+  switch (status) {
+    case 'valid':
+      return CheckCircle2;
+    case 'expiring':
+      return AlertTriangle;
+    case 'expired':
+      return AlertTriangle;
+    default:
+      return FileCheck;
+  }
+}
 
 interface ProfileData {
   user: {
@@ -688,36 +753,35 @@ export default function SubContaPage() {
               <>
                 {/* License Display */}
                 {profile?.subcontractor.licenseNumber ? (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <FileCheck className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">Licenca</p>
-                        <p className="text-xs text-slate-500">{profile.subcontractor.licenseNumber}</p>
-                      </div>
-                    </div>
-                    {profile.subcontractor.licenseExpirationDate && (
-                      <div className="text-right">
-                        <p className="text-xs text-slate-500">Validade</p>
-                        <div className="flex items-center gap-1">
-                          {isBefore(parseISO(profile.subcontractor.licenseExpirationDate), new Date()) ? (
-                            <AlertTriangle className="h-3 w-3 text-red-500" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3 text-green-500" />
-                          )}
-                          <span className={`text-sm font-medium ${
-                            isBefore(parseISO(profile.subcontractor.licenseExpirationDate), new Date())
-                              ? 'text-red-600'
-                              : 'text-green-600'
-                          }`}>
-                            {format(parseISO(profile.subcontractor.licenseExpirationDate), 'dd/MM/yyyy', { locale: ptBR })}
-                          </span>
+                  (() => {
+                    const licenseStatus = getComplianceStatus(profile.subcontractor.licenseExpirationDate);
+                    const licenseColors = getStatusColor(licenseStatus);
+                    const LicenseStatusIcon = getStatusIcon(licenseStatus);
+
+                    return (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 ${licenseColors.bg} rounded-full flex items-center justify-center`}>
+                            <FileCheck className={`h-5 w-5 ${licenseColors.text}`} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">Licenca</p>
+                            <p className="text-xs text-slate-500">{profile.subcontractor.licenseNumber}</p>
+                          </div>
                         </div>
+                        {profile.subcontractor.licenseExpirationDate && (
+                          <div className="text-right">
+                            <div className="flex items-center gap-1 justify-end">
+                              <LicenseStatusIcon className={`h-3 w-3 ${licenseColors.icon}`} />
+                              <span className={`text-sm font-medium ${licenseColors.text}`}>
+                                {getDaysRemaining(profile.subcontractor.licenseExpirationDate)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()
                 ) : (
                   <div className="flex items-center gap-3 text-slate-400">
                     <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
@@ -729,36 +793,35 @@ export default function SubContaPage() {
 
                 {/* Insurance Display */}
                 {profile?.subcontractor.insuranceNumber ? (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                        <Shield className="h-5 w-5 text-emerald-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">Seguro</p>
-                        <p className="text-xs text-slate-500">{profile.subcontractor.insuranceNumber}</p>
-                      </div>
-                    </div>
-                    {profile.subcontractor.insuranceExpirationDate && (
-                      <div className="text-right">
-                        <p className="text-xs text-slate-500">Validade</p>
-                        <div className="flex items-center gap-1">
-                          {isBefore(parseISO(profile.subcontractor.insuranceExpirationDate), new Date()) ? (
-                            <AlertTriangle className="h-3 w-3 text-red-500" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3 text-green-500" />
-                          )}
-                          <span className={`text-sm font-medium ${
-                            isBefore(parseISO(profile.subcontractor.insuranceExpirationDate), new Date())
-                              ? 'text-red-600'
-                              : 'text-green-600'
-                          }`}>
-                            {format(parseISO(profile.subcontractor.insuranceExpirationDate), 'dd/MM/yyyy', { locale: ptBR })}
-                          </span>
+                  (() => {
+                    const insuranceStatus = getComplianceStatus(profile.subcontractor.insuranceExpirationDate);
+                    const insuranceColors = getStatusColor(insuranceStatus);
+                    const InsuranceStatusIcon = getStatusIcon(insuranceStatus);
+
+                    return (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 ${insuranceColors.bg} rounded-full flex items-center justify-center`}>
+                            <Shield className={`h-5 w-5 ${insuranceColors.text}`} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">Seguro</p>
+                            <p className="text-xs text-slate-500">{profile.subcontractor.insuranceNumber}</p>
+                          </div>
                         </div>
+                        {profile.subcontractor.insuranceExpirationDate && (
+                          <div className="text-right">
+                            <div className="flex items-center gap-1 justify-end">
+                              <InsuranceStatusIcon className={`h-3 w-3 ${insuranceColors.icon}`} />
+                              <span className={`text-sm font-medium ${insuranceColors.text}`}>
+                                {getDaysRemaining(profile.subcontractor.insuranceExpirationDate)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()
                 ) : (
                   <div className="flex items-center gap-3 text-slate-400">
                     <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
@@ -825,6 +888,26 @@ export default function SubContaPage() {
                   <div>
                     <p className="font-medium text-slate-900">Minha Equipe</p>
                     <p className="text-sm text-slate-500">Gerenciar funcionarios</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-slate-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Training Link */}
+        <Link href="/sub/treinamento">
+          <Card className="hover:bg-slate-50 transition-colors cursor-pointer">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                    <GraduationCap className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Treinamento</p>
+                    <p className="text-sm text-slate-500">Cursos e certificados</p>
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-slate-400" />
