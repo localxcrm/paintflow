@@ -104,6 +104,9 @@ export async function GET() {
         insuranceNumber: subcontractor.insuranceNumber,
         insuranceExpirationDate: subcontractor.insuranceExpirationDate,
         insuranceImageUrl: subcontractor.insuranceImageUrl,
+        // Compliance tracking
+        complianceUpdatedBy: subcontractor.complianceUpdatedBy,
+        complianceUpdatedAt: subcontractor.complianceUpdatedAt,
       },
     }, { headers: corsHeaders });
   } catch (error) {
@@ -131,6 +134,27 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
     const { name, phone, companyName, address, city, state, zipCode, profileImageUrl } = body;
+
+    // Compliance fields list for validation and tracking
+    const complianceFields = [
+      'licenseNumber', 'licenseExpirationDate', 'licenseImageUrl',
+      'insuranceNumber', 'insuranceExpirationDate', 'insuranceImageUrl'
+    ];
+
+    // Validate no clearing of existing compliance values
+    for (const field of complianceFields) {
+      const fieldKey = field as keyof typeof body;
+      const subKey = field as keyof typeof subcontractor;
+      if (body[fieldKey] !== undefined && body[fieldKey] === '' && subcontractor[subKey]) {
+        return NextResponse.json(
+          { error: 'Campos de compliance nao podem ser apagados, apenas atualizados' },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+    }
+
+    // Check if any compliance field is being updated
+    const isUpdatingCompliance = complianceFields.some(field => body[field] !== undefined);
 
     // Update User name and phone
     if (name || phone !== undefined) {
@@ -160,6 +184,12 @@ export async function PATCH(request: NextRequest) {
     if (body.insuranceNumber !== undefined) subUpdate.insuranceNumber = body.insuranceNumber;
     if (body.insuranceExpirationDate !== undefined) subUpdate.insuranceExpirationDate = body.insuranceExpirationDate;
     if (body.insuranceImageUrl !== undefined) subUpdate.insuranceImageUrl = body.insuranceImageUrl;
+
+    // Set tracking fields if compliance is being updated
+    if (isUpdatingCompliance) {
+      subUpdate.complianceUpdatedBy = 'sub';
+      subUpdate.complianceUpdatedAt = new Date().toISOString();
+    }
 
     if (Object.keys(subUpdate).length > 0) {
       await supabase
