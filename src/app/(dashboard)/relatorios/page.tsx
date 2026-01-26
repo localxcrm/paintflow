@@ -27,6 +27,12 @@ import { LeadROIChart } from '@/components/reports/lead-roi-chart';
 import { SubPerformanceChart } from '@/components/reports/sub-performance-chart';
 import { fetchReports } from '@/lib/api/reports';
 import type { ReportsResponse } from '@/types/reports';
+import {
+  generateRevenueReportPDF,
+  generateSubPerformanceReportPDF,
+  generateLeadROIReportPDF,
+  generateFullReportPDF,
+} from '@/lib/utils/report-pdf';
 
 // Helper to format currency
 function formatCurrency(value: number): string {
@@ -95,9 +101,44 @@ export default function ReportsPage() {
     loadData(true);
   };
 
-  // Export PDF (placeholder for now)
-  const handleExportPDF = async () => {
-    toast.info('Exportação PDF será implementada em breve');
+  // Export PDF based on active tab
+  const handleExportPDF = () => {
+    if (!data || !dateRange?.from || !dateRange?.to) {
+      toast.error('Dados não disponíveis para exportação');
+      return;
+    }
+
+    const range = {
+      start: format(dateRange.from, 'yyyy-MM-dd'),
+      end: format(dateRange.to, 'yyyy-MM-dd'),
+    };
+
+    try {
+      switch (activeTab) {
+        case 'overview':
+          generateFullReportPDF(data);
+          toast.success('Relatório completo exportado!');
+          break;
+        case 'revenue':
+          generateRevenueReportPDF(data.revenue, range);
+          toast.success('Relatório de receita exportado!');
+          break;
+        case 'subcontractors':
+          generateSubPerformanceReportPDF(data.subPerformance, range);
+          toast.success('Relatório de subcontratados exportado!');
+          break;
+        case 'leadroi':
+          generateLeadROIReportPDF(data.leadSourceROI, range);
+          toast.success('Relatório de ROI exportado!');
+          break;
+        default:
+          generateFullReportPDF(data);
+          toast.success('Relatório exportado!');
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Erro ao gerar PDF');
+    }
   };
 
   // Loading skeleton
