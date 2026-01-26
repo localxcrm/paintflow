@@ -21,6 +21,10 @@ import { cn } from '@/lib/utils';
 
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { ReportCard, ReportSection } from '@/components/reports/report-card';
+import { RevenueChart } from '@/components/reports/revenue-chart';
+import { RevenueTypeChart } from '@/components/reports/revenue-type-chart';
+import { LeadROIChart } from '@/components/reports/lead-roi-chart';
+import { SubPerformanceChart } from '@/components/reports/sub-performance-chart';
 import { fetchReports } from '@/lib/api/reports';
 import type { ReportsResponse } from '@/types/reports';
 
@@ -317,34 +321,17 @@ export default function ReportsPage() {
             />
           </div>
 
-          <ReportSection title="Receita por Tipo de Projeto">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-900">
-                  {formatCurrency(data.revenue.byProjectType.interior)}
-                </p>
-                <p className="text-sm text-blue-600">Interior</p>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-2xl font-bold text-green-900">
-                  {formatCurrency(data.revenue.byProjectType.exterior)}
-                </p>
-                <p className="text-sm text-green-600">Exterior</p>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <p className="text-2xl font-bold text-purple-900">
-                  {formatCurrency(data.revenue.byProjectType.both)}
-                </p>
-                <p className="text-sm text-purple-600">Ambos</p>
-              </div>
-            </div>
-          </ReportSection>
-
-          <ReportSection title="Receita Diária">
-            <div className="h-[300px] flex items-center justify-center text-slate-400">
-              Gráfico de receita diária será implementado
-            </div>
-          </ReportSection>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <RevenueChart
+              data={data.revenue.dailyData}
+              type="area"
+              title="Receita Diária"
+            />
+            <RevenueTypeChart
+              data={data.revenue.byProjectType}
+              title="Receita por Tipo de Projeto"
+            />
+          </div>
         </TabsContent>
 
         {/* Subcontractors Tab */}
@@ -369,6 +356,19 @@ export default function ReportsPage() {
               title="Pontualidade"
               icon={Target}
               value={formatPercent(data.subPerformance.summary.avgOnTimeRate)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <SubPerformanceChart
+              data={data.subPerformance.subcontractors}
+              metric="revenue"
+              title="Receita por Subcontratado"
+            />
+            <SubPerformanceChart
+              data={data.subPerformance.subcontractors}
+              metric="margin"
+              title="Margem por Subcontratado"
             />
           </div>
 
@@ -448,6 +448,19 @@ export default function ReportsPage() {
               icon={Target}
               value={formatPercent(data.leadSourceROI.summary.overallROI)}
               changeDirection={data.leadSourceROI.summary.overallROI > 0 ? 'up' : 'down'}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <LeadROIChart
+              data={data.leadSourceROI.sources}
+              metric="roi"
+              title="ROI por Fonte"
+            />
+            <LeadROIChart
+              data={data.leadSourceROI.sources}
+              metric="revenue"
+              title="Receita por Fonte"
             />
           </div>
 
