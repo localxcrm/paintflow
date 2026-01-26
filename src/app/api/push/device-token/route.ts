@@ -1,96 +1,83 @@
-import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient, getOrganizationIdFromRequest, getSubIdFromRequest } from '@/lib/supabase-server';
 
-const SUB_SESSION_COOKIE = 'paintpro_sub_session';
+interface DeviceTokenBody {
+  token: string;
+  platform: 'ios' | 'android' | 'web';
+  userId?: string;
+}
 
-// POST /api/push/device-token - Save device token for native push notifications
-export async function POST(request: Request) {
+// POST /api/push/device-token - Register a device token
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { token, platform, userId: providedUserId } = body;
-
-    if (!token) {
-      return NextResponse.json({ error: 'Token is required' }, { status: 400 });
-    }
-
     const supabase = createServerSupabaseClient();
+    const body = await request.json() as DeviceTokenBody;
 
-    // Try to get user ID from session if not provided
-    let userId = providedUserId;
-
-    if (!userId) {
-      const cookieStore = await cookies();
-      const sessionToken = cookieStore.get(SUB_SESSION_COOKIE)?.value;
-
-      if (sessionToken) {
-        const { data: session } = await supabase
-          .from('Session')
-          .select('*, User(*)')
-          .eq('token', sessionToken)
-          .single();
-
-        userId = session?.User?.id;
-      }
+    if (!body.token || !body.platform) {
+      return NextResponse.json({ error: 'token and platform are required' }, { status: 400 });
     }
 
-    // Upsert device token
-    const { error } = await supabase
+    const orgId = getOrganizationIdFromRequest(request);
+    const subId = getSubIdFromRequest(request);
+
+    // Upsert the device token
+    const { data, error } = await supabase
       .from('DeviceToken')
-      .upsert(
-        {
-          token,
-          platform: platform || 'ios',
-          userId: userId || null,
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          onConflict: 'token',
-        }
-      );
+      .upsert({
+        token: body.token,
+        platform: body.platform,
+        userId: body.userId || null,
+        subcontractorId: subId || null,
+        organizationId: orgId || null,
+        isActive: true,
+        lastUsedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, {
+        onConflict: 'token',
+      })
+      .select()
+      .single();
 
     if (error) {
-      // Table might not exist yet
-      if (error.code === '42P01') {
-        console.log('DeviceToken table does not exist yet');
-        return NextResponse.json({ success: true, message: 'Table not created' });
-      }
-      throw error;
+      console.error('Error saving device token:', error);
+      return NextResponse.json({ error: 'Failed to save device token' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, id: data.id });
   } catch (error) {
-    console.error('Error saving device token:', error);
-    return NextResponse.json(
-      { error: 'Failed to save device token' },
-      { status: 500 }
-    );
+    console.error('Error in device token endpoint:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// DELETE /api/push/device-token - Remove device token
-export async function DELETE(request: Request) {
+// DELETE /api/push/device-token - Unregister a device token
+export async function DELETE(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
 
     if (!token) {
-      return NextResponse.json({ error: 'Token is required' }, { status: 400 });
+      return NextResponse.json({ error: 'token is required' }, { status: 400 });
     }
 
-    const supabase = createServerSupabaseClient();
-
-    await supabase
+    // Soft delete - mark as inactive
+    const { error } = await supabase
       .from('DeviceToken')
-      .delete()
+      .update({ 
+        isActive: false,
+        updatedAt: new Date().toISOString(),
+      })
       .eq('token', token);
+
+    if (error) {
+      console.error('Error deactivating device token:', error);
+      return NextResponse.json({ error: 'Failed to deactivate token' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting device token:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete device token' },
-      { status: 500 }
-    );
+    console.error('Error in device token endpoint:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

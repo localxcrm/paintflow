@@ -414,6 +414,28 @@ export function getOrganizationIdFromRequest(request: Request): string | null {
     return null;
 }
 
+// Get subcontractor ID from request headers (for sub API routes)
+export function getSubIdFromRequest(request: Request): string | null {
+    const SUB_SESSION_COOKIE = 'sub_session';
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+        const match = cookieHeader.match(new RegExp(`${SUB_SESSION_COOKIE}=([^;]+)`));
+        if (match) {
+            // The cookie contains the session token, we need to look up the subcontractor ID
+            // For now, return null - this will be resolved by the API route itself
+            return null;
+        }
+    }
+
+    // Try from custom header (for API clients)
+    const subHeader = request.headers.get('x-subcontractor-id');
+    if (subHeader) {
+        return subHeader;
+    }
+
+    return null;
+}
+
 // ============================================
 // SESSION HELPERS
 // ============================================

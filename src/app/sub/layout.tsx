@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { BottomNav } from '@/components/sub/bottom-nav';
+import { PushInit } from '@/components/sub/push-init';
 import { Loader2, Bell } from 'lucide-react';
 import { Toaster } from 'sonner';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -112,6 +113,9 @@ export default function SubLayout({ children }: SubLayoutProps) {
   return (
     <div className="min-h-screen bg-slate-50">
       <Toaster position="top-center" richColors />
+      
+      {/* Initialize push notifications */}
+      {user && <PushInit userId={user.id} />}
 
       {/* Top Header with Notification Bell */}
       <header className="fixed top-0 left-0 right-0 z-50 safe-area-top">
