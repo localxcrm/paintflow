@@ -581,13 +581,20 @@ export default function JobDetailPage({ params }: PageProps) {
     const now = new Date().toISOString();
     const paymentsArray: JobPayment[] = [];
 
+    // Ensure numeric values (Supabase may return strings)
+    const jobValue = Number(job.jobValue) || 0;
+    const depositRequired = Number(job.depositRequired) || 0;
+    const salesCommissionAmount = Number(job.salesCommissionAmount) || 0;
+    const pmCommissionAmount = Number(job.pmCommissionAmount) || 0;
+    const subcontractorPrice = Number(job.subcontractorPrice) || 0;
+
     // Client deposit
     paymentsArray.push({
       id: crypto.randomUUID(),
       type: 'client_deposit',
       category: 'income',
       description: 'Depósito (30%)',
-      amount: job.depositRequired,
+      amount: depositRequired,
       status: job.depositPaid ? 'paid' : 'pending',
       paidDate: job.depositPaymentDate,
       method: job.depositPaymentMethod as JobPayment['method'],
@@ -600,7 +607,7 @@ export default function JobDetailPage({ params }: PageProps) {
       type: 'client_final',
       category: 'income',
       description: 'Pagamento Final',
-      amount: job.jobValue - job.depositRequired,
+      amount: jobValue - depositRequired,
       status: job.jobPaid ? 'paid' : 'pending',
       paidDate: job.jobPaymentDate,
       method: job.jobPaymentMethod as JobPayment['method'],
@@ -608,13 +615,13 @@ export default function JobDetailPage({ params }: PageProps) {
     });
 
     // Sales commission
-    if (job.salesCommissionAmount > 0) {
+    if (salesCommissionAmount > 0) {
       paymentsArray.push({
         id: crypto.randomUUID(),
         type: 'sales_commission',
         category: 'expense',
         description: `Comissão Vendedor (${job.salesCommissionPct}%)`,
-        amount: job.salesCommissionAmount,
+        amount: salesCommissionAmount,
         status: job.salesCommissionPaid ? 'paid' : 'pending',
         recipientName: job.salesRep?.name,
         createdAt: now,
@@ -622,13 +629,13 @@ export default function JobDetailPage({ params }: PageProps) {
     }
 
     // PM commission
-    if (job.pmCommissionAmount > 0) {
+    if (pmCommissionAmount > 0) {
       paymentsArray.push({
         id: crypto.randomUUID(),
         type: 'pm_commission',
         category: 'expense',
         description: `Comissão PM (${job.pmCommissionPct}%)`,
-        amount: job.pmCommissionAmount,
+        amount: pmCommissionAmount,
         status: job.pmCommissionPaid ? 'paid' : 'pending',
         recipientName: job.projectManager?.name,
         createdAt: now,
@@ -636,13 +643,13 @@ export default function JobDetailPage({ params }: PageProps) {
     }
 
     // Subcontractor
-    if (job.subcontractorPrice > 0) {
+    if (subcontractorPrice > 0) {
       paymentsArray.push({
         id: crypto.randomUUID(),
         type: 'subcontractor',
         category: 'expense',
         description: 'Pagamento Subcontratado',
-        amount: job.subcontractorPrice,
+        amount: subcontractorPrice,
         status: job.subcontractorPaid ? 'paid' : 'pending',
         recipientName: job.subcontractor?.name,
         createdAt: now,
@@ -664,10 +671,11 @@ export default function JobDetailPage({ params }: PageProps) {
       payments: paymentsArray,
       incomePayments: income,
       expensePayments: expense,
-      totalReceived: income.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0),
-      totalPending: income.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0),
-      totalExpensesPaid: expense.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0),
-      totalExpensesPending: expense.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0),
+      // Use Number() to handle string amounts from database
+      totalReceived: income.filter(p => p.status === 'paid').reduce((sum, p) => sum + Number(p.amount), 0),
+      totalPending: income.filter(p => p.status === 'pending').reduce((sum, p) => sum + Number(p.amount), 0),
+      totalExpensesPaid: expense.filter(p => p.status === 'paid').reduce((sum, p) => sum + Number(p.amount), 0),
+      totalExpensesPending: expense.filter(p => p.status === 'pending').reduce((sum, p) => sum + Number(p.amount), 0),
     };
   };
 

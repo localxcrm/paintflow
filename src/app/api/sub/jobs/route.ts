@@ -53,7 +53,10 @@ export async function GET() {
       );
     }
 
+    console.log('[API sub/jobs] Subcontractor ID:', subcontractor.id);
+
     // Get jobs assigned to this subcontractor
+    // Exclude 'lost' and 'cancelled' statuses
     const { data: jobs, error: jobsError } = await supabase
       .from('Job')
       .select(`
@@ -76,8 +79,14 @@ export async function GET() {
         )
       `)
       .eq('subcontractorId', subcontractor.id)
-      .in('status', ['scheduled', 'got_the_job'])
-      .order('scheduledStartDate', { ascending: true });
+      .neq('status', 'lost')
+      .neq('status', 'cancelled')
+      .order('scheduledStartDate', { ascending: true, nullsFirst: false });
+
+    console.log('[API sub/jobs] Found jobs:', jobs?.length || 0);
+    if (jobs && jobs.length > 0) {
+      console.log('[API sub/jobs] Jobs:', jobs.map((j: { id: string; jobNumber: string; status: string }) => ({ id: j.id, jobNumber: j.jobNumber, status: j.status })));
+    }
 
     if (jobsError) {
       console.error('Error fetching jobs:', jobsError);

@@ -1,21 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { format, startOfWeek, endOfWeek, parseISO } from 'date-fns';
+import { useEffect, useState, useCallback } from 'react';
+import { format, startOfWeek, endOfWeek, parseISO, subWeeks, addWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import {
   Clock,
   DollarSign,
   Plus,
-  Edit,
-  Trash2,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
-  Calendar as CalendarIcon,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -27,12 +27,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { TimeEntryForm } from '@/components/sub/time-entry-form';
 import type { SubcontractorEmployee } from '@/types/database';
 import type { TimeEntryFormData } from '@/lib/validations/time-entry';
-import { cn } from '@/lib/utils';
 
 interface Job {
   id: string;
@@ -76,27 +79,23 @@ export default function HorasPage() {
     start: startOfWeek(new Date(), { weekStartsOn: 1 }),
     end: endOfWeek(new Date(), { weekStartsOn: 1 }),
   });
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [dateRange]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Load employees
-      const empRes = await fetch('/api/sub/employees');
+      const [empRes, jobsRes, meRes] = await Promise.all([
+        fetch('/api/sub/employees'),
+        fetch('/api/sub/jobs'),
+        fetch('/api/sub/me'),
+      ]);
+
       if (empRes.ok) {
         const empData = await empRes.json();
         setEmployees(empData.employees || []);
       }
 
-      // Load jobs - get from SubcontractorPayout
-      const jobsRes = await fetch('/api/sub/jobs');
       if (jobsRes.ok) {
         const jobsData = await jobsRes.json();
-        // Extract unique jobs
         const jobList = jobsData.jobs.map((j: any) => ({
           id: j.id,
           jobNumber: j.jobNumber,
@@ -105,12 +104,7 @@ export default function HorasPage() {
         setJobs(jobList);
       }
 
-      // Load subcontractor settings for break policy
-      const meRes = await fetch('/api/sub/me');
       if (meRes.ok) {
-        const meData = await meRes.json();
-        // TODO: When Subcontractor schema extended, get breakPolicy from meData.subcontractor.breakPolicy
-        // For now, default to 'paid'
         setBreakPolicy('paid');
       }
 
@@ -130,7 +124,41 @@ export default function HorasPage() {
     } finally {
       setIsLoading(false);
     }
+  }, [dateRange]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Week navigation
+  const goToPreviousWeek = () => {
+    setDateRange({
+      start: subWeeks(dateRange.start, 1),
+      end: subWeeks(dateRange.end, 1),
+    });
   };
+
+  const goToNextWeek = () => {
+    const nextStart = addWeeks(dateRange.start, 1);
+    const today = new Date();
+    if (nextStart <= today) {
+      setDateRange({
+        start: nextStart,
+        end: addWeeks(dateRange.end, 1),
+      });
+    }
+  };
+
+  const goToCurrentWeek = () => {
+    setDateRange({
+      start: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      end: endOfWeek(new Date(), { weekStartsOn: 1 }),
+    });
+  };
+
+  // Check if current week is selected
+  const isCurrentWeek = format(dateRange.start, 'yyyy-MM-dd') ===
+    format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
   // Calculate week summary
   const weekSummary = {
@@ -207,192 +235,193 @@ export default function HorasPage() {
     }
   };
 
-  const handleDateRangeChange = (range: { start: Date; end: Date }) => {
-    setDateRange(range);
-    setIsDatePickerOpen(false);
-  };
-
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex items-center justify-center h-screen bg-[#F2F2F7]">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          </div>
+          <p className="text-slate-500 text-sm">Carregando...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pb-20">
+    <div className="min-h-screen bg-[#F2F2F7] pb-20">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 shadow-lg">
+      <header className="bg-white px-4 pt-6 pb-4 safe-area-top border-b border-slate-100">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Horas</h1>
-          <Button
+          <h1 className="text-[28px] font-bold text-slate-900 tracking-tight">Horas</h1>
+          <button
             onClick={handleAdd}
-            size="sm"
-            className="bg-white text-blue-600 hover:bg-blue-50"
+            className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center active:scale-95 transition-transform shadow-lg shadow-blue-600/30"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar
-          </Button>
+            <Plus className="h-5 w-5 text-white" />
+          </button>
         </div>
 
-        {/* Summary Cards */}
+        {/* Week Navigator */}
+        <div className="flex items-center justify-between bg-slate-100 rounded-xl p-1">
+          <button
+            onClick={goToPreviousWeek}
+            className="w-10 h-10 rounded-lg flex items-center justify-center active:bg-slate-200 transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5 text-slate-600" />
+          </button>
+
+          <button
+            onClick={goToCurrentWeek}
+            className={cn(
+              "flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all",
+              isCurrentWeek
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 active:bg-slate-200"
+            )}
+          >
+            {format(dateRange.start, 'dd MMM', { locale: ptBR })} - {format(dateRange.end, 'dd MMM', { locale: ptBR })}
+          </button>
+
+          <button
+            onClick={goToNextWeek}
+            disabled={isCurrentWeek}
+            className={cn(
+              "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+              isCurrentWeek
+                ? "text-slate-300"
+                : "text-slate-600 active:bg-slate-200"
+            )}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* Summary Cards */}
+      <div className="px-4 py-4">
         <div className="grid grid-cols-2 gap-3">
-          <Card className="bg-white/10 backdrop-blur border-white/20 p-4">
-            <div className="flex items-center gap-2 text-white/80 text-sm mb-1">
-              <Clock className="h-4 w-4" />
-              Esta Semana
+          {/* Total Hours */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center mb-2">
+              <Clock className="h-5 w-5 text-blue-600" />
             </div>
-            <div className="text-2xl font-bold">
+            <p className="text-2xl font-bold text-slate-900">
               {weekSummary.totalHours.toFixed(1)}h
-            </div>
-          </Card>
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">Total Horas</p>
+          </div>
 
-          <Card className="bg-white/10 backdrop-blur border-white/20 p-4">
-            <div className="flex items-center gap-2 text-white/80 text-sm mb-1">
-              <DollarSign className="h-4 w-4" />
-              Custo Total
+          {/* Total Cost */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center mb-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
             </div>
-            <div className="text-2xl font-bold">
-              ${weekSummary.totalCost.toFixed(2)}
-            </div>
-          </Card>
-        </div>
-
-        {/* Date Filter */}
-        <div className="mt-4">
-          <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full bg-white/10 backdrop-blur border-white/20 text-white hover:bg-white/20"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(dateRange.start, 'dd MMM', { locale: ptBR })} -{' '}
-                {format(dateRange.end, 'dd MMM yyyy', { locale: ptBR })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <div className="p-3 space-y-2">
-                <div className="space-y-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      const start = startOfWeek(new Date(), { weekStartsOn: 1 });
-                      const end = endOfWeek(new Date(), { weekStartsOn: 1 });
-                      handleDateRangeChange({ start, end });
-                    }}
-                  >
-                    Esta Semana
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      const now = new Date();
-                      const lastWeek = new Date(now.setDate(now.getDate() - 7));
-                      const start = startOfWeek(lastWeek, { weekStartsOn: 1 });
-                      const end = endOfWeek(lastWeek, { weekStartsOn: 1 });
-                      handleDateRangeChange({ start, end });
-                    }}
-                  >
-                    Semana Passada
-                  </Button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+            <p className="text-2xl font-bold text-slate-900">
+              ${weekSummary.totalCost.toFixed(0)}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">Custo Total</p>
+          </div>
         </div>
       </div>
 
       {/* Time Entries List */}
-      <div className="p-4 space-y-6">
+      <div className="px-4 space-y-4">
         {sortedDates.length === 0 ? (
-          <Card className="p-8 text-center">
-            <Clock className="h-12 w-12 mx-auto text-slate-300 mb-3" />
+          <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
+            <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+              <Clock className="h-8 w-8 text-slate-400" />
+            </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2">
               Nenhuma hora registrada
             </h3>
-            <p className="text-slate-500 mb-4">
+            <p className="text-slate-500 text-sm mb-4">
               Adicione suas primeiras horas trabalhadas
             </p>
-            <Button onClick={handleAdd}>
-              <Plus className="h-4 w-4 mr-2" />
+            <button
+              onClick={handleAdd}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm active:scale-95 transition-transform"
+            >
+              <Plus className="h-4 w-4" />
               Adicionar Horas
-            </Button>
-          </Card>
+            </button>
+          </div>
         ) : (
           sortedDates.map((date) => (
-            <div key={date} className="space-y-3">
+            <div key={date}>
               {/* Date Header */}
-              <div className="flex items-center gap-2 text-slate-600 font-medium">
-                <CalendarIcon className="h-4 w-4" />
-                {format(parseISO(date), 'EEEE, dd \'de\' MMMM', { locale: ptBR })}
-              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
+                {format(parseISO(date), 'EEEE, dd MMM', { locale: ptBR })}
+              </p>
 
               {/* Entries for this date */}
-              {entriesByDate[date].map((entry) => (
-                <Card key={entry.id} className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-semibold text-slate-900">
-                          {entry.employee.name}
-                        </span>
-                        <Badge variant="secondary" className="text-xs">
-                          ${entry.employee.hourlyRate.toFixed(2)}/h
-                        </Badge>
-                      </div>
-
-                      <div className="text-sm text-slate-600 mb-2">
-                        #{entry.job.jobNumber} - {entry.job.clientName}
-                      </div>
-
-                      <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-1 text-blue-600">
-                          <Clock className="h-4 w-4" />
-                          <span className="font-medium">
-                            {entry.hoursWorked.toFixed(2)}h
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden divide-y divide-slate-100">
+                {entriesByDate[date].map((entry) => (
+                  <div key={entry.id} className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-slate-900 truncate">
+                            {entry.employee.name}
                           </span>
+                          {entry.employee.isOwner && (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-medium rounded">
+                              Dono
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1 text-green-600">
-                          <DollarSign className="h-4 w-4" />
-                          <span className="font-medium">
-                            ${entry.laborCost.toFixed(2)}
-                          </span>
+
+                        <p className="text-sm text-slate-500 mb-2 truncate">
+                          #{entry.job.jobNumber} - {entry.job.clientName}
+                        </p>
+
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-4 w-4 text-blue-500" />
+                            <span className="font-semibold text-slate-900">
+                              {entry.hoursWorked.toFixed(1)}h
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <DollarSign className="h-4 w-4 text-green-500" />
+                            <span className="font-semibold text-slate-900">
+                              ${entry.laborCost.toFixed(0)}
+                            </span>
+                          </div>
                         </div>
+
+                        {entry.notes && (
+                          <p className="mt-2 text-sm text-slate-400 italic line-clamp-2">
+                            {entry.notes}
+                          </p>
+                        )}
                       </div>
 
-                      {entry.notes && (
-                        <div className="mt-2 text-sm text-slate-500 italic">
-                          {entry.notes}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEdit(entry)}
-                      >
-                        <Edit className="h-4 w-4 text-blue-600" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteEntry(entry)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
+                      {/* Actions Menu */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors">
+                            <MoreHorizontal className="h-5 w-5 text-slate-400" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onClick={() => handleEdit(entry)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setDeleteEntry(entry)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
-                </Card>
-              ))}
+                ))}
+              </div>
             </div>
           ))
         )}
@@ -400,9 +429,9 @@ export default function HorasPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto mx-4 rounded-2xl">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-xl font-bold">
               {selectedEntry ? 'Editar Horas' : 'Adicionar Horas'}
             </DialogTitle>
           </DialogHeader>
@@ -430,7 +459,7 @@ export default function HorasPage() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteEntry} onOpenChange={() => setDeleteEntry(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="mx-4 rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusao</AlertDialogTitle>
             <AlertDialogDescription>
@@ -439,12 +468,12 @@ export default function HorasPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 rounded-xl"
             >
-              Deletar
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

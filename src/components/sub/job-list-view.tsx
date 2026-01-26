@@ -85,10 +85,13 @@ export function JobListView({ jobs }: JobListViewProps) {
     }
   };
 
+  // Separate jobs with and without scheduled dates
+  const jobsWithDate = jobs.filter(job => job.scheduledStartDate);
+  const jobsWithoutDate = jobs.filter(job => !job.scheduledStartDate);
+
   // Group jobs by date
-  const groupedJobs = jobs.reduce((groups: Record<string, Job[]>, job) => {
-    if (!job.scheduledStartDate) return groups;
-    const dateKey = new Date(job.scheduledStartDate).toDateString();
+  const groupedJobs = jobsWithDate.reduce((groups: Record<string, Job[]>, job) => {
+    const dateKey = new Date(job.scheduledStartDate!).toDateString();
     if (!groups[dateKey]) {
       groups[dateKey] = [];
     }
@@ -115,8 +118,66 @@ export function JobListView({ jobs }: JobListViewProps) {
     );
   }
 
+  const renderJobCard = (job: Job) => (
+    <Card
+      key={job.id}
+      className="cursor-pointer active:scale-[0.98] transition-transform"
+      onClick={() => {
+        if (job.workOrder) {
+          router.push(`/sub/os/${job.workOrder.id}`);
+        }
+      }}
+    >
+      <CardContent className="p-4">
+        {/* Address */}
+        <div className="flex items-start gap-2 mb-2">
+          <MapPin className="h-5 w-5 text-slate-400 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-slate-900 truncate">
+              {job.address}
+            </p>
+            <p className="text-sm text-slate-500">
+              {job.city} • {job.clientName}
+            </p>
+          </div>
+          <Badge variant="outline" className="shrink-0 text-xs">
+            {job.workOrder?.osNumber || job.jobNumber}
+          </Badge>
+        </div>
+
+        {/* Progress and Price */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center gap-3 flex-1">
+            <Progress value={job.progress} className="h-2.5 flex-1 max-w-[120px]" />
+            <span className="text-sm font-medium text-slate-600">
+              {job.progress}%
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <DollarSign className="h-4 w-4 text-emerald-500" />
+            <span className="font-bold text-emerald-600">
+              {formatCurrency(job.subcontractorPrice || 0)}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-4">
+      {/* Jobs without scheduled date */}
+      {jobsWithoutDate.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <div className="w-3 h-3 rounded-full bg-blue-500" />
+            <span className="font-bold text-sm text-slate-700">PENDENTE AGENDAR</span>
+          </div>
+          {jobsWithoutDate.map(job => renderJobCard(job))}
+        </div>
+      )}
+
+      {/* Jobs grouped by date */}
       {sortedDates.map(dateKey => {
         const dateJobs = groupedJobs[dateKey];
         const firstJob = dateJobs[0];
@@ -132,51 +193,7 @@ export function JobListView({ jobs }: JobListViewProps) {
             </div>
 
             {/* Jobs for this date */}
-            {dateJobs.map(job => (
-              <Card
-                key={job.id}
-                className="cursor-pointer active:scale-[0.98] transition-transform"
-                onClick={() => {
-                  if (job.workOrder) {
-                    router.push(`/sub/os/${job.workOrder.id}`);
-                  }
-                }}
-              >
-                <CardContent className="p-4">
-                  {/* Address */}
-                  <div className="flex items-start gap-2 mb-2">
-                    <MapPin className="h-5 w-5 text-slate-400 mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 truncate">
-                        {job.address}
-                      </p>
-                      <p className="text-sm text-slate-500">
-                        {job.city} • {job.clientName}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="shrink-0 text-xs">
-                      {job.workOrder?.osNumber || job.jobNumber}
-                    </Badge>
-                  </div>
-
-                  {/* Progress and Price */}
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                    <div className="flex items-center gap-3 flex-1">
-                      <Progress value={job.progress} className="h-2.5 flex-1 max-w-[120px]" />
-                      <span className="text-sm font-medium text-slate-600">
-                        {job.progress}%
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <DollarSign className="h-4 w-4 text-emerald-500" />
-                      <span className="font-bold text-emerald-600">
-                        {formatCurrency(job.subcontractorPrice || 0)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {dateJobs.map(job => renderJobCard(job))}
           </div>
         );
       })}

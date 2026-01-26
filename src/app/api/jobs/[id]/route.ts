@@ -265,6 +265,9 @@ export async function PATCH(
     if (body.projectManagerId !== undefined) updateData.projectManagerId = body.projectManagerId;
     if (body.subcontractorId !== undefined) updateData.subcontractorId = body.subcontractorId;
 
+    // Track if subcontractor is being assigned
+    const isAssigningSubcontractor = body.subcontractorId && body.subcontractorId !== currentJob.subcontractorId;
+
     // Payment tracking fields
     if (body.depositPaymentMethod !== undefined) updateData.depositPaymentMethod = body.depositPaymentMethod;
     if (body.depositPaymentDate !== undefined) updateData.depositPaymentDate = body.depositPaymentDate;
@@ -287,6 +290,44 @@ export async function PATCH(
 
     if (updateError) {
       throw updateError;
+    }
+
+    // Create Chat if subcontractor was just assigned and job has WorkOrder
+    if (isAssigningSubcontractor && job.subcontractorId) {
+      // Check if job has a WorkOrder
+      const { data: workOrder } = await supabase
+        .from('WorkOrder')
+        .select('id')
+        .eq('jobId', job.id)
+        .eq('organizationId', organizationId)
+        .maybeSingle();
+
+      if (workOrder) {
+        // Check if Chat already exists
+        const { data: existingChat } = await supabase
+          .from('Chat')
+          .select('id')
+          .eq('workOrderId', workOrder.id)
+          .maybeSingle();
+
+        if (!existingChat) {
+          const { error: chatError } = await supabase
+            .from('Chat')
+            .insert({
+              workOrderId: workOrder.id,
+              organizationId,
+              subcontractorId: job.subcontractorId,
+              unreadCountCompany: 0,
+              unreadCountSubcontractor: 0,
+            });
+
+          if (chatError) {
+            console.error('Error creating chat:', chatError);
+          } else {
+            console.log(`Auto-created chat for job ${job.jobNumber}`);
+          }
+        }
+      }
     }
 
     // Auto-create payout if job is completing

@@ -162,7 +162,7 @@ async function sendEmail(params: {
 }
 
 // Main handler
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   try {
     // Create Supabase client with service role
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);

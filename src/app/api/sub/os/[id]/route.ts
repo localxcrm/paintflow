@@ -1,64 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { cookies } from 'next/headers';
+import { getSubSessionToken } from '@/lib/auth';
 
-const SUB_SESSION_COOKIE = 'paintpro_sub_session';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
-// Helper to get the authenticated subcontractor
-async function getAuthenticatedSubcontractor() {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SUB_SESSION_COOKIE)?.value;
-
-  if (!sessionToken) {
-    return { error: 'Não autenticado', status: 401 };
-  }
-
-  const supabase = createServerSupabaseClient();
-
-  const { data: session, error: sessionError } = await supabase
-    .from('Session')
-    .select('*, User(*)')
-    .eq('token', sessionToken)
-    .single();
-
-  if (sessionError || !session) {
-    return { error: 'Sessão inválida', status: 401 };
-  }
-
-  const { data: subcontractor, error: subError } = await supabase
-    .from('Subcontractor')
-    .select('id, organizationId')
-    .eq('userId', session.userId)
-    .single();
-
-  if (subError || !subcontractor) {
-    return { error: 'Subcontratado não encontrado', status: 404 };
-  }
-
-  return { subcontractor, supabase };
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// GET /api/sub/os/[id] - Get work order detail
+// GET /api/sub/os/[id] - Get a single work order for subcontractor
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const auth = await getAuthenticatedSubcontractor();
+    const sessionToken = await getSubSessionToken();
 
-    if ('error' in auth) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    if (!sessionToken) {
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
-    const { subcontractor, supabase } = auth;
+    const supabase = createServerSupabaseClient();
+    const { id } = await params;
 
-    // Get work order with job
+    // Get session with user
+    const { data: session, error: sessionError } = await supabase
+      .from('Session')
+      .select('*, User(*)')
+      .eq('token', sessionToken)
+      .single();
+
+    if (sessionError || !session) {
+      return NextResponse.json(
+        { error: 'Sessão inválida' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    // Get subcontractor linked to this user
+    const { data: subcontractor, error: subError } = await supabase
+      .from('Subcontractor')
+      .select('id, organizationId')
+      .eq('userId', session.userId)
+      .single();
+
+    if (subError || !subcontractor) {
+      return NextResponse.json(
+        { error: 'Subcontratado não encontrado' },
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
+    // Get the work order with job details
     const { data: workOrder, error: woError } = await supabase
       .from('WorkOrder')
       .select(`
         *,
-        Job (
+        job:Job(
           id,
           jobNumber,
           clientName,
@@ -66,123 +71,134 @@ export async function GET(
           city,
           state,
           zipCode,
-          subcontractorId,
-          subcontractorPrice
+          subcontractorId
         ),
-        Organization (
+        organization:Organization(
           id,
           name,
           logo
         )
       `)
       .eq('id', id)
+      .eq('organizationId', subcontractor.organizationId)
       .single();
 
     if (woError || !workOrder) {
       return NextResponse.json(
         { error: 'OS não encontrada' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
-    // Verify the work order belongs to a job assigned to this subcontractor
-    if (workOrder.Job?.subcontractorId !== subcontractor.id) {
+    // Verify that this work order's job is assigned to this subcontractor
+    if (workOrder.job?.subcontractorId !== subcontractor.id) {
       return NextResponse.json(
         { error: 'Acesso não autorizado' },
-        { status: 403 }
+        { status: 403, headers: corsHeaders }
       );
     }
 
-    // Format response
-    const response = {
-      ...workOrder,
-      job: workOrder.Job,
-      organization: workOrder.Organization,
-      subcontractorPrice: workOrder.Job?.subcontractorPrice || 0,
-      rooms: workOrder.rooms || [],
-      tasks: workOrder.tasks || [],
-      materials: workOrder.materials || [],
-      photos: workOrder.photos || [],
-      comments: workOrder.comments || [],
-    };
-
-    delete response.Job;
-    delete response.Organization;
-
-    return NextResponse.json(response);
+    return NextResponse.json(workOrder, { headers: corsHeaders });
   } catch (error) {
     console.error('Error fetching work order:', error);
     return NextResponse.json(
       { error: 'Erro interno' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
 
-// PATCH /api/sub/os/[id] - Update work order (tasks, comments, photos)
+// PATCH /api/sub/os/[id] - Update work order (tasks, rooms, photos)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const auth = await getAuthenticatedSubcontractor();
+    const sessionToken = await getSubSessionToken();
 
-    if ('error' in auth) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    if (!sessionToken) {
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
-    const { subcontractor, supabase } = auth;
+    const supabase = createServerSupabaseClient();
+    const { id } = await params;
+    const body = await request.json();
 
-    // Verify ownership first
-    const { data: workOrder, error: woError } = await supabase
-      .from('WorkOrder')
-      .select(`
-        id,
-        rooms,
-        tasks,
-        photos,
-        comments,
-        Job!inner (subcontractorId)
-      `)
-      .eq('id', id)
+    // Get session with user
+    const { data: session, error: sessionError } = await supabase
+      .from('Session')
+      .select('*, User(*)')
+      .eq('token', sessionToken)
       .single();
 
-    if (woError || !workOrder) {
+    if (sessionError || !session) {
+      return NextResponse.json(
+        { error: 'Sessão inválida' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    // Get subcontractor linked to this user
+    const { data: subcontractor, error: subError } = await supabase
+      .from('Subcontractor')
+      .select('id, organizationId')
+      .eq('userId', session.userId)
+      .single();
+
+    if (subError || !subcontractor) {
+      return NextResponse.json(
+        { error: 'Subcontratado não encontrado' },
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
+    // Get current work order to verify access
+    const { data: currentWO, error: currentError } = await supabase
+      .from('WorkOrder')
+      .select('*, job:Job(subcontractorId)')
+      .eq('id', id)
+      .eq('organizationId', subcontractor.organizationId)
+      .single();
+
+    if (currentError || !currentWO) {
       return NextResponse.json(
         { error: 'OS não encontrada' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
-    const jobData = workOrder.Job as { subcontractorId: string } | { subcontractorId: string }[];
-    const subcontractorId = Array.isArray(jobData) ? jobData[0]?.subcontractorId : jobData?.subcontractorId;
-
-    if (subcontractorId !== subcontractor.id) {
+    // Verify access
+    if (currentWO.job?.subcontractorId !== subcontractor.id) {
       return NextResponse.json(
         { error: 'Acesso não autorizado' },
-        { status: 403 }
+        { status: 403, headers: corsHeaders }
       );
     }
 
-    const body = await request.json();
-    const updateData: Record<string, unknown> = {
+    // Build update data - only allow certain fields to be updated by subcontractor
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: any = {
       updatedAt: new Date().toISOString(),
     };
 
-    // Only allow updating specific fields
     if (body.tasks !== undefined) updateData.tasks = body.tasks;
     if (body.rooms !== undefined) updateData.rooms = body.rooms;
-    if (body.comments !== undefined) updateData.comments = body.comments;
     if (body.photos !== undefined) updateData.photos = body.photos;
+    if (body.comments !== undefined) updateData.comments = body.comments;
+    if (body.actualStartDate !== undefined) updateData.actualStartDate = body.actualStartDate;
+    if (body.actualEndDate !== undefined) updateData.actualEndDate = body.actualEndDate;
 
-    const { data: updated, error: updateError } = await supabase
+    // Update work order
+    const { data: workOrder, error: updateError } = await supabase
       .from('WorkOrder')
       .update(updateData)
       .eq('id', id)
       .select(`
         *,
-        Job (
+        job:Job(
           id,
           jobNumber,
           clientName,
@@ -190,9 +206,9 @@ export async function PATCH(
           city,
           state,
           zipCode,
-          subcontractorPrice
+          subcontractorId
         ),
-        Organization (
+        organization:Organization(
           id,
           name,
           logo
@@ -201,35 +217,15 @@ export async function PATCH(
       .single();
 
     if (updateError) {
-      console.error('Error updating work order:', updateError);
-      return NextResponse.json(
-        { error: 'Erro ao atualizar OS' },
-        { status: 500 }
-      );
+      throw updateError;
     }
 
-    // Format response
-    const response = {
-      ...updated,
-      job: updated.Job,
-      organization: updated.Organization,
-      subcontractorPrice: updated.Job?.subcontractorPrice || 0,
-      rooms: updated.rooms || [],
-      tasks: updated.tasks || [],
-      materials: updated.materials || [],
-      photos: updated.photos || [],
-      comments: updated.comments || [],
-    };
-
-    delete response.Job;
-    delete response.Organization;
-
-    return NextResponse.json(response);
+    return NextResponse.json(workOrder, { headers: corsHeaders });
   } catch (error) {
     console.error('Error updating work order:', error);
     return NextResponse.json(
       { error: 'Erro interno' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

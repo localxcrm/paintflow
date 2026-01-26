@@ -75,10 +75,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
     }
 
-    // Get job data
+    // Get job data including subcontractorId
     const { data: job, error: jobError } = await supabase
       .from('Job')
-      .select('id, jobNumber, clientName, subcontractorPrice, scheduledStartDate')
+      .select('id, jobNumber, clientName, subcontractorPrice, scheduledStartDate, subcontractorId')
       .eq('id', body.jobId)
       .eq('organizationId', organizationId)
       .single();
@@ -124,6 +124,24 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       throw error;
+    }
+
+    // Create Chat for subcontractor if job has one assigned
+    if (job.subcontractorId && workOrder) {
+      const { error: chatError } = await supabase
+        .from('Chat')
+        .insert({
+          workOrderId: workOrder.id,
+          organizationId,
+          subcontractorId: job.subcontractorId,
+          unreadCountCompany: 0,
+          unreadCountSubcontractor: 0,
+        });
+
+      if (chatError) {
+        console.error('Error creating chat for work order:', chatError);
+        // Don't fail the work order creation, just log the error
+      }
     }
 
     return NextResponse.json(workOrder, { status: 201 });

@@ -383,7 +383,7 @@ export default function VendasPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card className="shadow-sm border border-slate-200">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-50 rounded-lg">
@@ -396,7 +396,7 @@ export default function VendasPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-sm border border-slate-200">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-50 rounded-lg">
@@ -409,7 +409,7 @@ export default function VendasPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-sm border border-slate-200">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-50 rounded-lg">
@@ -422,7 +422,7 @@ export default function VendasPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-sm border border-slate-200">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-50 rounded-lg">
@@ -439,7 +439,7 @@ export default function VendasPage() {
 
       {/* Conversion Rates */}
       <div className="grid grid-cols-2 gap-4">
-        <Card className="border-l-4 border-l-blue-500">
+        <Card className="shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -453,7 +453,7 @@ export default function VendasPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
+        <Card className="shadow-sm border border-slate-200 border-l-4 border-l-green-500">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -471,7 +471,7 @@ export default function VendasPage() {
       </div>
 
       {/* Unified Input Section */}
-      <Card>
+      <Card className="w-full shadow-md border border-slate-300 min-h-[400px]">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <CardTitle className="text-lg">Registro Semanal</CardTitle>
@@ -502,92 +502,99 @@ export default function VendasPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[160px]">Canal</TableHead>
-                    <TableHead className="text-center">Leads</TableHead>
-                    <TableHead className="text-center">Orçamentos</TableHead>
-                    <TableHead className="text-center">Vendas</TableHead>
-                    <TableHead className="text-center">Faturamento</TableHead>
-                    <TableHead className="text-center">Taxa Fech.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {channelTotals.map((ch) => (
-                    <TableRow key={ch.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${ch.color}`} />
-                          {ch.label}
-                        </div>
+              <div
+                className="overflow-x-auto"
+                role="region"
+                aria-label="Tabela de registro semanal"
+                tabIndex={0}
+              >
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[160px]">Canal</TableHead>
+                      <TableHead className="text-center">Leads</TableHead>
+                      <TableHead className="text-center">Orçamentos</TableHead>
+                      <TableHead className="text-center">Vendas</TableHead>
+                      <TableHead className="text-center">Faturamento</TableHead>
+                      <TableHead className="text-center">Taxa Fech.</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {channelTotals.map((ch) => (
+                      <TableRow key={ch.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${ch.color}`} />
+                            {ch.label}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="w-16 text-center h-8"
+                            value={ch.data.leads || ''}
+                            onChange={(e) => updateChannelData(ch.id, 'leads', parseInt(e.target.value) || 0)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="w-16 text-center h-8"
+                            value={ch.data.estimates || ''}
+                            onChange={(e) => updateChannelData(ch.id, 'estimates', parseInt(e.target.value) || 0)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="w-16 text-center h-8"
+                            value={ch.data.sales || ''}
+                            onChange={(e) => updateChannelData(ch.id, 'sales', parseInt(e.target.value) || 0)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="w-24 text-center h-8"
+                            value={ch.data.revenue || ''}
+                            onChange={(e) => updateChannelData(ch.id, 'revenue', parseInt(e.target.value) || 0)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-center font-medium">
+                          {ch.conversionRate}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {/* Totals Row */}
+                    <TableRow className="font-bold bg-slate-50">
+                      <TableCell>Total da Semana</TableCell>
+                      <TableCell className="text-center">
+                        {channelTotals.reduce((sum: number, ch) => sum + ch.data.leads, 0)}
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          className="w-16 text-center h-8"
-                          value={ch.data.leads || ''}
-                          onChange={(e) => updateChannelData(ch.id, 'leads', parseInt(e.target.value) || 0)}
-                        />
+                      <TableCell className="text-center">
+                        {channelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0)}
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          className="w-16 text-center h-8"
-                          value={ch.data.estimates || ''}
-                          onChange={(e) => updateChannelData(ch.id, 'estimates', parseInt(e.target.value) || 0)}
-                        />
+                      <TableCell className="text-center">
+                        {channelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0)}
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          className="w-16 text-center h-8"
-                          value={ch.data.sales || ''}
-                          onChange={(e) => updateChannelData(ch.id, 'sales', parseInt(e.target.value) || 0)}
-                        />
+                      <TableCell className="text-center">
+                        ${channelTotals.reduce((sum: number, ch) => sum + ch.data.revenue, 0).toLocaleString()}
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          className="w-24 text-center h-8"
-                          value={ch.data.revenue || ''}
-                          onChange={(e) => updateChannelData(ch.id, 'revenue', parseInt(e.target.value) || 0)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center font-medium">
-                        {ch.conversionRate}%
+                      <TableCell className="text-center">
+                        {(() => {
+                          const totalEst = channelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0);
+                          const totalSales = channelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0);
+                          return totalEst > 0 ? Math.round((totalSales / totalEst) * 100) : 0;
+                        })()}%
                       </TableCell>
                     </TableRow>
-                  ))}
-                  {/* Totals Row */}
-                  <TableRow className="font-bold bg-slate-50">
-                    <TableCell>Total da Semana</TableCell>
-                    <TableCell className="text-center">
-                      {channelTotals.reduce((sum: number, ch) => sum + ch.data.leads, 0)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {channelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {channelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      ${channelTotals.reduce((sum: number, ch) => sum + ch.data.revenue, 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {(() => {
-                        const totalEst = channelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0);
-                        const totalSales = channelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0);
-                        return totalEst > 0 ? Math.round((totalSales / totalEst) * 100) : 0;
-                      })()}%
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+              </div>
 
               <div className="flex justify-end">
                 <Button onClick={handleSaveWeek} disabled={isLoading} className="w-full sm:w-auto">
@@ -601,14 +608,20 @@ export default function VendasPage() {
       </Card>
 
       {/* Historical Data Table */}
-      <Card>
+      <Card className="w-full shadow-md border border-slate-300 min-h-[400px]">
         <CardHeader>
           <CardTitle className="text-lg">
             Histórico: {months[selectedMonth]} {selectedYear}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div
+            className="overflow-x-auto"
+            role="region"
+            aria-label="Tabela de historico mensal"
+            tabIndex={0}
+          >
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Semana</TableHead>
@@ -651,77 +664,85 @@ export default function VendasPage() {
                 })
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* Monthly Channel Report */}
-      <Card>
+      <Card className="w-full shadow-md border border-slate-300 min-h-[400px]">
         <CardHeader>
           <CardTitle className="text-lg">Relatório Mensal por Canal</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[160px]">Canal</TableHead>
-                <TableHead className="text-center">Leads</TableHead>
-                <TableHead className="text-center">Orçamentos</TableHead>
-                <TableHead className="text-center">Vendas</TableHead>
-                <TableHead className="text-center">Faturamento</TableHead>
-                <TableHead className="text-center">Taxa Fech.</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {monthlyChannelTotals.map((ch) => (
-                <TableRow key={ch.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${ch.color}`} />
-                      {ch.label}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">{ch.data.leads}</TableCell>
-                  <TableCell className="text-center">{ch.data.estimates}</TableCell>
-                  <TableCell className="text-center">{ch.data.sales}</TableCell>
+          <div
+            className="overflow-x-auto"
+            role="region"
+            aria-label="Tabela de relatorio mensal por canal"
+            tabIndex={0}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[160px]">Canal</TableHead>
+                  <TableHead className="text-center">Leads</TableHead>
+                  <TableHead className="text-center">Orçamentos</TableHead>
+                  <TableHead className="text-center">Vendas</TableHead>
+                  <TableHead className="text-center">Faturamento</TableHead>
+                  <TableHead className="text-center">Taxa Fech.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {monthlyChannelTotals.map((ch) => (
+                  <TableRow key={ch.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${ch.color}`} />
+                        {ch.label}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">{ch.data.leads}</TableCell>
+                    <TableCell className="text-center">{ch.data.estimates}</TableCell>
+                    <TableCell className="text-center">{ch.data.sales}</TableCell>
+                    <TableCell className="text-center">
+                      ${ch.data.revenue.toLocaleString('en-US')}
+                    </TableCell>
+                    <TableCell className="text-center font-medium">
+                      {ch.conversionRate}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {/* Totals Row */}
+                <TableRow className="font-bold bg-slate-50">
+                  <TableCell>Total do Mês</TableCell>
                   <TableCell className="text-center">
-                    ${ch.data.revenue.toLocaleString('en-US')}
+                    {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.leads, 0)}
                   </TableCell>
-                  <TableCell className="text-center font-medium">
-                    {ch.conversionRate}%
+                  <TableCell className="text-center">
+                    {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    ${monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.revenue, 0).toLocaleString('en-US')}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(() => {
+                      const totalEst = monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0);
+                      const totalSales = monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0);
+                      return totalEst > 0 ? Math.round((totalSales / totalEst) * 100) : 0;
+                    })()}%
                   </TableCell>
                 </TableRow>
-              ))}
-              {/* Totals Row */}
-              <TableRow className="font-bold bg-slate-50">
-                <TableCell>Total do Mês</TableCell>
-                <TableCell className="text-center">
-                  {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.leads, 0)}
-                </TableCell>
-                <TableCell className="text-center">
-                  {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0)}
-                </TableCell>
-                <TableCell className="text-center">
-                  {monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0)}
-                </TableCell>
-                <TableCell className="text-center">
-                  ${monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.revenue, 0).toLocaleString('en-US')}
-                </TableCell>
-                <TableCell className="text-center">
-                  {(() => {
-                    const totalEst = monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.estimates, 0);
-                    const totalSales = monthlyChannelTotals.reduce((sum: number, ch) => sum + ch.data.sales, 0);
-                    return totalEst > 0 ? Math.round((totalSales / totalEst) * 100) : 0;
-                  })()}%
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* Weekly Goals Reference */}
-      <Card className="bg-slate-50">
+      <Card className="bg-slate-50 shadow-sm border border-slate-200">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-slate-700">Metas Semanais</h3>

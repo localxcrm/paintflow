@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,10 +22,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { DollarSign, Percent, Building, Save, Megaphone, Trash2, Plus, Users, UserPlus, Loader2, ImageIcon, Upload, X, Home, Pencil, FileText, Star, Copy, Clock } from 'lucide-react';
+import { DollarSign, Percent, Building, Save, Megaphone, Trash2, Plus, Loader2, Home, Pencil, FileText, Star, Copy, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import { InviteUserDialog } from '@/components/users/invite-user-dialog';
-import { useOrganization } from '@/contexts/organization-context';
 import { RoomType, ROOM_TYPE_TYPE_LABELS, DEFAULT_SCOPE_OPTIONS } from '@/types/room-type';
 import { OSTemplate } from '@/types/os-template';
 
@@ -48,26 +45,7 @@ interface BusinessSettings {
     marketingChannels: MarketingChannel[];
 }
 
-interface OrgUser {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    orgRole: string;
-    isActive: boolean;
-    createdAt: string;
-}
-
-const roleLabels: Record<string, string> = {
-    admin: 'Administrador',
-    user: 'Usuário',
-    viewer: 'Visualizador',
-    owner: 'Proprietário',
-    member: 'Membro',
-};
-
 export default function ConfiguracoesPage() {
-    const { organization, refreshOrganization } = useOrganization();
     const [settings, setSettings] = useState<BusinessSettings>({
         companyName: 'PaintFlow Demo',
         defaultDepositPct: 30,
@@ -89,15 +67,6 @@ export default function ConfiguracoesPage() {
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    // Logo state
-    const [logoUrl, setLogoUrl] = useState('');
-    const [isSavingLogo, setIsSavingLogo] = useState(false);
-
-    // Users state
-    const [users, setUsers] = useState<OrgUser[]>([]);
-    const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-    const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-
     // Room Types state
     const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
     const [isLoadingRoomTypes, setIsLoadingRoomTypes] = useState(true);
@@ -113,20 +82,6 @@ export default function ConfiguracoesPage() {
     // OS Templates state
     const [osTemplates, setOsTemplates] = useState<OSTemplate[]>([]);
     const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
-
-    const loadUsers = useCallback(async () => {
-        try {
-            const res = await fetch('/api/users');
-            if (res.ok) {
-                const data = await res.json();
-                setUsers(data.users || []);
-            }
-        } catch (error) {
-            console.error('Error loading users:', error);
-        } finally {
-            setIsLoadingUsers(false);
-        }
-    }, []);
 
     const loadRoomTypes = useCallback(async () => {
         try {
@@ -166,10 +121,9 @@ export default function ConfiguracoesPage() {
             }
         }
 
-        loadUsers();
         loadRoomTypes();
         loadOsTemplates();
-    }, [loadUsers, loadRoomTypes, loadOsTemplates]);
+    }, [loadRoomTypes, loadOsTemplates]);
 
     const handleAddRoomType = async () => {
         if (!newRoomType.name.trim()) {
@@ -308,76 +262,6 @@ export default function ConfiguracoesPage() {
             setIsSaving(false);
             toast.success('Configurações salvas com sucesso!');
         }, 500);
-    };
-
-    const handleRemoveUser = async (userId: string) => {
-        if (!confirm('Tem certeza que deseja remover este usuário da organização?')) {
-            return;
-        }
-
-        try {
-            const res = await fetch(`/api/users?id=${userId}`, {
-                method: 'DELETE',
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || 'Erro ao remover usuário');
-            }
-
-            toast.success('Usuário removido com sucesso');
-            loadUsers();
-        } catch (error) {
-            console.error('Error removing user:', error);
-            toast.error(error instanceof Error ? error.message : 'Erro ao remover usuário');
-        }
-    };
-
-    const handleSaveLogo = async () => {
-        setIsSavingLogo(true);
-        try {
-            const res = await fetch('/api/organizations/logo', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ logo: logoUrl || null }),
-            });
-
-            if (!res.ok) {
-                throw new Error('Erro ao salvar logo');
-            }
-
-            await refreshOrganization();
-            toast.success('Logo atualizada com sucesso!');
-        } catch (error) {
-            console.error('Error saving logo:', error);
-            toast.error('Erro ao salvar logo');
-        } finally {
-            setIsSavingLogo(false);
-        }
-    };
-
-    const handleRemoveLogo = async () => {
-        setLogoUrl('');
-        setIsSavingLogo(true);
-        try {
-            const res = await fetch('/api/organizations/logo', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ logo: null }),
-            });
-
-            if (!res.ok) {
-                throw new Error('Erro ao remover logo');
-            }
-
-            await refreshOrganization();
-            toast.success('Logo removida com sucesso!');
-        } catch (error) {
-            console.error('Error removing logo:', error);
-            toast.error('Erro ao remover logo');
-        } finally {
-            setIsSavingLogo(false);
-        }
     };
 
     return (
@@ -937,13 +821,6 @@ export default function ConfiguracoesPage() {
                     {isSaving ? 'Salvando...' : 'Salvar Configurações'}
                 </Button>
             </div>
-
-            {/* Invite User Dialog */}
-            <InviteUserDialog
-                open={inviteDialogOpen}
-                onOpenChange={setInviteDialogOpen}
-                onUserCreated={loadUsers}
-            />
         </div>
     );
 }
