@@ -3,9 +3,9 @@
 
 -- Client access tokens for magic link access
 CREATE TABLE IF NOT EXISTS "ClientAccessToken" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  "jobId" UUID NOT NULL REFERENCES "Job"(id) ON DELETE CASCADE,
-  "organizationId" UUID NOT NULL REFERENCES "Organization"(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "jobId" TEXT NOT NULL REFERENCES "Job"(id) ON DELETE CASCADE,
+  "organizationId" TEXT NOT NULL REFERENCES "Organization"(id) ON DELETE CASCADE,
   token VARCHAR(100) UNIQUE NOT NULL,
   "clientEmail" VARCHAR(255) NOT NULL,
   "clientName" VARCHAR(255),
@@ -19,10 +19,10 @@ CREATE TABLE IF NOT EXISTS "ClientAccessToken" (
 
 -- Client messages (communication with admin)
 CREATE TABLE IF NOT EXISTS "ClientMessage" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "accessTokenId" UUID NOT NULL REFERENCES "ClientAccessToken"(id) ON DELETE CASCADE,
-  "jobId" UUID NOT NULL REFERENCES "Job"(id) ON DELETE CASCADE,
-  "organizationId" UUID NOT NULL REFERENCES "Organization"(id) ON DELETE CASCADE,
+  "jobId" TEXT NOT NULL REFERENCES "Job"(id) ON DELETE CASCADE,
+  "organizationId" TEXT NOT NULL REFERENCES "Organization"(id) ON DELETE CASCADE,
   "authorType" TEXT NOT NULL CHECK ("authorType" IN ('client', 'admin')),
   "authorName" TEXT NOT NULL,
   message TEXT NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS "ClientMessage" (
 
 -- Client viewed photos (track what they've seen)
 CREATE TABLE IF NOT EXISTS "ClientPhotoView" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "accessTokenId" UUID NOT NULL REFERENCES "ClientAccessToken"(id) ON DELETE CASCADE,
   "photoId" UUID NOT NULL,
   "viewedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

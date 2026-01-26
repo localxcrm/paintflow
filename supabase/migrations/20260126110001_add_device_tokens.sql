@@ -2,10 +2,10 @@
 -- Run: supabase db push
 
 CREATE TABLE IF NOT EXISTS "DeviceToken" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "userId" UUID,
-  "subcontractorId" UUID REFERENCES "Subcontractor"(id) ON DELETE CASCADE,
-  "organizationId" UUID REFERENCES "Organization"(id) ON DELETE CASCADE,
+  "subcontractorId" TEXT REFERENCES "Subcontractor"(id) ON DELETE CASCADE,
+  "organizationId" TEXT REFERENCES "Organization"(id) ON DELETE CASCADE,
   token TEXT NOT NULL,
   platform TEXT NOT NULL CHECK (platform IN ('ios', 'android', 'web')),
   "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -35,7 +35,7 @@ CREATE POLICY "Admins can view org tokens" ON "DeviceToken"
 
 -- Add notification history table
 CREATE TABLE IF NOT EXISTS "PushNotificationLog" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "deviceTokenId" UUID REFERENCES "DeviceToken"(id) ON DELETE SET NULL,
   "recipientType" TEXT NOT NULL CHECK ("recipientType" IN ('admin', 'sub')),
   "recipientId" UUID NOT NULL,

@@ -3,25 +3,25 @@
 
 -- Schedule entry for a job (when the job is scheduled)
 CREATE TABLE IF NOT EXISTS "JobSchedule" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  "jobId" UUID NOT NULL REFERENCES "Job"(id) ON DELETE CASCADE,
-  "organizationId" UUID NOT NULL REFERENCES "Organization"(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "jobId" TEXT NOT NULL REFERENCES "Job"(id) ON DELETE CASCADE,
+  "organizationId" TEXT NOT NULL REFERENCES "Organization"(id) ON DELETE CASCADE,
   "scheduledDate" DATE NOT NULL,
   "startTime" TIME,
   "endTime" TIME,
   "estimatedHours" DECIMAL(5,2),
   notes TEXT,
-  "createdBy" UUID REFERENCES "User"(id) ON DELETE SET NULL,
+  "createdBy" TEXT REFERENCES "User"(id) ON DELETE SET NULL,
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Assign subcontractors to specific schedule dates
 CREATE TABLE IF NOT EXISTS "JobAssignment" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "jobScheduleId" UUID NOT NULL REFERENCES "JobSchedule"(id) ON DELETE CASCADE,
-  "subcontractorId" UUID NOT NULL REFERENCES "Subcontractor"(id) ON DELETE CASCADE,
-  "organizationId" UUID NOT NULL REFERENCES "Organization"(id) ON DELETE CASCADE,
+  "subcontractorId" TEXT NOT NULL REFERENCES "Subcontractor"(id) ON DELETE CASCADE,
+  "organizationId" TEXT NOT NULL REFERENCES "Organization"(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'assigned' CHECK (status IN ('assigned', 'confirmed', 'in_progress', 'completed', 'cancelled')),
   "assignedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "confirmedAt" TIMESTAMP WITH TIME ZONE,
